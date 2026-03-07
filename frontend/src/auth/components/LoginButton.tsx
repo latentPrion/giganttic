@@ -16,6 +16,7 @@ import { AuthStatusDialog } from "./AuthStatusDialog.js";
 interface LoginButtonProps {
   isBusy: boolean;
   onLogin(payload: LoginRequest): Promise<void>;
+  triggerButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 interface LoginFormState {
@@ -54,7 +55,11 @@ function toLoginPayload(formState: LoginFormState): LoginRequest {
   };
 }
 
-export function LoginButton({ isBusy, onLogin }: LoginButtonProps) {
+export function LoginButton({
+  isBusy,
+  onLogin,
+  triggerButtonRef,
+}: LoginButtonProps) {
   const [formState, setFormState] = useState<LoginFormState>(DEFAULT_FORM_STATE);
   const [feedbackState, setFeedbackState] = useState<FeedbackState>(DEFAULT_FEEDBACK_STATE);
   const [isOpen, setIsOpen] = useState(false);
@@ -129,7 +134,7 @@ export function LoginButton({ isBusy, onLogin }: LoginButtonProps) {
 
   return (
     <>
-      <Button onClick={openDialog} variant="outlined">
+      <Button onClick={openDialog} ref={triggerButtonRef} variant="outlined">
         {LOGIN_BUTTON_LABEL}
       </Button>
       <Dialog

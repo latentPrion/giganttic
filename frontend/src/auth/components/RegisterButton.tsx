@@ -16,6 +16,7 @@ import { AuthStatusDialog } from "./AuthStatusDialog.js";
 interface RegisterButtonProps {
   isBusy: boolean;
   onRegister(payload: RegisterRequest): Promise<void>;
+  successReturnFocusRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 interface RegisterFormState {
@@ -62,7 +63,11 @@ function toRegisterPayload(formState: RegisterFormState): RegisterRequest {
   };
 }
 
-export function RegisterButton({ isBusy, onRegister }: RegisterButtonProps) {
+export function RegisterButton({
+  isBusy,
+  onRegister,
+  successReturnFocusRef,
+}: RegisterButtonProps) {
   const [formState, setFormState] = useState<RegisterFormState>(DEFAULT_FORM_STATE);
   const [feedbackState, setFeedbackState] = useState<FeedbackState>(DEFAULT_FEEDBACK_STATE);
   const [isOpen, setIsOpen] = useState(false);
@@ -122,6 +127,9 @@ export function RegisterButton({ isBusy, onRegister }: RegisterButtonProps) {
 
   function closeFeedbackDialog(): void {
     setFeedbackState(DEFAULT_FEEDBACK_STATE);
+    window.setTimeout(() => {
+      successReturnFocusRef?.current?.focus();
+    }, 0);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>): void {

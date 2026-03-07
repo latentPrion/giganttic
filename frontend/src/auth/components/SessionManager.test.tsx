@@ -28,6 +28,31 @@ vi.mock("../storage/auth-token-storage.js", () => ({
 
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
+const LOGIN_DIALOG_NAME = "Login";
+const REGISTER_DIALOG_NAME = "Register";
+const LOGIN_FAILURE_DIALOG_NAME = "Login Failed";
+const REGISTRATION_SUCCESS_DIALOG_NAME = "Registration Succeeded";
+const REGISTRATION_FAILURE_DIALOG_NAME = "Registration Failed";
+const SESSION_ERROR_DIALOG_NAME = "Session Error";
+const USERNAME_LABEL = "Username";
+const EMAIL_LABEL = "Email";
+const PASSWORD_LABEL = "Password";
+const LOGIN_BUTTON_LABEL = "Login";
+const REGISTER_BUTTON_LABEL = "Register";
+const MENU_BUTTON_LABEL = "Menu";
+const LOG_IN_BUTTON_LABEL = "Log In";
+const CREATE_ACCOUNT_BUTTON_LABEL = "Create Account";
+const CLOSE_BUTTON_LABEL = "Close";
+const CANCEL_BUTTON_LABEL = "Cancel";
+const LOGOUT_MENU_LABEL = "Logout";
+const INVALID_USERNAME_OR_PASSWORD = "Invalid username or password";
+const INVALID_OR_EXPIRED_SESSION = "Invalid or expired session";
+const USERNAME_ALREADY_EXISTS = "Username already exists";
+const LOGIN_FAILED_FALLBACK = "Login failed.";
+const REGISTRATION_FAILED_FALLBACK = "Registration failed.";
+const SESSION_FAILED_FALLBACK = "Unable to load the current session.";
+const REGISTRATION_SUCCEEDED_MESSAGE =
+  "Registration succeeded. You can now log in.";
 
 function createAuthenticatedResponse(roles: string[] = []) {
   return {
@@ -47,6 +72,47 @@ function createAuthenticatedResponse(roles: string[] = []) {
       username: "demo-user",
     },
   };
+}
+
+function createLoginResponse(roles: string[] = []) {
+  return {
+    accessToken: "fresh-token",
+    ...createAuthenticatedResponse(roles),
+    tokenType: "Bearer" as const,
+  };
+}
+
+async function openLoginDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL }));
+}
+
+async function openRegisterDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: REGISTER_BUTTON_LABEL }));
+}
+
+async function fillLoginForm(
+  user: ReturnType<typeof userEvent.setup>,
+  values: { password: string; username: string },
+) {
+  await user.type(screen.getByLabelText(USERNAME_LABEL), values.username);
+  await user.type(screen.getByLabelText(PASSWORD_LABEL), values.password);
+}
+
+async function fillRegisterForm(
+  user: ReturnType<typeof userEvent.setup>,
+  values: { email: string; password: string; username: string },
+) {
+  await user.type(screen.getByLabelText(USERNAME_LABEL), values.username);
+  await user.type(screen.getByLabelText(EMAIL_LABEL), values.email);
+  await user.type(screen.getByLabelText(PASSWORD_LABEL), values.password);
+}
+
+async function expectDialogToClose(dialogName: string) {
+  await waitFor(() => {
+    expect(
+      screen.queryByRole("dialog", { name: dialogName }),
+    ).not.toBeInTheDocument();
+  });
 }
 
 describe("SessionManager", () => {
@@ -76,8 +142,8 @@ describe("SessionManager", () => {
   it("renders logged-out controls when no session exists", async () => {
     renderWithTheme(<SessionManager />);
 
-    expect(await screen.findByRole("button", { name: "Login" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Register" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(screen.getByRole("button", { name: REGISTER_BUTTON_LABEL })).toBeVisible();
   });
 
   it("renders the authenticated username when session lookup succeeds", async () => {
@@ -87,23 +153,18 @@ describe("SessionManager", () => {
     renderWithTheme(<SessionManager />);
 
     expect(await screen.findByText("demo-user")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Menu" })).toBeVisible();
+    expect(screen.getByRole("button", { name: MENU_BUTTON_LABEL })).toBeVisible();
   });
 
   it("logs in through the modal and stores the returned token", async () => {
     const user = userEvent.setup();
-    authApiMock.login.mockResolvedValue({
-      accessToken: "fresh-token",
-      ...createAuthenticatedResponse(),
-      tokenType: "Bearer",
-    });
+    authApiMock.login.mockResolvedValue(createLoginResponse());
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Login" }));
-    await user.type(screen.getByLabelText("Username"), "demo-user");
-    await user.type(screen.getByLabelText("Password"), "secret");
-    await user.click(screen.getByRole("button", { name: "Log In" }));
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "secret", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
 
     await waitFor(() => {
       expect(authApiMock.login).toHaveBeenCalledWith({
@@ -120,10 +181,10 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Login" }));
+    await openLoginDialog(user);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Username")).toHaveFocus();
+      expect(screen.getByLabelText(USERNAME_LABEL)).toHaveFocus();
     });
   });
 
@@ -138,37 +199,31 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Login" }));
-    await user.type(screen.getByLabelText("Username"), "demo-user");
-    await user.type(screen.getByLabelText("Password"), "wrong");
-    await user.click(screen.getByRole("button", { name: "Log In" }));
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "wrong", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
 
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: "Login" }),
-      ).not.toBeInTheDocument();
-    });
+    await expectDialogToClose(LOGIN_DIALOG_NAME);
     expect(
-      await screen.findByRole("dialog", { name: "Login Failed" }),
+      await screen.findByRole("dialog", { name: LOGIN_FAILURE_DIALOG_NAME }),
     ).toBeVisible();
     expect(
-      screen.getByText("Invalid username or password"),
+      screen.getByText(INVALID_USERNAME_OR_PASSWORD),
     ).toBeVisible();
   });
 
   it("submits the login form when Enter is pressed", async () => {
     const user = userEvent.setup();
     authApiMock.login.mockResolvedValue({
+      ...createLoginResponse(),
       accessToken: "enter-token",
-      ...createAuthenticatedResponse(),
-      tokenType: "Bearer",
     });
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Login" }));
-    await user.type(screen.getByLabelText("Username"), "demo-user");
-    await user.type(screen.getByLabelText("Password"), "secret{Enter}");
+    await openLoginDialog(user);
+    await user.type(screen.getByLabelText(USERNAME_LABEL), "demo-user");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret{Enter}");
 
     await waitFor(() => {
       expect(authApiMock.login).toHaveBeenCalledWith({
@@ -177,6 +232,108 @@ describe("SessionManager", () => {
       });
     });
     expect(await screen.findByText("demo-user")).toBeVisible();
+  });
+
+  it("submits login failure by Enter into a failure modal", async () => {
+    const user = userEvent.setup();
+    authApiMock.login.mockRejectedValue(
+      new ApiError("http", "HTTP 401", {
+        responseBody: INVALID_USERNAME_OR_PASSWORD,
+        status: 401,
+      }),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await user.type(screen.getByLabelText(USERNAME_LABEL), "demo-user");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "wrong{Enter}");
+
+    expect(
+      await screen.findByRole("dialog", { name: LOGIN_FAILURE_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(INVALID_USERNAME_OR_PASSWORD)).toBeVisible();
+  });
+
+  it("resets the login form when cancel is pressed", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "secret", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: CANCEL_BUTTON_LABEL }));
+
+    await openLoginDialog(user);
+
+    expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+  });
+
+  it("closes the login dialog when Escape is pressed", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await user.keyboard("{Escape}");
+
+    await expectDialogToClose(LOGIN_DIALOG_NAME);
+  });
+
+  it("closes the failure dialog when Escape is pressed", async () => {
+    const user = userEvent.setup();
+    authApiMock.login.mockRejectedValue(new Error("boom"));
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "wrong", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
+
+    expect(
+      await screen.findByRole("dialog", { name: LOGIN_FAILURE_DIALOG_NAME }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+
+    await expectDialogToClose(LOGIN_FAILURE_DIALOG_NAME);
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toHaveFocus();
+  });
+
+  it("reopens login with a clean form after a prior failure dialog is dismissed", async () => {
+    const user = userEvent.setup();
+    authApiMock.login.mockRejectedValue(new Error("boom"));
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "wrong", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
+    await user.click(
+      await screen.findByRole("button", { name: CLOSE_BUTTON_LABEL }),
+    );
+
+    await openLoginDialog(user);
+
+    expect(screen.queryByRole("dialog", { name: LOGIN_FAILURE_DIALOG_NAME })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+  });
+
+  it("shows the fallback login failure message for network errors", async () => {
+    const user = userEvent.setup();
+    authApiMock.login.mockRejectedValue(new ApiError("network", "Network request failed"));
+
+    renderWithTheme(<SessionManager />);
+
+    await openLoginDialog(user);
+    await fillLoginForm(user, { password: "secret", username: "demo-user" });
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
+
+    expect(
+      await screen.findByRole("dialog", { name: LOGIN_FAILURE_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(LOGIN_FAILED_FALLBACK)).toBeVisible();
   });
 
   it("registers through the modal and returns to logged-out state", async () => {
@@ -192,11 +349,13 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Register" }));
-    await user.type(screen.getByLabelText("Username"), "new-user");
-    await user.type(screen.getByLabelText("Email"), "new@example.com");
-    await user.type(screen.getByLabelText("Password"), "secret");
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await openRegisterDialog(user);
+    await fillRegisterForm(user, {
+      email: "new@example.com",
+      password: "secret",
+      username: "new-user",
+    });
+    await user.click(screen.getByRole("button", { name: CREATE_ACCOUNT_BUTTON_LABEL }));
 
     await waitFor(() => {
       expect(authApiMock.register).toHaveBeenCalledWith({
@@ -205,19 +364,16 @@ describe("SessionManager", () => {
         username: "new-user",
       });
     });
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: "Register" }),
-      ).not.toBeInTheDocument();
-    });
+    await expectDialogToClose(REGISTER_DIALOG_NAME);
     expect(
-      await screen.findByRole("dialog", { name: "Registration Succeeded" }),
+      await screen.findByRole("dialog", { name: REGISTRATION_SUCCESS_DIALOG_NAME }),
     ).toBeVisible();
     expect(
-      screen.getByText("Registration succeeded. You can now log in."),
+      screen.getByText(REGISTRATION_SUCCEEDED_MESSAGE),
     ).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Close" }));
-    expect(await screen.findByRole("button", { name: "Login" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: CLOSE_BUTTON_LABEL }));
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL })).toHaveFocus();
   });
 
   it("focuses the first registration field when the register modal opens", async () => {
@@ -225,10 +381,10 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Register" }));
+    await openRegisterDialog(user);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Username")).toHaveFocus();
+      expect(screen.getByLabelText(USERNAME_LABEL)).toHaveFocus();
     });
   });
 
@@ -245,10 +401,10 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Register" }));
-    await user.type(screen.getByLabelText("Username"), "enter-user");
-    await user.type(screen.getByLabelText("Email"), "enter@example.com");
-    await user.type(screen.getByLabelText("Password"), "secret{Enter}");
+    await openRegisterDialog(user);
+    await user.type(screen.getByLabelText(USERNAME_LABEL), "enter-user");
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "enter@example.com");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret{Enter}");
 
     await waitFor(() => {
       expect(authApiMock.register).toHaveBeenCalledWith({
@@ -258,7 +414,7 @@ describe("SessionManager", () => {
       });
     });
     expect(
-      await screen.findByRole("dialog", { name: "Registration Succeeded" }),
+      await screen.findByRole("dialog", { name: REGISTRATION_SUCCESS_DIALOG_NAME }),
     ).toBeVisible();
   });
 
@@ -273,21 +429,119 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Register" }));
-    await user.type(screen.getByLabelText("Username"), "taken-user");
-    await user.type(screen.getByLabelText("Email"), "taken@example.com");
-    await user.type(screen.getByLabelText("Password"), "secret");
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
-
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: "Register" }),
-      ).not.toBeInTheDocument();
+    await openRegisterDialog(user);
+    await fillRegisterForm(user, {
+      email: "taken@example.com",
+      password: "secret",
+      username: "taken-user",
     });
+    await user.click(screen.getByRole("button", { name: CREATE_ACCOUNT_BUTTON_LABEL }));
+
+    await expectDialogToClose(REGISTER_DIALOG_NAME);
     expect(
-      await screen.findByRole("dialog", { name: "Registration Failed" }),
+      await screen.findByRole("dialog", { name: REGISTRATION_FAILURE_DIALOG_NAME }),
     ).toBeVisible();
-    expect(screen.getByText("Username already exists")).toBeVisible();
+    expect(screen.getByText(USERNAME_ALREADY_EXISTS)).toBeVisible();
+  });
+
+  it("submits registration failure by Enter into a failure modal", async () => {
+    const user = userEvent.setup();
+    authApiMock.register.mockRejectedValue(
+      new ApiError("http", "HTTP 409", {
+        responseBody: USERNAME_ALREADY_EXISTS,
+        status: 409,
+      }),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    await openRegisterDialog(user);
+    await user.type(screen.getByLabelText(USERNAME_LABEL), "taken-user");
+    await user.type(screen.getByLabelText(EMAIL_LABEL), "taken@example.com");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret{Enter}");
+
+    expect(
+      await screen.findByRole("dialog", { name: REGISTRATION_FAILURE_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(USERNAME_ALREADY_EXISTS)).toBeVisible();
+  });
+
+  it("resets the registration form when cancel is pressed", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<SessionManager />);
+
+    await openRegisterDialog(user);
+    await fillRegisterForm(user, {
+      email: "user@example.com",
+      password: "secret",
+      username: "demo-user",
+    });
+    await user.click(screen.getByRole("button", { name: CANCEL_BUTTON_LABEL }));
+
+    await openRegisterDialog(user);
+
+    expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(EMAIL_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+  });
+
+  it("closes the registration dialog when Escape is pressed", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<SessionManager />);
+
+    await openRegisterDialog(user);
+    await user.keyboard("{Escape}");
+
+    await expectDialogToClose(REGISTER_DIALOG_NAME);
+  });
+
+  it("reopens registration with a clean form after a prior failure dialog is dismissed", async () => {
+    const user = userEvent.setup();
+    authApiMock.register.mockRejectedValue(new Error("boom"));
+
+    renderWithTheme(<SessionManager />);
+
+    await openRegisterDialog(user);
+    await fillRegisterForm(user, {
+      email: "user@example.com",
+      password: "secret",
+      username: "demo-user",
+    });
+    await user.click(screen.getByRole("button", { name: CREATE_ACCOUNT_BUTTON_LABEL }));
+    await user.click(
+      await screen.findByRole("button", { name: CLOSE_BUTTON_LABEL }),
+    );
+
+    await openRegisterDialog(user);
+
+    expect(screen.queryByRole("dialog", { name: REGISTRATION_FAILURE_DIALOG_NAME })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(EMAIL_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+  });
+
+  it("shows the fallback registration failure message for network errors", async () => {
+    const user = userEvent.setup();
+    authApiMock.register.mockRejectedValue(
+      new ApiError("network", "Network request failed"),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    await openRegisterDialog(user);
+    await fillRegisterForm(user, {
+      email: "user@example.com",
+      password: "secret",
+      username: "demo-user",
+    });
+    await user.click(screen.getByRole("button", { name: CREATE_ACCOUNT_BUTTON_LABEL }));
+
+    expect(
+      await screen.findByRole("dialog", { name: REGISTRATION_FAILURE_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(REGISTRATION_FAILED_FALLBACK)).toBeVisible();
   });
 
   it("shows session lookup failures in a modal", async () => {
@@ -302,9 +556,70 @@ describe("SessionManager", () => {
     renderWithTheme(<SessionManager />);
 
     expect(
-      await screen.findByRole("dialog", { name: "Session Error" }),
+      await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
     ).toBeVisible();
-    expect(screen.getByText("Invalid or expired session")).toBeVisible();
+    expect(screen.getByText(INVALID_OR_EXPIRED_SESSION)).toBeVisible();
+  });
+
+  it("dismisses the session error modal back to anonymous state", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockRejectedValue(
+      new ApiError("http", "HTTP 401", {
+        responseBody: INVALID_OR_EXPIRED_SESSION,
+        status: 401,
+      }),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    await user.click(await screen.findByRole("button", { name: CLOSE_BUTTON_LABEL }));
+
+    await expectDialogToClose(SESSION_ERROR_DIALOG_NAME);
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+  });
+
+  it("shows the fallback session error message for network failures", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockRejectedValue(
+      new ApiError("network", "Network request failed"),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    expect(
+      await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(SESSION_FAILED_FALLBACK)).toBeVisible();
+  });
+
+  it("shows the fallback session error message for malformed validated responses", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockRejectedValue(
+      new ApiError("validation", "Response payload failed validation"),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    expect(
+      await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
+    ).toBeVisible();
+    expect(screen.getByText(SESSION_FAILED_FALLBACK)).toBeVisible();
+  });
+
+  it("clears the stored token when persisted session lookup fails", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockRejectedValue(
+      new ApiError("http", "HTTP 401", {
+        responseBody: INVALID_OR_EXPIRED_SESSION,
+        status: 401,
+      }),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    expect(await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME })).toBeVisible();
+    expect(authTokenStorageMock.clear).toHaveBeenCalled();
   });
 
   it("clears local auth state on logout", async () => {
@@ -317,8 +632,8 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Menu" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Logout" }));
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
+    await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
 
     await waitFor(() => {
       expect(authApiMock.revokeCurrentSession).toHaveBeenCalledWith(
@@ -327,7 +642,62 @@ describe("SessionManager", () => {
       );
     });
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: "Login" })).toBeVisible();
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+  });
+
+  it("clears local auth state even when revoke fails", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+    authApiMock.revokeCurrentSession.mockRejectedValue(new Error("revoke failed"));
+
+    renderWithTheme(<SessionManager />);
+
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
+    await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
+
+    expect(authTokenStorageMock.clear).toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+  });
+
+  it("closes the menu after logout is triggered", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(
+      createAuthenticatedResponse(),
+    );
+    authApiMock.revokeCurrentSession.mockResolvedValue({
+      revokedSessionIds: ["session-1"],
+    });
+
+    renderWithTheme(<SessionManager />);
+
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
+    await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
+
+    expect(screen.queryByRole("menuitem", { name: LOGOUT_MENU_LABEL })).not.toBeInTheDocument();
+  });
+
+  it("supports keyboard navigation to open the menu and activate logout", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+    authApiMock.revokeCurrentSession.mockResolvedValue({
+      revokedSessionIds: ["session-1"],
+    });
+
+    renderWithTheme(<SessionManager />);
+
+    const menuButton = await screen.findByRole("button", { name: MENU_BUTTON_LABEL });
+    menuButton.focus();
+    expect(menuButton).toHaveFocus();
+    await user.keyboard("{Enter}");
+    const logoutMenuItem = await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL });
+    expect(logoutMenuItem).toBeVisible();
+    logoutMenuItem.focus();
+    expect(logoutMenuItem).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
   });
 
   it("shows the project management menu only for project managers", async () => {
@@ -339,7 +709,7 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Menu" }));
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
     expect(await screen.findByRole("menuitem", { name: "Project Management Menu" })).toBeVisible();
     expect(screen.queryByRole("menuitem", { name: "Admin Menu" })).not.toBeInTheDocument();
@@ -354,11 +724,43 @@ describe("SessionManager", () => {
 
     renderWithTheme(<SessionManager />);
 
-    await user.click(await screen.findByRole("button", { name: "Menu" }));
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
     expect(await screen.findByRole("menuitem", { name: "Admin Menu" })).toBeVisible();
     expect(
       screen.queryByRole("menuitem", { name: "Project Management Menu" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows both role-based menu items when the user has both roles", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(
+      createAuthenticatedResponse([
+        "GGTT_ROLE_PROJECT_MANAGER",
+        "GGTT_ROLE_ADMIN",
+      ]),
+    );
+
+    renderWithTheme(<SessionManager />);
+
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
+
+    expect(await screen.findByRole("menuitem", { name: "Project Management Menu" })).toBeVisible();
+    expect(await screen.findByRole("menuitem", { name: "Admin Menu" })).toBeVisible();
+  });
+
+  it("shows only logout when the user has no roles", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse([]));
+
+    renderWithTheme(<SessionManager />);
+
+    await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
+
+    expect(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Project Management Menu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Admin Menu" })).not.toBeInTheDocument();
   });
 });

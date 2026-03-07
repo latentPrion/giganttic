@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Stack } from "@mui/material";
 
 import type {
@@ -17,10 +17,20 @@ interface LoggedOutSessionManagerProps {
 export function LoggedOutSessionManager(
   props: LoggedOutSessionManagerProps,
 ) {
+  const loginButtonReference = useRef<HTMLButtonElement | null>(null);
+
   return (
     <Stack direction="row" spacing={1.5}>
-      <LoginButton isBusy={props.isBusy} onLogin={props.onLogin} />
-      <RegisterButton isBusy={props.isBusy} onRegister={props.onRegister} />
+      <LoginButton
+        isBusy={props.isBusy}
+        onLogin={props.onLogin}
+        triggerButtonRef={loginButtonReference}
+      />
+      <RegisterButton
+        isBusy={props.isBusy}
+        onRegister={props.onRegister}
+        successReturnFocusRef={loginButtonReference}
+      />
     </Stack>
   );
 }
