@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
-import { users, usersSessions } from "../db/index.js";
+import { users, usersRoles, usersSessions } from "../db/index.js";
 
 describe("backend auth api", () => {
   let app: NestFastifyApplication;
@@ -149,6 +149,40 @@ describe("backend auth api", () => {
     expect(meResponse.statusCode).toBe(200);
     expect(meBody.user.username).toBe("testadminuser");
     expect(meBody.user.roles).toContain("GGTT_ROLE_ADMIN");
+  });
+
+  it("stores plain IPv6 unchanged and uses the first forwarded IP when proxies are present", async () => {
+    const ipv6Login = await loginAs("testnoroleuser", {
+      headers: {
+        "x-forwarded-for": "2001:db8::1",
+      },
+    });
+    expect(ipv6Login.session.ipAddress).toBe("2001:db8::1");
+
+    const proxiedLogin = await loginAs("testnoroleuser", {
+      headers: {
+        "x-forwarded-for": "198.51.100.10, 10.0.0.1, 10.0.0.2",
+      },
+    });
+    expect(proxiedLogin.session.ipAddress).toBe("198.51.100.10");
+  });
+
+  it("stores only a session token hash in the database", async () => {
+    const loginBody = await loginAs("testadminuser");
+
+    const sessionRow = databaseService.db
+      .select({
+        id: usersSessions.id,
+        sessionTokenHash: usersSessions.sessionTokenHash,
+      })
+      .from(usersSessions)
+      .where(eq(usersSessions.id, loginBody.session.id))
+      .get();
+
+    expect(sessionRow).toBeDefined();
+    expect(sessionRow?.sessionTokenHash).toBeTruthy();
+    expect(sessionRow?.sessionTokenHash).not.toBe(loginBody.accessToken);
+    expect(sessionRow?.sessionTokenHash).not.toContain(loginBody.accessToken);
   });
 
   it("rejects unknown users and invalid passwords", async () => {
@@ -313,6 +347,29 @@ describe("backend auth api", () => {
     ).toBe(true);
   });
 
+  it("lists sessions newest-first for a user", async () => {
+    const firstLogin = await loginAs("testnoroleuser");
+    const secondLogin = await loginAs("testnoroleuser");
+
+    const sessionsResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${secondLogin.accessToken}`,
+      },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/auth/session?userId=${secondLogin.user.id}`,
+    });
+    const sessionsBody = parseJson<{
+      sessions: Array<{ id: string; startTimestamp: string }>;
+    }>(sessionsResponse.payload);
+
+    expect(sessionsResponse.statusCode).toBe(200);
+    expect(sessionsBody.sessions[0]?.id).toBe(secondLogin.session.id);
+    expect(sessionsBody.sessions.findIndex((session) => session.id === secondLogin.session.id))
+      .toBeLessThan(
+        sessionsBody.sessions.findIndex((session) => session.id === firstLogin.session.id),
+      );
+  });
+
   it("revokes the current session and prevents further use", async () => {
     const loginBody = await loginAs("testnoroleuser");
 
@@ -378,6 +435,68 @@ describe("backend auth api", () => {
     expect(adminRevokeBody.revokedSessionIds).toContain(noRoleLogin.session.id);
   });
 
+  it("revokes only the targeted session when a user has multiple active sessions", async () => {
+    const firstSession = await loginAs("testnoroleuser");
+    const secondSession = await loginAs("testnoroleuser");
+
+    const revokeResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${secondSession.accessToken}`,
+      },
+      method: "POST",
+      payload: {
+        sessionIds: [firstSession.session.id],
+      },
+      url: "/stc-proj-mgmt/api/auth/session/revoke",
+    });
+
+    expect(revokeResponse.statusCode).toBe(201);
+
+    const revokedMe = await app.inject({
+      headers: {
+        authorization: `Bearer ${firstSession.accessToken}`,
+      },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(revokedMe.statusCode).toBe(401);
+
+    const activeMe = await app.inject({
+      headers: {
+        authorization: `Bearer ${secondSession.accessToken}`,
+      },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(activeMe.statusCode).toBe(200);
+  });
+
+  it("allows an admin to revoke the current session and treats it like logout", async () => {
+    const adminLogin = await loginAs("testadminuser");
+
+    const revokeResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${adminLogin.accessToken}`,
+      },
+      method: "POST",
+      payload: {
+        sessionIds: [adminLogin.session.id],
+      },
+      url: "/stc-proj-mgmt/api/auth/session/revoke",
+    });
+
+    expect(revokeResponse.statusCode).toBe(201);
+
+    const meResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${adminLogin.accessToken}`,
+      },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(meResponse.statusCode).toBe(401);
+  });
+
   it("rejects mixed owned and unowned revocations for non-admin users", async () => {
     const adminLogin = await loginAs("testadminuser");
     const noRoleLogin = await loginAs("testnoroleuser");
@@ -424,6 +543,50 @@ describe("backend auth api", () => {
 
     expect(revokeResponse.statusCode).toBe(201);
     expect(revokeBody.revokedSessionIds).toEqual([]);
+  });
+
+  it("handles duplicate and mixed revoke ids without affecting unrelated active sessions", async () => {
+    const loginBody = await loginAs("testnoroleuser");
+    const otherSession = await loginAs("testnoroleuser");
+
+    const revokeResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${otherSession.accessToken}`,
+      },
+      method: "POST",
+      payload: {
+        sessionIds: [
+          loginBody.session.id,
+          loginBody.session.id,
+          "missing-session-id",
+        ],
+      },
+      url: "/stc-proj-mgmt/api/auth/session/revoke",
+    });
+    const revokeBody = parseJson<{ revokedSessionIds: string[] }>(
+      revokeResponse.payload,
+    );
+
+    expect(revokeResponse.statusCode).toBe(201);
+    expect(revokeBody.revokedSessionIds).toEqual([loginBody.session.id]);
+
+    const revokedMe = await app.inject({
+      headers: {
+        authorization: `Bearer ${loginBody.accessToken}`,
+      },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(revokedMe.statusCode).toBe(401);
+
+    const stillActiveMe = await app.inject({
+      headers: {
+        authorization: `Bearer ${otherSession.accessToken}`,
+      },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(stillActiveMe.statusCode).toBe(200);
   });
 
   it("excludes expired sessions from the active session list", async () => {
@@ -551,6 +714,20 @@ describe("backend auth api", () => {
 
     expect(adminRows).toHaveLength(1);
     expect(noRoleRows).toHaveLength(1);
+
+    const adminRoles = databaseService.db
+      .select({ roleCode: usersRoles.roleCode })
+      .from(usersRoles)
+      .where(eq(usersRoles.userId, adminRows[0]!.id))
+      .all();
+    const noRoleUserRoles = databaseService.db
+      .select({ roleCode: usersRoles.roleCode })
+      .from(usersRoles)
+      .where(eq(usersRoles.userId, noRoleRows[0]!.id))
+      .all();
+
+    expect(adminRoles.map((row) => row.roleCode)).toEqual(["GGTT_ROLE_ADMIN"]);
+    expect(noRoleUserRoles).toEqual([]);
 
     const loginResponse = await app.inject({
       method: "POST",
