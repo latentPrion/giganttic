@@ -5,6 +5,8 @@
     "moduleResolution": "NodeNext",
     "baseUrl": ".",
     "allowJs": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "lib": [
       "ES2022"
     ],
@@ -25,6 +27,7 @@
     ]
   },
   "include": [
+    "backend/**/*.ts",
     "db/**/*.ts",
     "db/**/*.mjs",
     "tests/**/*.ts"

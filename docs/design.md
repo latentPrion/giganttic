@@ -304,13 +304,13 @@ Suggested frontend structure:
 
 Suggested backend structure:
 
-- `backend/src/main.ts`
-- `backend/src/app.module.ts`
-- `backend/src/modules/stc-proj-mgmt/`
-- `backend/src/modules/charts/`
-- `backend/src/modules/storage/`
-- `backend/src/modules/integrations/`
-- `backend/src/modules/documents/`
+- `backend/main.ts`
+- `backend/app.module.ts`
+- `backend/modules/stc-proj-mgmt/`
+- `backend/modules/charts/`
+- `backend/modules/storage/`
+- `backend/modules/integrations/`
+- `backend/modules/documents/`
 
 ### Shared Contracts
 
@@ -324,16 +324,16 @@ Suggested shared structure:
 
 Suggested schema structure:
 
-- `backend/src/db/schema/`
-- `backend/src/db/migrations/`
+- `backend/db/schema/`
+- `backend/db/migrations/`
 
 ### Temporal
 
 Suggested workflow structure:
 
-- `backend/src/temporal/workflows/`
-- `backend/src/temporal/activities/`
-- `backend/src/temporal/workers/`
+- `backend/temporal/workflows/`
+- `backend/temporal/activities/`
+- `backend/temporal/workers/`
 
 ## API Design Principles
 

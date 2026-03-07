@@ -21,6 +21,7 @@ describe("db module facade", () => {
     });
     const parsedSession = usersSessionsInsertSchema.parse({
       id: "facade-session",
+      ipAddress: "127.0.0.1",
       userId: 1,
       sessionTokenHash: "facade-hash",
       startTimestamp: new Date("2026-03-07T12:00:00.000Z"),

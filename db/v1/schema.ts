@@ -160,6 +160,7 @@ export const usersSessions = sqliteTable(
     expirationTimestamp: integer("expirationTimestamp", {
       mode: "timestamp_ms",
     }).notNull(),
+    ipAddress: text("ipAddress").notNull(),
     location: text("location"),
     oauthAuthorizationCode: text("oauthAuthorizationCode"),
     oauthAccessToken: text("oauthAccessToken"),

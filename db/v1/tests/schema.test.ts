@@ -43,6 +43,7 @@ describe("auth v1 zod schemas", () => {
     expect(() =>
       usersSessionsInsertSchema.parse({
         id: "session_123",
+        ipAddress: "127.0.0.1",
         userId: 1,
         startTimestamp: new Date("2026-03-07T12:00:00.000Z"),
         expirationTimestamp: new Date("2026-03-07T13:00:00.000Z"),

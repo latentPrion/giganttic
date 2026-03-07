@@ -1,0 +1,1 @@
+ALTER TABLE `Users_Sessions` ADD `ipAddress` text NOT NULL;

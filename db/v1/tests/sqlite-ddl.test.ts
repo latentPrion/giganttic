@@ -119,7 +119,7 @@ describe("generated sqlite ddl", () => {
     ).toThrow(/unique/i);
     expect(() =>
       db.exec(
-        "INSERT INTO Users_Sessions (id, userId, sessionTokenHash, startTimestamp, expirationTimestamp) VALUES ('sess-1', 1, 'hash-1', 200, 100);",
+        "INSERT INTO Users_Sessions (id, userId, sessionTokenHash, startTimestamp, expirationTimestamp, ipAddress) VALUES ('sess-1', 1, 'hash-1', 200, 100, '127.0.0.1');",
       ),
     ).toThrow(/check/i);
     db.close();
