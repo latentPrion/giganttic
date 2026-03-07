@@ -2,17 +2,23 @@ import React from "react";
 import {
   AppBar,
   Box,
+  CircularProgress,
   Container,
   Toolbar,
   Typography,
 } from "@mui/material";
 
-import { SessionManager } from "./SessionManager.js";
+import { useSessionManager } from "../hooks/useSessionManager.js";
+import { LoggedInSessionManager } from "./LoggedInSessionManager.js";
+import { LoggedOutSessionManager } from "./LoggedOutSessionManager.js";
 
 const PRODUCT_NAME = "Gigantt";
 const PRODUCT_TAGLINE = "Structured project control";
+const LOADING_SIZE = 20;
 
 export function HeaderNavbar() {
+  const { actions, authState, isBusy } = useSessionManager();
+
   return (
     <AppBar
       color="transparent"
@@ -25,8 +31,17 @@ export function HeaderNavbar() {
       }}
     >
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ gap: 3, minHeight: 80 }}>
-          <Box sx={{ flexGrow: 1 }}>
+        <Toolbar
+          disableGutters
+          sx={{
+            alignItems: { sm: "center", xs: "flex-start" },
+            flexWrap: "wrap",
+            gap: 2,
+            minHeight: { sm: 80, xs: "auto" },
+            paddingY: { sm: 0, xs: 1.5 },
+          }}
+        >
+          <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: "100%", sm: "auto" } }}>
             <Typography color="primary.main" variant="h6">
               {PRODUCT_NAME}
             </Typography>
@@ -34,7 +49,24 @@ export function HeaderNavbar() {
               {PRODUCT_TAGLINE}
             </Typography>
           </Box>
-          <SessionManager />
+          {authState.status === "loading" ? (
+            <CircularProgress size={LOADING_SIZE} />
+          ) : null}
+          {authState.status === "authenticated" ? (
+            <LoggedInSessionManager
+              isBusy={isBusy}
+              onLogout={actions.logout}
+              roles={authState.auth.user.roles}
+              username={authState.auth.user.username}
+            />
+          ) : null}
+          {authState.status !== "authenticated" && authState.status !== "loading" ? (
+            <LoggedOutSessionManager
+              isBusy={isBusy}
+              onLogin={actions.login}
+              onRegister={actions.register}
+            />
+          ) : null}
         </Toolbar>
       </Container>
     </AppBar>

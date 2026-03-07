@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/api-error.js";
 import { authApi } from "../api/auth-api.js";
 import { authTokenStorage } from "../storage/auth-token-storage.js";
-import { SessionManager } from "./SessionManager.js";
+import { App } from "../../App.js";
 import { renderWithTheme } from "../../test/render-with-theme.js";
 
 vi.mock("../api/auth-api.js", () => ({
@@ -83,11 +83,17 @@ function createLoginResponse(roles: string[] = []) {
 }
 
 async function openLoginDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL }));
+  const loginButtons = await screen.findAllByRole("button", {
+    name: LOGIN_BUTTON_LABEL,
+  });
+  await user.click(loginButtons[0]);
 }
 
 async function openRegisterDialog(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole("button", { name: REGISTER_BUTTON_LABEL }));
+  const registerButtons = await screen.findAllByRole("button", {
+    name: REGISTER_BUTTON_LABEL,
+  });
+  await user.click(registerButtons[0]);
 }
 
 async function fillLoginForm(
@@ -134,23 +140,27 @@ describe("SessionManager", () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockReturnValue(new Promise(() => undefined));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(screen.getByLabelText("Loading session")).toBeInTheDocument();
   });
 
   it("renders logged-out controls when no session exists", async () => {
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
-    expect(screen.getByRole("button", { name: REGISTER_BUTTON_LABEL })).toBeVisible();
+    expect(
+      await screen.findAllByRole("button", { name: LOGIN_BUTTON_LABEL }),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByRole("button", { name: REGISTER_BUTTON_LABEL }),
+    ).toHaveLength(2);
   });
 
   it("renders the authenticated username when session lookup succeeds", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(await screen.findByText("demo-user")).toBeVisible();
     expect(screen.getByRole("button", { name: MENU_BUTTON_LABEL })).toBeVisible();
@@ -160,7 +170,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authApiMock.login.mockResolvedValue(createLoginResponse());
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "secret", username: "demo-user" });
@@ -179,7 +189,7 @@ describe("SessionManager", () => {
   it("focuses the first login field when the login modal opens", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
 
@@ -197,7 +207,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "wrong", username: "demo-user" });
@@ -219,7 +229,7 @@ describe("SessionManager", () => {
       accessToken: "enter-token",
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "demo-user");
@@ -243,7 +253,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "demo-user");
@@ -258,7 +268,7 @@ describe("SessionManager", () => {
   it("resets the login form when cancel is pressed", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "secret", username: "demo-user" });
@@ -273,7 +283,7 @@ describe("SessionManager", () => {
   it("closes the login dialog when Escape is pressed", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await user.keyboard("{Escape}");
@@ -285,7 +295,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authApiMock.login.mockRejectedValue(new Error("boom"));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "wrong", username: "demo-user" });
@@ -297,14 +307,17 @@ describe("SessionManager", () => {
     await user.keyboard("{Escape}");
 
     await expectDialogToClose(LOGIN_FAILURE_DIALOG_NAME);
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toHaveFocus();
+    const loginButtons = await screen.findAllByRole("button", {
+      name: LOGIN_BUTTON_LABEL,
+    });
+    expect(loginButtons[0]).toHaveFocus();
   });
 
   it("reopens login with a clean form after a prior failure dialog is dismissed", async () => {
     const user = userEvent.setup();
     authApiMock.login.mockRejectedValue(new Error("boom"));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "wrong", username: "demo-user" });
@@ -324,7 +337,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authApiMock.login.mockRejectedValue(new ApiError("network", "Network request failed"));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openLoginDialog(user);
     await fillLoginForm(user, { password: "secret", username: "demo-user" });
@@ -347,7 +360,7 @@ describe("SessionManager", () => {
       },
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await fillRegisterForm(user, {
@@ -372,14 +385,17 @@ describe("SessionManager", () => {
       screen.getByText(REGISTRATION_SUCCEEDED_MESSAGE),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: CLOSE_BUTTON_LABEL }));
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
-    expect(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL })).toHaveFocus();
+    const loginButtons = await screen.findAllByRole("button", {
+      name: LOGIN_BUTTON_LABEL,
+    });
+    expect(loginButtons).toHaveLength(2);
+    expect(loginButtons[0]).toHaveFocus();
   });
 
   it("focuses the first registration field when the register modal opens", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
 
@@ -399,7 +415,7 @@ describe("SessionManager", () => {
       },
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "enter-user");
@@ -427,7 +443,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await fillRegisterForm(user, {
@@ -453,7 +469,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "taken-user");
@@ -469,7 +485,7 @@ describe("SessionManager", () => {
   it("resets the registration form when cancel is pressed", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await fillRegisterForm(user, {
@@ -489,7 +505,7 @@ describe("SessionManager", () => {
   it("closes the registration dialog when Escape is pressed", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await user.keyboard("{Escape}");
@@ -501,7 +517,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authApiMock.register.mockRejectedValue(new Error("boom"));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await fillRegisterForm(user, {
@@ -528,7 +544,7 @@ describe("SessionManager", () => {
       new ApiError("network", "Network request failed"),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await openRegisterDialog(user);
     await fillRegisterForm(user, {
@@ -553,7 +569,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(
       await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
@@ -571,12 +587,14 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: CLOSE_BUTTON_LABEL }));
 
     await expectDialogToClose(SESSION_ERROR_DIALOG_NAME);
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(
+      await screen.findAllByRole("button", { name: LOGIN_BUTTON_LABEL }),
+    ).toHaveLength(2);
   });
 
   it("shows the fallback session error message for network failures", async () => {
@@ -585,7 +603,7 @@ describe("SessionManager", () => {
       new ApiError("network", "Network request failed"),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(
       await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
@@ -599,7 +617,7 @@ describe("SessionManager", () => {
       new ApiError("validation", "Response payload failed validation"),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(
       await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME }),
@@ -616,7 +634,7 @@ describe("SessionManager", () => {
       }),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     expect(await screen.findByRole("dialog", { name: SESSION_ERROR_DIALOG_NAME })).toBeVisible();
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
@@ -630,7 +648,7 @@ describe("SessionManager", () => {
       revokedSessionIds: ["session-1"],
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
     await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
@@ -642,7 +660,9 @@ describe("SessionManager", () => {
       );
     });
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(
+      await screen.findAllByRole("button", { name: LOGIN_BUTTON_LABEL }),
+    ).toHaveLength(2);
   });
 
   it("clears local auth state even when revoke fails", async () => {
@@ -651,13 +671,15 @@ describe("SessionManager", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
     authApiMock.revokeCurrentSession.mockRejectedValue(new Error("revoke failed"));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
     await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
 
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(
+      await screen.findAllByRole("button", { name: LOGIN_BUTTON_LABEL }),
+    ).toHaveLength(2);
   });
 
   it("closes the menu after logout is triggered", async () => {
@@ -670,7 +692,7 @@ describe("SessionManager", () => {
       revokedSessionIds: ["session-1"],
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
     await user.click(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL }));
@@ -686,7 +708,7 @@ describe("SessionManager", () => {
       revokedSessionIds: ["session-1"],
     });
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     const menuButton = await screen.findByRole("button", { name: MENU_BUTTON_LABEL });
     menuButton.focus();
@@ -697,7 +719,9 @@ describe("SessionManager", () => {
     logoutMenuItem.focus();
     expect(logoutMenuItem).toHaveFocus();
     await user.keyboard("{Enter}");
-    expect(await screen.findByRole("button", { name: LOGIN_BUTTON_LABEL })).toBeVisible();
+    expect(
+      await screen.findAllByRole("button", { name: LOGIN_BUTTON_LABEL }),
+    ).toHaveLength(2);
   });
 
   it("shows the project management menu only for project managers", async () => {
@@ -707,7 +731,7 @@ describe("SessionManager", () => {
       createAuthenticatedResponse(["GGTT_ROLE_PROJECT_MANAGER"]),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
@@ -722,7 +746,7 @@ describe("SessionManager", () => {
       createAuthenticatedResponse(["GGTT_ROLE_ADMIN"]),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
@@ -742,7 +766,7 @@ describe("SessionManager", () => {
       ]),
     );
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
@@ -755,7 +779,7 @@ describe("SessionManager", () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse([]));
 
-    renderWithTheme(<SessionManager />);
+    renderWithTheme(<App />);
 
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 

@@ -10,8 +10,10 @@
     "db:generate:v1": "node db/generate-ddl.mjs",
     "db:create": "node db/create-db.mjs",
     "dev": "node scripts/dev-launcher.mjs",
+    "dev:lan": "node scripts/dev-launcher.mjs --lan",
     "frontend:build": "vite build --config frontend/vite.config.ts",
     "frontend:dev": "vite --config frontend/vite.config.ts",
+    "frontend:dev:lan": "vite --host 0.0.0.0 --config frontend/vite.config.ts",
     "frontend:preview": "vite preview --config frontend/vite.config.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.frontend.json --noEmit",
     "test": "vitest run"

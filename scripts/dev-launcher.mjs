@@ -7,6 +7,7 @@ const SCRIPT_NAMES = {
   backendStart: "backend:start",
   dbCreate: "db:create",
   frontendDev: "frontend:dev",
+  frontendDevLan: "frontend:dev:lan",
 };
 
 const EXIT_CODE = {
@@ -17,9 +18,14 @@ const EXIT_CODE = {
 const EXIT_SIGNAL_OFFSET = 128;
 const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM"];
 const NPM_EXECUTABLE = process.platform === "win32" ? "npm.cmd" : "npm";
+const LAN_FLAG = "--lan";
 
 function buildScriptCommand(scriptName) {
   return ["run", scriptName];
+}
+
+function isLanModeEnabled(argv) {
+  return argv.includes(LAN_FLAG);
 }
 
 function buildInheritedSpawnOptions() {
@@ -129,9 +135,13 @@ async function prepareRuntime() {
 }
 
 function startRuntimeProcesses() {
+  const frontendScriptName = isLanModeEnabled(process.argv)
+    ? SCRIPT_NAMES.frontendDevLan
+    : SCRIPT_NAMES.frontendDev;
+
   return [
     startLongRunningScript(SCRIPT_NAMES.backendStart),
-    startLongRunningScript(SCRIPT_NAMES.frontendDev),
+    startLongRunningScript(frontendScriptName),
   ];
 }
 

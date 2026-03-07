@@ -1,3 +1,10 @@
+:root,
+:root *,
+:root *::before,
+:root *::after {
+  box-sizing: border-box;
+}
+
 :root {
   color: #f4efe5;
   background:
@@ -9,13 +16,62 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  overflow-x: hidden;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .app-shell {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  width: 100%;
+}
+
+.home-hero {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-height: 0;
+  padding: 2rem;
+  width: 100%;
+}
+
+.home-hero__content {
+  align-items: center;
+  max-width: 52rem;
+  text-align: center;
+  width: 100%;
+}
+
+.home-hero__title {
+  font-size: clamp(2.8rem, 7vw, 5.8rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+}
+
+.home-hero__links {
+  align-items: center;
+  width: 100%;
+}
+
+.home-hero__links a {
+  color: #f4efe5;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .home-hero {
+    padding: 1.5rem;
+  }
+
+  .home-hero__title {
+    font-size: clamp(2.35rem, 12vw, 3.8rem);
+  }
 }
