@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySqlDdl,
   getGeneratedSqlDdlDir,
+  getGeneratedSqlDdlFilePath,
   readGeneratedSqlStatements,
   runtimeSqliteDbPath,
 } from "../../apply-sql-ddl.mjs";
@@ -35,6 +36,9 @@ describe("generated sqlite ddl", () => {
     expect(statements[0]).toContain("CREATE TABLE `CredentialTypes`");
     expect(getGeneratedSqlDdlDir()).toContain(
       `db/${activeSchemaVersion}/generated-sql-ddl`,
+    );
+    expect(getGeneratedSqlDdlFilePath()).toContain(
+      `db/${activeSchemaVersion}/generated-sql-ddl/schema.sql`,
     );
   });
 

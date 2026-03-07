@@ -6,7 +6,8 @@
   "scripts": {
     "backend:build": "tsc -p tsconfig.backend.json",
     "backend:start": "node dist/backend/main.js",
-    "db:generate:v1": "drizzle-kit generate --config drizzle.config.ts",
+    "db:generate": "node db/generate-ddl.mjs",
+    "db:generate:v1": "node db/generate-ddl.mjs",
     "db:create": "node db/create-db.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

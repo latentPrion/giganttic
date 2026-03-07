@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { drizzle, type SQLJsDatabase } from "drizzle-orm/sql-js";
@@ -86,22 +86,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const generatedSqlDdlDir = path.resolve(
+    const generatedSqlDdlPath = path.resolve(
       process.cwd(),
-      `db/${activeSchemaVersion}/generated-sql-ddl`,
+      `db/${activeSchemaVersion}/generated-sql-ddl/schema.sql`,
     );
-    const files = (await readdir(generatedSqlDdlDir))
-      .filter((entry) => entry.endsWith(".sql"))
-      .sort();
-
-    for (const file of files) {
-      const ddl = await readFile(path.join(generatedSqlDdlDir, file), "utf8");
-      for (const statement of ddl
-        .split("--> statement-breakpoint")
-        .map((entry) => entry.trim())
-        .filter(Boolean)) {
-        this.client.exec(statement);
-      }
+    const ddl = await readFile(generatedSqlDdlPath, "utf8");
+    for (const statement of ddl
+      .split("--> statement-breakpoint")
+      .map((entry) => entry.trim())
+      .filter(Boolean)) {
+      this.client.exec(statement);
     }
   }
 }

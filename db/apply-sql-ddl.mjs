@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
@@ -18,28 +18,21 @@ export function getGeneratedSqlDdlDir(
   return path.resolve(process.cwd(), `db/${schemaVersion}/generated-sql-ddl`);
 }
 
+export function getGeneratedSqlDdlFilePath(
+  schemaVersion = config.activeSchemaVersion,
+) {
+  return path.join(getGeneratedSqlDdlDir(schemaVersion), "schema.sql");
+}
+
 export async function readGeneratedSqlStatements(
   schemaVersion = config.activeSchemaVersion,
 ) {
-  const generatedSqlDdlDir = getGeneratedSqlDdlDir(schemaVersion);
-  const files = (await readdir(generatedSqlDdlDir))
-    .filter((entry) => entry.endsWith(".sql"))
-    .sort();
+  const ddl = await readFile(getGeneratedSqlDdlFilePath(schemaVersion), "utf8");
 
-  const statements = [];
-
-  for (const file of files) {
-    const ddl = await readFile(path.join(generatedSqlDdlDir, file), "utf8");
-
-    statements.push(
-      ...ddl
-        .split("--> statement-breakpoint")
-        .map((statement) => statement.trim())
-        .filter((statement) => statement.length > 0),
-    );
-  }
-
-  return statements;
+  return ddl
+    .split("--> statement-breakpoint")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
 }
 
 export async function applySqlDdl(
