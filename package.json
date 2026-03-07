@@ -1,0 +1,25 @@
+{
+  "name": "gigantt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:generate:v1": "drizzle-kit generate --config drizzle.config.ts",
+    "db:create": "node db/create-db.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.5",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "@types/sql.js": "^1.4.9",
+    "drizzle-kit": "^0.31.4",
+    "drizzle-zod": "^0.8.3",
+    "sql.js": "^1.13.0",
+    "typescript": "^5.9.2",
+    "vitest": "^2.1.8"
+  }
+}

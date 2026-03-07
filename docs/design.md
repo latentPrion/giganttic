@@ -1,308 +1,400 @@
-# Gantt Workspace Design
+# Design
 
-## Summary
+## Purpose
 
-This project is intended to become a small web application for creating, uploading, browsing, and rendering Gantt chart documents. The system has two main parts:
+This project is a TypeScript-first project management system that turns team/client conversations and documents into structured project artifacts, including Gantt charts and later Kanban-style views.
 
-- a single-page React frontend implemented in TypeScript
-- a Node.js backend implemented in TypeScript and built around Fastify, exposed as a reusable route plugin
+The system must support:
 
-The backend is designed so its project-management routes can either run standalone or be mounted into a larger Fastify application under a namespace such as `/stc-proj-mgmt/api`.
+- Creating and uploading project chart documents
+- Rendering DHTMLX Gantt charts in a browser SPA
+- Selecting different frontend view modes
+- Persisting project data with a centrally defined, type-safe schema
+- Ingesting and processing external collaboration data over time
+- Evolving toward a larger platform where this module can be embedded under a route namespace
 
-The frontend is designed to work against that namespaced REST API and to use the DHTMLX Gantt library as the chart renderer.
+## Core Architectural Decisions
 
-Type safety is a design goal. Shared shapes such as chart documents, task records, backend config payloads, chart list items, and create/upload request bodies should be modeled with explicit TypeScript types.
+### Language
 
-## Top-Level Architecture
+All application code should be implemented in TypeScript.
 
-The target project layout is:
+This includes:
 
-```text
-/
-  docs/
-    design.md
-  frontend/
-    index.html
-    frontend.css
-    src/
-      main.tsx
-    dist/
-      app.js
-  plugins/
-    stc-proj-mgmt-routes.ts
-  charts/
-    welcome-chart.json
-  app.ts
-  server.ts
-  build.mjs
-  package.json
-  gantt-git/
-    codebase/
-      dhtmlxgantt.js
-      dhtmlxgantt.css
-      ...
-```
+- frontend application code
+- backend HTTP API code
+- background workflow code
+- shared domain types and schemas
+- database schema definitions
+
+Vendored third-party runtime assets may remain in their original formats.
+
+### Frontend
+
+The frontend is a single-page React application written in TypeScript.
 
 Responsibilities:
 
-- `frontend/` contains the browser UI
-- `plugins/stc-proj-mgmt-routes.ts` contains reusable Fastify route registration plus chart-storage logic
-- `app.ts` creates the standalone Fastify app by combining static serving and the plugin
-- `server.ts` is a thin bootstrap entrypoint
-- `charts/` is the default backend-relative storage directory for chart JSON files
-- `gantt-git/codebase/` remains the source of the DHTMLX runtime assets
+- render the main application shell
+- render the Gantt chart area
+- provide controls for chart selection and upload
+- provide a configurable backend storage-directory input for testing
+- provide a tabset or segmented control to choose the current rendered view mode
+- communicate with the backend REST API
+- use shared typed DTOs and Zod schemas for transport objects
 
-## Frontend Design
+Preferred entry points:
 
-The frontend should be a React SPA written in TypeScript with one primary shell:
+- `frontend/src/main.tsx`
+- `frontend/src/App.tsx`
 
-- left control panel / sidebar
-- main rendering stage
+### Backend
 
-The control panel should provide:
+The backend is a TypeScript HTTP service with a modular structure suitable for future embedding in a larger application.
 
-- a text input for the backend storage subdirectory
-- an apply/save action for that directory
-- a list of available chart files returned by the backend
-- an action to create a new sample chart
-- an action to upload a chart JSON file
-- a view-type tabset for renderer modes
+The backend should be implemented as a reusable module, not as an inseparable monolith.
 
-The rendering stage should provide:
+Responsibilities:
 
-- a permanently mounted DHTMLX Gantt host element
-- empty-state UI as an overlay, never as a replacement for the host node
-- a header showing the selected chart name and active view mode
+- serve REST endpoints for project/chart management
+- accept uploaded chart documents
+- list existing charts from a configurable backend directory
+- read and write chart JSON documents
+- validate request and response payloads
+- expose the frontend SPA in standalone mode
+- support mounting the project-management routes under a namespace in a larger parent application
 
-### Frontend View Modes
+### Background Processing
 
-The UI should expose a tabset with these modes:
+The system should use Temporal for workflow orchestration and long-running asynchronous work.
 
-- `Grid + Chart`
-- `Chart Only`
-- `Grid Only`
+Temporal is responsible for:
 
-These modes should drive DHTMLX config, not separate renderers:
+- polling external systems
+- scheduling recurring syncs
+- durable retries and backoff
+- orchestration of multi-step ingestion pipelines
+- recovery from worker or process restarts
+- long-running conversation/document enrichment pipelines
 
-- `show_grid`
-- `show_chart`
-- `grid_width`
-- `resetLayout()`
+Temporal is not the owner of the database schema or API schema.
 
-When switching modes:
+## Recommended Stack
 
-- the grid host must not be conditionally mounted/unmounted
-- the grid width must be explicitly reset when returning from `Grid Only` to `Grid + Chart`
-- the app should reuse one DHTMLX instance and update it incrementally
+### Backend Framework
 
-### Frontend Data Flow
+Recommended backend framework: NestJS
 
-On startup:
+Reasoning:
 
-1. fetch backend config
-2. fetch chart list for the configured storage directory
-3. auto-load the first chart if one exists
-4. initialize DHTMLX against the mounted host
-5. apply the selected view mode and parse the loaded chart
+- strong TypeScript ergonomics
+- modular structure
+- clear separation of controllers, services, and modules
+- good long-term maintainability for a growing system
+- suitable for reusable submodules mounted under a route namespace
+- good fit for combining HTTP APIs with background-processing integrations
 
-When no charts exist:
+### Workflow Engine
 
-- keep the host mounted
-- show an overlay explaining that no charts are loaded yet
+Recommended workflow engine: Temporal
 
-When a chart is selected, created, or uploaded:
+Reasoning:
 
-- refresh the chart list
-- load the selected file
-- call `gantt.clearAll()` and `gantt.parse(chart)`
+- durable workflows
+- reliable retries
+- good fit for external polling and sync orchestration
+- better suited than ad hoc cron jobs for ingestion pipelines
 
-### Frontend Typing Expectations
+### Database Layer and Validation
 
-The frontend should define explicit types for at least:
+The system uses Drizzle and Zod for end-to-end type safety.
 
-- chart document
-- task record
-- link record
-- chart list response
-- chart config response
-- view-mode option
-- create/upload request payloads
+- Drizzle is the canonical source of truth for the persisted database schema and relational data model.
+- Zod is the canonical source of truth for runtime validation of request, response, and integration payloads.
+- Shared DTOs and validation schemas should be defined once and reused across backend and frontend TypeScript code.
+- Temporal workflows and activities should consume the same shared typed contracts, but Temporal is not the owner of the database schema.
 
-The React app should not rely on untyped `any` state for API responses.
+In practice:
 
-## Backend Design
+- database schema: Drizzle
+- runtime API validation: Zod
+- shared transport/domain contracts: shared TypeScript + Zod modules
+- workflow orchestration: Temporal
 
-The backend should be implemented in TypeScript and should center on a reusable Fastify plugin, for example:
+## End-to-End Type Safety Strategy
 
-```ts
-app.register(stcProjMgmtRoutes, {
-  prefix: "/stc-proj-mgmt/api",
-  projectRoot: __dirname,
-  defaultStorageDir: "charts"
-});
-```
+The project should enforce type safety across the full stack.
 
-The plugin should encapsulate:
+### Canonical Ownership
 
-- chart storage directory management
-- chart file listing
-- chart file reading
-- chart file creation
-- chart file upload
-- default sample-chart creation for first run
+- persisted relational schema is defined in Drizzle
+- runtime API payload validation is defined in Zod
+- shared DTOs are exported from shared TypeScript modules
+- frontend consumes those same shared schemas and inferred types
+- backend handlers validate incoming payloads with Zod before use
+- Temporal workflows and activities consume the same shared contract types
 
-### Route Namespace
+### Goals
 
-The REST API should live under a namespace intended for future composition:
+- avoid duplicated interface definitions across frontend and backend
+- avoid unvalidated JSON crossing trust boundaries
+- ensure data sent to the frontend is statically typed and runtime-validated
+- keep schema evolution explicit and migration-backed
 
-```text
-/stc-proj-mgmt/api
-```
+### Non-Goals
 
-Expected route shape:
+- Temporal is not used as an ORM
+- ad hoc untyped request bodies are not acceptable
+- frontend-only type definitions that diverge from backend contracts are not acceptable
 
-- `GET /stc-proj-mgmt/api/config`
-- `PUT /stc-proj-mgmt/api/config`
-- `GET /stc-proj-mgmt/api/charts`
-- `GET /stc-proj-mgmt/api/chart`
-- `POST /stc-proj-mgmt/api/charts/create`
-- `POST /stc-proj-mgmt/api/charts/upload`
+## Namespacing and Embedding
 
-These routes should be implemented inside the plugin so they can be mounted into a larger parent Fastify app without rewriting handler logic.
+The project-management API must be namespaced so it can later be mounted into a larger application.
 
-### Backend Storage Rules
+Recommended namespace:
 
-The storage directory should be:
+- `/stc-proj-mgmt`
 
-- relative to the backend project root
-- configurable by the frontend
-- created automatically if missing
-- constrained so it cannot escape the backend project root
+The REST API should live under a nested API prefix such as:
 
-Chart files should be JSON documents with a DHTMLX-compatible structure:
+- `/stc-proj-mgmt/api`
 
-```json
-{
-  "data": [...],
-  "links": [...]
-}
-```
+The backend module should be designed so that a higher-level application can register or mount it cleanly without rewriting route logic.
 
-File names should be normalized to `.json` and should not allow path traversal.
+This means:
 
-### Backend Typing Expectations
+- avoid hard-coding global app assumptions
+- keep the project-management module self-contained
+- keep route registration modular
+- keep configuration injectable
 
-The backend should define explicit TypeScript interfaces or types for:
+## Frontend UI Requirements
 
-- plugin options
-- storage directory resolution results
-- chart list items
-- chart document payloads
-- create/upload request bodies
-- route response shapes
+### Main Areas
 
-The plugin API should be strongly typed so that both standalone use and embedded parent-app registration remain type-safe.
+The frontend should contain:
 
-## Chart Document Model
+- a control panel for backend connectivity and chart actions
+- a chart-selection area
+- a main canvas area for rendering the current view
+- a view-type tabset or segmented control
 
-Charts are stored as JSON and rendered by DHTMLX Gantt. The current intended sample model supports:
+### Required Testing-Stage Controls
 
-- regular tasks
-- project/summary tasks
+For early development and testing, the frontend must expose an input field where the user can configure the backend storage directory used for chart listing and upload.
+
+That control is a temporary operational/testing feature, but it is intentionally part of the current design.
+
+### View Selection
+
+The frontend must expose a UI control that allows the user to choose which view type to render.
+
+Initial supported modes:
+
+- `grid-chart`
+- `grid-only`
+- `chart-only`
+
+Future modes may include:
+
+- `kanban`
+- `timeline-summary`
+- `document-context`
+
+The view-selection state is frontend-owned UI state. It may later be persisted per project or per user.
+
+## Gantt Integration
+
+DHTMLX Gantt is currently the chart-rendering engine.
+
+### Initial Integration Rules
+
+- the frontend hosts a DHTMLX Gantt instance inside a stable DOM container
+- the Gantt host element must remain mounted while view/data state changes
+- empty-state UI should be rendered as an overlay or sibling, not by removing the Gantt host
+- the frontend controls when chart data is parsed into the Gantt instance
+- the frontend controls view-mode switching by updating Gantt configuration and layout state
+
+### Data Expectations
+
+Initial chart documents should contain:
+
+- tasks
+- links
+- milestones where needed
+- hierarchical task relationships
+- grouping metadata where useful
+
+Example concepts that should be supported in stored chart data:
+
+- normal tasks
+- milestone tasks
+- subgroup or stream metadata
+- progress state
+- future custom metadata such as external sync identifiers
+
+### Important Constraint
+
+DHTMLX-specific UI concerns such as lightbox configuration are not the source of truth for the project data model.
+
+The source of truth is the shared typed application model.
+
+## Chart Storage Model
+
+### Initial Storage Strategy
+
+For early development, chart documents may be stored as JSON files in a configurable server-side directory.
+
+The backend must support:
+
+- listing available chart documents
+- reading a selected chart document
+- writing a new chart document
+- uploading a chart JSON file
+- switching the active storage directory for testing purposes
+
+### Future Storage Strategy
+
+File-backed chart storage is a transitional development-stage approach.
+
+The long-term architecture should evolve toward persisted project entities in the database, where JSON file import/export becomes an integration feature rather than the primary source of truth.
+
+## External Integration Goals
+
+The long-term system is intended to integrate with external collaboration and document systems, including examples such as:
+
+- Discord
+- Gmail
+- Slack
+- Fireflies meeting transcripts
+- Google Docs
+- Google Meet related documents or metadata
+- NotebookLM push/export workflows
+
+These integrations should be modeled as ingestion pipelines that normalize external content into internal domain objects.
+
+Likely normalized concepts include:
+
+- conversation threads
+- transcript excerpts
+- decisions
+- action items
+- blockers
 - milestones
-- dependency links
-- optional grouping metadata
+- project updates
+- inferred schedule changes
 
-Representative task fields:
+Those internal domain objects can then drive updates to project plans and chart views.
 
-- `id`
-- `text`
-- `start_date`
-- `duration`
-- `progress`
-- `parent`
-- `type`
-- `open`
-- `group_id`
-- `key`
-- `label`
+## Suggested High-Level Module Layout
 
-This allows the sample data to demonstrate:
+### Frontend
 
-- hierarchical plans
-- milestone rendering
-- grouping metadata for future filtering or alternate views
+Suggested frontend structure:
 
-## DHTMLX Integration Rules
+- `frontend/src/main.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/components/`
+- `frontend/src/features/charts/`
+- `frontend/src/features/views/`
+- `frontend/src/lib/api/`
+- `frontend/src/lib/gantt/`
 
-The frontend should treat DHTMLX as a rendering engine over loaded chart JSON, not as the source of truth.
+### Backend
 
-Important integration rules:
+Suggested backend structure:
 
-- initialize DHTMLX once against a stable DOM host
-- keep the host mounted for the lifetime of the page
-- update data with `clearAll()` + `parse(...)`
-- update layout mode with `show_grid`, `show_chart`, `grid_width`, and `resetLayout()`
-- never rely on a conditionally mounted host node for initialization
+- `backend/src/main.ts`
+- `backend/src/app.module.ts`
+- `backend/src/modules/stc-proj-mgmt/`
+- `backend/src/modules/charts/`
+- `backend/src/modules/storage/`
+- `backend/src/modules/integrations/`
+- `backend/src/modules/documents/`
 
-The DHTMLX assets should be served statically from the vendored `gantt-git/codebase/` directory.
+### Shared Contracts
 
-Where DHTMLX has incomplete or weak typings, wrapper-layer types should be introduced at the application boundary rather than allowing type unsafety to spread through the app.
+Suggested shared structure:
 
-## Standalone vs Embedded Use
+- `packages/shared/src/schemas/`
+- `packages/shared/src/contracts/`
+- `packages/shared/src/domain/`
 
-The design intentionally supports two deployment patterns.
+### Database
 
-### Standalone
+Suggested schema structure:
 
-`server.ts` starts a local Fastify app, serves:
+- `backend/src/db/schema/`
+- `backend/src/db/migrations/`
 
-- the SPA
-- the built React bundle
-- the DHTMLX static assets
-- the namespaced project-management API
+### Temporal
 
-### Embedded
+Suggested workflow structure:
 
-A larger application can import the plugin and register it into its own main Fastify app. In that mode:
+- `backend/src/temporal/workflows/`
+- `backend/src/temporal/activities/`
+- `backend/src/temporal/workers/`
 
-- the plugin provides only the project-management API behavior
-- the parent app decides final route composition, auth, logging, and other cross-cutting concerns
+## API Design Principles
 
-If desired later, the SPA itself can also be made mount-path-aware so both the UI and API can live under a larger application prefix.
+- all request bodies must be validated with Zod
+- all response shapes should correspond to shared contract types
+- routes must stay namespaced under `/stc-proj-mgmt`
+- the API should remain usable both in standalone mode and when embedded into a larger host app
+- storage-directory overrides must be explicit and validated
+- upload endpoints must validate file type and payload structure
+- route handlers should be thin; business logic belongs in services
 
-## Sample Welcome Chart
+## Development Priorities
 
-The default `welcome-chart.json` should be rich enough to validate:
+### Phase 1
 
-- multiple regular tasks
-- multiple milestones
-- multiple summary/project tasks
-- dependencies across streams
-- grouping metadata such as product, engineering, and delivery
+- establish the TypeScript project structure
+- stand up the React SPA
+- stand up the namespaced backend API
+- define shared Zod schemas and DTOs
+- define initial Drizzle schema
+- implement file-backed chart listing, reading, and upload
+- render DHTMLX Gantt in the frontend
+- expose a view-mode selector
+- expose testing-stage storage-directory input
 
-This sample should serve as the first-run chart returned by the backend when the default chart directory is empty.
+### Phase 2
+
+- persist projects and chart metadata in the database
+- add user/project identity concepts
+- move from file-centric state toward database-backed state
+- import/export chart JSON as an edge feature rather than the core data model
+- add normalized document and conversation entities
+
+### Phase 3
+
+- add Temporal workers and workflows
+- add integration adapters
+- ingest external conversations and documents
+- derive project updates from normalized records
+- support richer planning and collaboration views, including Kanban
 
 ## Testing Expectations
 
-Minimum behavior to verify after rebuild:
+The implementation should support:
 
-- the root page serves the React SPA
-- the namespaced API returns config and chart metadata
-- the default welcome chart loads automatically
-- DHTMLX renders visible grid/chart content on first load
-- switching between `Grid + Chart`, `Chart Only`, and `Grid Only` works without layout corruption
-- an empty storage directory shows the overlay empty state while keeping the host mounted
-- creating a sample chart populates the directory and renders immediately
-- uploading a valid chart JSON renders immediately
-- TypeScript compilation passes with no intentional type holes in application code
+- unit tests for schema validation and domain logic
+- integration tests for API routes
+- frontend tests for view switching and chart selection
+- workflow tests for Temporal activities and orchestration logic
+- migration discipline for schema changes
+- typed contract tests across backend and frontend boundaries
 
-## Future Extensions
+## Summary
 
-The architecture is intentionally compatible with future additions such as:
+This system is a TypeScript-first project-management platform with:
 
-- authentication and authorization in the parent Fastify app
-- alternate chart storage backends
-- Kanban or filtered views derived from chart metadata
-- custom task properties such as `description` or `status`
-- deeper chart management workflows beyond simple JSON file storage
+- React on the frontend
+- NestJS on the backend
+- Drizzle as the canonical database schema layer
+- Zod as the canonical runtime-validation and shared contract layer
+- Temporal for durable asynchronous workflows
+- DHTMLX Gantt as the initial chart-rendering engine
+- namespaced routes under `/stc-proj-mgmt`
+- a modular structure suitable for later embedding into a larger application

@@ -1,0 +1,229 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "text": "STC Platform Rollout",
+      "start_date": "2026-03-07 00:00",
+      "duration": 18,
+      "progress": 0.42,
+      "open": true,
+      "parent": 0,
+      "type": "project"
+    },
+    {
+      "id": 10,
+      "text": "Product Stream",
+      "start_date": "2026-03-07 00:00",
+      "duration": 10,
+      "progress": 0.58,
+      "open": true,
+      "parent": 1,
+      "type": "project",
+      "group_id": "product",
+      "key": "product",
+      "label": "Product"
+    },
+    {
+      "id": 11,
+      "text": "Requirements Lock",
+      "start_date": "2026-03-07 00:00",
+      "duration": 2,
+      "progress": 1,
+      "parent": 10,
+      "group_id": "product",
+      "key": "product",
+      "label": "Product"
+    },
+    {
+      "id": 12,
+      "text": "UX Review",
+      "start_date": "2026-03-09 00:00",
+      "duration": 2,
+      "progress": 0.85,
+      "parent": 10,
+      "group_id": "product",
+      "key": "product",
+      "label": "Product"
+    },
+    {
+      "id": 13,
+      "text": "Product Sign-Off",
+      "start_date": "2026-03-11 00:00",
+      "parent": 10,
+      "type": "milestone",
+      "group_id": "product",
+      "key": "product",
+      "label": "Product"
+    },
+    {
+      "id": 20,
+      "text": "Engineering Stream",
+      "start_date": "2026-03-08 00:00",
+      "duration": 12,
+      "progress": 0.33,
+      "open": true,
+      "parent": 1,
+      "type": "project",
+      "group_id": "engineering",
+      "key": "engineering",
+      "label": "Engineering"
+    },
+    {
+      "id": 21,
+      "text": "Frontend Workspace",
+      "start_date": "2026-03-08 00:00",
+      "duration": 4,
+      "progress": 0.7,
+      "parent": 20,
+      "group_id": "engineering",
+      "key": "engineering",
+      "label": "Engineering"
+    },
+    {
+      "id": 22,
+      "text": "REST Plugin Integration",
+      "start_date": "2026-03-12 00:00",
+      "duration": 3,
+      "progress": 0.45,
+      "parent": 20,
+      "group_id": "engineering",
+      "key": "engineering",
+      "label": "Engineering"
+    },
+    {
+      "id": 23,
+      "text": "Kanban Prototype",
+      "start_date": "2026-03-15 00:00",
+      "duration": 2,
+      "progress": 0.1,
+      "parent": 20,
+      "group_id": "engineering",
+      "key": "engineering",
+      "label": "Engineering"
+    },
+    {
+      "id": 24,
+      "text": "Engineering Freeze",
+      "start_date": "2026-03-17 00:00",
+      "parent": 20,
+      "type": "milestone",
+      "group_id": "engineering",
+      "key": "engineering",
+      "label": "Engineering"
+    },
+    {
+      "id": 30,
+      "text": "Delivery Stream",
+      "start_date": "2026-03-10 00:00",
+      "duration": 8,
+      "progress": 0.24,
+      "open": true,
+      "parent": 1,
+      "type": "project",
+      "group_id": "delivery",
+      "key": "delivery",
+      "label": "Delivery"
+    },
+    {
+      "id": 31,
+      "text": "Data Migration Dry Run",
+      "start_date": "2026-03-10 00:00",
+      "duration": 2,
+      "progress": 0.4,
+      "parent": 30,
+      "group_id": "delivery",
+      "key": "delivery",
+      "label": "Delivery"
+    },
+    {
+      "id": 32,
+      "text": "UAT Window",
+      "start_date": "2026-03-13 00:00",
+      "duration": 3,
+      "progress": 0.15,
+      "parent": 30,
+      "group_id": "delivery",
+      "key": "delivery",
+      "label": "Delivery"
+    },
+    {
+      "id": 33,
+      "text": "Go-Live Decision",
+      "start_date": "2026-03-18 00:00",
+      "parent": 30,
+      "type": "milestone",
+      "group_id": "delivery",
+      "key": "delivery",
+      "label": "Delivery"
+    },
+    {
+      "id": 40,
+      "text": "Program Launch",
+      "start_date": "2026-03-19 00:00",
+      "parent": 1,
+      "type": "milestone"
+    }
+  ],
+  "links": [
+    {
+      "id": 1,
+      "source": 11,
+      "target": 12,
+      "type": "0"
+    },
+    {
+      "id": 2,
+      "source": 12,
+      "target": 13,
+      "type": "0"
+    },
+    {
+      "id": 3,
+      "source": 13,
+      "target": 21,
+      "type": "0"
+    },
+    {
+      "id": 4,
+      "source": 21,
+      "target": 22,
+      "type": "0"
+    },
+    {
+      "id": 5,
+      "source": 22,
+      "target": 23,
+      "type": "0"
+    },
+    {
+      "id": 6,
+      "source": 23,
+      "target": 24,
+      "type": "0"
+    },
+    {
+      "id": 7,
+      "source": 24,
+      "target": 31,
+      "type": "0"
+    },
+    {
+      "id": 8,
+      "source": 31,
+      "target": 32,
+      "type": "0"
+    },
+    {
+      "id": 9,
+      "source": 32,
+      "target": 33,
+      "type": "0"
+    },
+    {
+      "id": 10,
+      "source": 33,
+      "target": 40,
+      "type": "0"
+    }
+  ]
+}
