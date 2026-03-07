@@ -8,4 +8,8 @@ export default defineConfig({
       db: path.resolve(__dirname, "db/index.ts"),
     },
   },
+  test: {
+    environmentMatchGlobs: [["frontend/**/*.test.{ts,tsx}", "jsdom"]],
+    setupFiles: ["frontend/src/test/setup-tests.ts"],
+  },
 });

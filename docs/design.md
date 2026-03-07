@@ -7,8 +7,9 @@ an application that turns conversations, documents, and other external inputs
 into structured project artifacts such as Gantt charts and related views.
 
 The current repository already contains a working auth/session backend slice and
-a versioned database layer. Frontend chart rendering, chart storage, and
-Temporal workflows remain future work.
+a versioned database layer. The repository now also contains the first frontend
+shell for session-aware header navigation. Frontend chart rendering, chart
+storage, and Temporal workflows remain future work.
 
 ## Current Architecture
 
@@ -17,19 +18,21 @@ Temporal workflows remain future work.
 The repository currently contains:
 
 - a NestJS backend under `backend/`
+- a React frontend under `frontend/`
 - a versioned Drizzle schema under `db/`
 - generated Zod schemas derived from the active DB schema version
 - generated full-schema SQLite DDL for the active DB schema version
 - backend auth/session APIs for registration, login, session inspection, and
   session revocation
+- a frontend header/navbar shell with login, registration, current-session
+  lookup, and logout controls
 - automated tests covering schema generation, SQLite DDL application, the root
-  `db` facade, and the auth/session API
+  `db` facade, the auth/session API, and the frontend auth/session shell
 
 ### Not Yet Implemented
 
 The repository does not yet contain:
 
-- a frontend application under `frontend/`
 - DHTMLX Gantt integration
 - chart storage and chart-management APIs
 - Temporal workers or workflows
@@ -100,9 +103,13 @@ Current validation ownership is:
 - persisted schema and relations: Drizzle
 - runtime request and response validation: Zod
 - backend transport contracts: local TypeScript + Zod modules
+- frontend transport contracts: local TypeScript + Zod modules
 
 The backend validates request bodies and query parameters at the REST boundary
 using Zod-backed Nest pipes.
+
+The frontend validates auth/session REST responses with local Zod schemas before
+response data is accepted into React state.
 
 ### Session Model
 
@@ -168,11 +175,17 @@ and the DB/schema generation path.
 
 ### Frontend
 
-The intended frontend remains a React SPA under `frontend/`.
+The frontend is now a React SPA under `frontend/`.
 
-Planned responsibilities:
+Current responsibilities:
 
-- render the application shell
+- render the application shell header/navbar
+- host session-aware login, registration, current-session lookup, and logout UI
+- validate auth REST payloads at the transport boundary with Zod before data
+  enters frontend state
+
+Planned future responsibilities:
+
 - host DHTMLX Gantt
 - render future project-management views
 - communicate with the backend REST API

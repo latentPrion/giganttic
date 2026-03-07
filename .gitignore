@@ -1,6 +1,9 @@
 node_modules/
 coverage/
 dist/
+.vite/
+*.log
+.DS_Store
 run/*.db
 run/*.sqlite
 run/*.sqlite3

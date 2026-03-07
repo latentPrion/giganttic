@@ -1,0 +1,21 @@
+:root {
+  color: #f4efe5;
+  background:
+    radial-gradient(circle at top left, rgba(189, 110, 53, 0.34), transparent 32%),
+    radial-gradient(circle at top right, rgba(26, 110, 140, 0.22), transparent 28%),
+    linear-gradient(135deg, #12161d 0%, #202635 42%, #1a2432 100%);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
