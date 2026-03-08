@@ -1,5 +1,5 @@
 import React from "react";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -132,8 +132,8 @@ describe("UserLobbyPage", () => {
     renderLobbyPage();
 
     expect(await screen.findByText("Apollo")).toBeVisible();
-    expect(screen.getByText("Operators")).toBeVisible();
-    expect(screen.getByText("Giganttic Org")).toBeVisible();
+    expect(screen.getByText("Operators")).toBeInTheDocument();
+    expect(screen.getByText("Giganttic Org")).toBeInTheDocument();
 
     expect(lobbyApiMock.listProjects).toHaveBeenCalledWith(TOKEN);
     expect(lobbyApiMock.listTeams).toHaveBeenCalledWith(TOKEN);
@@ -212,6 +212,8 @@ describe("UserLobbyPage", () => {
 
     renderLobbyPage();
 
+    await screen.findByText("Apollo");
+    await user.click(screen.getByRole("button", { name: /^Teams$/i }));
     expect(await screen.findByText("Operators")).toBeVisible();
 
     await user.click(screen.getAllByRole("button", { name: "Leave" })[0]);
@@ -238,6 +240,8 @@ describe("UserLobbyPage", () => {
 
     renderLobbyPage();
 
+    await screen.findByText("Apollo");
+    await user.click(screen.getByRole("button", { name: /^Teams$/i }));
     expect(await screen.findByText("Operators")).toBeVisible();
 
     const leaveTeamButton = screen.getAllByRole("button", { name: "Leave" })[0];
@@ -274,9 +278,11 @@ describe("UserLobbyPage", () => {
 
     renderLobbyPage();
 
-    expect(await screen.findByText("Giganttic Org")).toBeVisible();
-
-    await user.click(screen.getAllByRole("button", { name: "Leave" })[1]);
+    await screen.findByText("Apollo");
+    await user.click(screen.getByRole("button", { name: /^Organizations$/i }));
+    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root")!);
+    expect(orgCard).toBeTruthy();
+    await user.click(within(orgCard).getByRole("button", { name: "Leave" }));
 
     await waitFor(() => {
       expect(lobbyApiMock.replaceOrganizationUsers).toHaveBeenCalledWith(TOKEN, 21, {
@@ -297,9 +303,10 @@ describe("UserLobbyPage", () => {
 
     renderLobbyPage();
 
-    expect(await screen.findByText("Giganttic Org")).toBeVisible();
-
-    const leaveOrganizationButton = screen.getAllByRole("button", { name: "Leave" })[1];
+    await screen.findByText("Apollo");
+    await user.click(screen.getByRole("button", { name: /^Organizations$/i }));
+    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root")!);
+    const leaveOrganizationButton = within(orgCard).getByRole("button", { name: "Leave" });
     await user.click(leaveOrganizationButton);
 
     expect(await screen.findByText(ORG_LOCKED_MESSAGE)).toBeVisible();

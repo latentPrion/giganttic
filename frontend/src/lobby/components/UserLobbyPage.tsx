@@ -59,9 +59,9 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
   const [lobbyData, setLobbyData] = useState<LobbyData>(createInitialLobbyData);
   const [knownLockedOrganizations, setKnownLockedOrganizations] = useState<number[]>([]);
   const [knownLockedTeams, setKnownLockedTeams] = useState<number[]>([]);
-  const [isOrganizationsOpen, setIsOrganizationsOpen] = useState(true);
+  const [isOrganizationsOpen, setIsOrganizationsOpen] = useState(false);
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
-  const [isTeamsOpen, setIsTeamsOpen] = useState(true);
+  const [isTeamsOpen, setIsTeamsOpen] = useState(false);
 
   const loadLobbyData = useCallback(async () => {
     setIsLoading(true);
