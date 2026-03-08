@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  HttpCode,
   Get,
   Inject,
   Param,
@@ -21,9 +22,11 @@ import {
   deleteTeamResponseSchema,
   getTeamResponseSchema,
   listTeamsResponseSchema,
+  teamRoleAssignmentRequestSchema,
   teamIdParamSchema,
   updateTeamMembershipRequestSchema,
   updateTeamMembershipResponseSchema,
+  updateTeamRoleAssignmentResponseSchema,
   updateTeamRequestSchema,
   updateTeamResponseSchema,
 } from "./teams.contracts.js";
@@ -90,6 +93,42 @@ export class TeamsController {
 
     return updateTeamMembershipResponseSchema.parse(
       await this.teamsService.replaceTeamMembers(
+        request.authContext!,
+        teamId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":teamId/roles/grant")
+  @HttpCode(200)
+  async grantTeamRole(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(teamIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(teamRoleAssignmentRequestSchema)) body: unknown,
+  ) {
+    const { teamId } = teamIdParamSchema.parse(params);
+
+    return updateTeamRoleAssignmentResponseSchema.parse(
+      await this.teamsService.grantTeamRole(
+        request.authContext!,
+        teamId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":teamId/roles/revoke")
+  @HttpCode(200)
+  async revokeTeamRole(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(teamIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(teamRoleAssignmentRequestSchema)) body: unknown,
+  ) {
+    const { teamId } = teamIdParamSchema.parse(params);
+
+    return updateTeamRoleAssignmentResponseSchema.parse(
+      await this.teamsService.revokeTeamRole(
         request.authContext!,
         teamId,
         body as never,

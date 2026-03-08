@@ -1,7 +1,7 @@
 # Authorization
 
-This document describes the authorization rules currently implemented in the
-backend for auth/session, teams, and projects.
+This document describes the backend authorization and role-transfer rules
+currently implemented for auth/session, teams, projects, and user deletion.
 
 ## Core Role Domains
 
@@ -14,9 +14,9 @@ Current role namespaces:
 
 Important distinction:
 
-- auth/session payload `user.roles` currently contains system roles only
-- project and team role checks are evaluated from their own scoped assignment
-  tables, not from `user.roles`
+- auth/session payload `user.roles` contains system roles only
+- project and team role checks are evaluated from scoped assignment tables
+- effective project-manager authority is computed, not stored
 
 ## Session and Auth Routes
 
@@ -33,9 +33,7 @@ Authorization rules:
 - `register` and `login` are anonymous routes
 - `session/me`, `session`, and `session/revoke` require bearer auth
 - a user may view or revoke xeir own sessions
-- a user with `GGTC_SYSTEMROLE_ADMIN` may view or revoke sessions for other
-  users
-- non-admin users may not manage other users' sessions
+- `GGTC_SYSTEMROLE_ADMIN` may view or revoke sessions for other users
 
 ## Teams
 
@@ -46,40 +44,43 @@ Current team routes:
 - `GET /stc-proj-mgmt/api/teams/:teamId`
 - `PATCH /stc-proj-mgmt/api/teams/:teamId`
 - `PUT /stc-proj-mgmt/api/teams/:teamId/members`
+- `POST /stc-proj-mgmt/api/teams/:teamId/roles/grant`
+- `POST /stc-proj-mgmt/api/teams/:teamId/roles/revoke`
 - `DELETE /stc-proj-mgmt/api/teams/:teamId`
 
-### Team creation
+### Team creation and visibility
 
 - any authenticated user may create a team
 - the creator is automatically inserted into `Teams_Users`
-- the creator is automatically granted
-  `GGTC_TEAMROLE_TEAM_MANAGER` in `Users_Teams_TeamRoles`
+- the creator is automatically granted `GGTC_TEAMROLE_TEAM_MANAGER`
+- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any team
+- non-admin users may list and fetch only teams where they are members
 
-### Team visibility
+### Team management authority
 
-- a user with `GGTC_SYSTEMROLE_ADMIN` may list and fetch any team
-- a non-admin user may list only teams where xe is a member
-- a non-admin user may fetch a team only if xe is a member of that team
-
-### Team update and deletion
-
-- `PATCH /teams/:teamId` requires either:
+- `PATCH /teams/:teamId` and `PUT /teams/:teamId/members` require either:
   - `GGTC_SYSTEMROLE_ADMIN`, or
-  - `GGTC_TEAMROLE_TEAM_MANAGER` for that team
-- `PUT /teams/:teamId/members` requires the same authorization
-- `DELETE /teams/:teamId` requires the same authorization
+  - direct `GGTC_TEAMROLE_TEAM_MANAGER` on that team
+- `DELETE /teams/:teamId` requires direct `GGTC_TEAMROLE_TEAM_MANAGER`
+- system admin may explicitly self-grant `GGTC_TEAMROLE_TEAM_MANAGER` on any
+  team and then use that direct ownership to delete it
+- `POST /teams/:teamId/roles/grant` and `.../revoke` use role-specific rules:
+  - `GGTC_TEAMROLE_TEAM_MANAGER` grant/revoke requires system admin or direct
+    `GGTC_TEAMROLE_TEAM_MANAGER`
+  - `GGTC_TEAMROLE_PROJECT_MANAGER` grant/revoke requires direct
+    `GGTC_TEAMROLE_PROJECT_MANAGER` on that same team
 
-### Team membership invariants
+### Team invariants
 
 - membership replacement is full replacement, not incremental patching
 - every submitted member must refer to an existing user
 - team member entries must be unique by `userId`
-- each submitted member's `roleCodes` array must not contain duplicates
-- after a membership update, the team must still contain at least one
-  `GGTC_TEAMROLE_TEAM_MANAGER`
-- removing the last team manager is rejected
-- this last-manager rule is intentionally bypassed when deleting the team
-  itself, because delete operates on the parent row and lets the DB cascade
+- each submitted member's `roleCodes` must be unique
+- a team must always retain at least one `GGTC_TEAMROLE_TEAM_MANAGER`
+- a team role target must already be a team member, except system admin
+  self-grant of `GGTC_TEAMROLE_TEAM_MANAGER`, which auto-adds admin as a member
+- deleting a team is blocked if removing that team would eliminate the final
+  effective project manager for any linked project
 
 ## Projects
 
@@ -90,54 +91,76 @@ Current project routes:
 - `GET /stc-proj-mgmt/api/projects/:projectId`
 - `PATCH /stc-proj-mgmt/api/projects/:projectId`
 - `PUT /stc-proj-mgmt/api/projects/:projectId/members`
+- `POST /stc-proj-mgmt/api/projects/:projectId/roles/grant`
+- `POST /stc-proj-mgmt/api/projects/:projectId/roles/revoke`
 - `DELETE /stc-proj-mgmt/api/projects/:projectId`
 
-### Project creation
+### Effective project-manager authority
+
+A user is treated as an effective project manager for a project if xe has either:
+
+- direct `GGTC_PROJECTROLE_PROJECT_MANAGER` on that project, or
+- `GGTC_TEAMROLE_PROJECT_MANAGER` on a team linked to that project through
+  `Projects_Teams`
+
+This effective authority is used for currently supported project-management
+operations.
+
+### Project creation and visibility
 
 - any authenticated user may create a project
 - the creator is automatically inserted into `Projects_Users`
-- the creator is automatically granted
-  `GGTC_PROJECTROLE_PROJECT_MANAGER` in
-  `Users_Projects_ProjectRoles`
+- the creator is automatically granted `GGTC_PROJECTROLE_PROJECT_MANAGER`
+- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any project
+- non-admin users may fetch a project if xe has direct access through
+  `Projects_Users` or indirect access through `Teams_Users` plus `Projects_Teams`
 
-### Project visibility
+### Project management authority
 
-- a user with `GGTC_SYSTEMROLE_ADMIN` may list and fetch any project
-- a non-admin user may access a project if xe has direct access through
-  `Projects_Users`
-- a non-admin user may also access a project if xe belongs to a team in
-  `Teams_Users` and that team is connected to the project through
-  `Projects_Teams`
-
-### Project update and deletion
-
-- `PATCH /projects/:projectId` requires either:
+- `PATCH /projects/:projectId`, `PUT /projects/:projectId/members`,
+  `POST /projects/:projectId/roles/grant`, and
+  `POST /projects/:projectId/roles/revoke` require either:
   - `GGTC_SYSTEMROLE_ADMIN`, or
-  - `GGTC_PROJECTROLE_PROJECT_MANAGER` for that project
-- `PUT /projects/:projectId/members` requires the same authorization
-- `DELETE /projects/:projectId` requires the same authorization
+  - effective project-manager authority
+- `DELETE /projects/:projectId` requires effective project-manager authority
+- system admin may explicitly self-grant direct
+  `GGTC_PROJECTROLE_PROJECT_MANAGER` on any project and then use that direct
+  ownership to delete it
 
-### Project membership invariants
+### Project invariants
 
-- membership replacement is full replacement, not incremental patching
+- direct membership replacement is full replacement
 - every submitted member must refer to an existing user
 - project member entries must be unique by `userId`
-- each submitted member's `roleCodes` array must not contain duplicates
-- after a membership update, the project must still contain at least one
+- each submitted member's `roleCodes` must be unique
+- the project must always retain at least one effective project manager after a
+  direct-membership or direct-role change
+- a direct project-role target must already be a direct project member, except
+  system admin self-grant of direct project-manager, which auto-adds admin as a
+  direct member
+- a direct last project manager may be removed if at least one linked-team
+  project manager still remains
+
+### Asymmetrical grant rules
+
+- an effective project manager may grant direct
   `GGTC_PROJECTROLE_PROJECT_MANAGER`
-- removing the last project manager is rejected
-- this last-manager rule is intentionally bypassed when deleting the project
-  itself, because delete operates on the parent row and lets the DB cascade
+- a team-scoped project manager may grant direct project-manager to a user
+  outside that team, as long as that user already has direct project membership
+- direct project-manager alone may not grant `GGTC_TEAMROLE_PROJECT_MANAGER`
+- there is currently no public API that mutates `Projects_Teams`
 
-## Functional Equivalence Note
+## Users
 
-`GGTC_TEAMROLE_PROJECT_MANAGER` is intended to be functionally relevant to
-project management at the product level, but the current backend CRUD
-authorization implemented today does not use it for project update/delete
-authorization. Current project-management route checks rely on:
+Current user route:
 
-- `GGTC_SYSTEMROLE_ADMIN`, or
-- `GGTC_PROJECTROLE_PROJECT_MANAGER` for the target project
+- `DELETE /stc-proj-mgmt/api/users/:userId`
 
-If team-scoped project-manager equivalence is later enforced in runtime
-authorization, this document should be updated along with the relevant tests.
+Authorization and integrity rules:
+
+- a user may delete themself
+- `GGTC_SYSTEMROLE_ADMIN` may delete another user
+- neither self-delete nor admin-delete may remove the final remaining:
+  - effective project manager for any project
+  - `GGTC_TEAMROLE_TEAM_MANAGER` for any team
+- deletion succeeds only after management responsibility has been transferred

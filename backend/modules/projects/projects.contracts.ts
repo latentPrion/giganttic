@@ -8,6 +8,8 @@ const PROJECT_UPDATE_REQUIRED_MESSAGE = "At least one field must be provided";
 const PROJECT_DUPLICATE_MEMBERS_MESSAGE = "Each project member must be unique";
 const PROJECT_DUPLICATE_ROLE_CODES_MESSAGE =
   "Role codes must be unique per member";
+const PROJECT_ROLE_ASSIGNMENT_REQUIRED_MESSAGE =
+  "A project role assignment requires userId and roleCode";
 
 function createOptionalDescriptionSchema() {
   return z.string().trim().min(1).nullable().optional();
@@ -54,6 +56,11 @@ export const updateProjectMembershipRequestSchema = z.object({
   ).min(1).refine(hasUniqueUserIds, PROJECT_DUPLICATE_MEMBERS_MESSAGE),
 });
 
+export const projectRoleAssignmentRequestSchema = z.object({
+  roleCode: PROJECT_ROLE_ENUM,
+  userId: z.number().int().positive(),
+}, PROJECT_ROLE_ASSIGNMENT_REQUIRED_MESSAGE);
+
 export const projectSchema = z.object({
   createdAt: z.string(),
   description: z.string().nullable(),
@@ -94,16 +101,27 @@ export const deleteProjectResponseSchema = z.object({
   deletedProjectId: z.number().int().positive(),
 });
 
+export const updateProjectRoleAssignmentResponseSchema = z.object({
+  members: z.array(projectMemberSchema),
+  projectId: z.number().int().positive(),
+});
+
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
 export type ProjectResponse = z.infer<typeof projectSchema>;
+export type ProjectRoleAssignmentRequest = z.infer<
+  typeof projectRoleAssignmentRequestSchema
+>;
 export type UpdateProjectMembershipRequest = z.infer<
   typeof updateProjectMembershipRequestSchema
 >;
 export type UpdateProjectMembershipResponse = z.infer<
   typeof updateProjectMembershipResponseSchema
+>;
+export type UpdateProjectRoleAssignmentResponse = z.infer<
+  typeof updateProjectRoleAssignmentResponseSchema
 >;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;

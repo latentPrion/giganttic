@@ -9,6 +9,8 @@ const TEAM_ID_PARAM_NAME = "teamId";
 const TEAM_UPDATE_REQUIRED_MESSAGE = "At least one field must be provided";
 const TEAM_DUPLICATE_MEMBERS_MESSAGE = "Each team member must be unique";
 const TEAM_DUPLICATE_ROLE_CODES_MESSAGE = "Role codes must be unique per member";
+const TEAM_ROLE_ASSIGNMENT_REQUIRED_MESSAGE =
+  "A team role assignment requires userId and roleCode";
 
 function createOptionalDescriptionSchema() {
   return z.string().trim().min(1).nullable().optional();
@@ -55,6 +57,11 @@ export const updateTeamMembershipRequestSchema = z.object({
   ).min(1).refine(hasUniqueUserIds, TEAM_DUPLICATE_MEMBERS_MESSAGE),
 });
 
+export const teamRoleAssignmentRequestSchema = z.object({
+  roleCode: TEAM_ROLE_ENUM,
+  userId: z.number().int().positive(),
+}, TEAM_ROLE_ASSIGNMENT_REQUIRED_MESSAGE);
+
 export const teamSchema = z.object({
   createdAt: z.string(),
   description: z.string().nullable(),
@@ -95,16 +102,27 @@ export const deleteTeamResponseSchema = z.object({
   deletedTeamId: z.number().int().positive(),
 });
 
+export const updateTeamRoleAssignmentResponseSchema = z.object({
+  members: z.array(teamMemberSchema),
+  teamId: z.number().int().positive(),
+});
+
 export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
 export type DeleteTeamResponse = z.infer<typeof deleteTeamResponseSchema>;
 export type GetTeamResponse = z.infer<typeof getTeamResponseSchema>;
 export type ListTeamsResponse = z.infer<typeof listTeamsResponseSchema>;
 export type TeamMember = z.infer<typeof teamMemberSchema>;
+export type TeamRoleAssignmentRequest = z.infer<
+  typeof teamRoleAssignmentRequestSchema
+>;
 export type TeamResponse = z.infer<typeof teamSchema>;
 export type UpdateTeamMembershipRequest = z.infer<
   typeof updateTeamMembershipRequestSchema
 >;
 export type UpdateTeamMembershipResponse = z.infer<
   typeof updateTeamMembershipResponseSchema
+>;
+export type UpdateTeamRoleAssignmentResponse = z.infer<
+  typeof updateTeamRoleAssignmentResponseSchema
 >;
 export type UpdateTeamRequest = z.infer<typeof updateTeamRequestSchema>;

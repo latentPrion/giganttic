@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  HttpCode,
   Get,
   Inject,
   Param,
@@ -21,9 +22,11 @@ import {
   deleteProjectResponseSchema,
   getProjectResponseSchema,
   listProjectsResponseSchema,
+  projectRoleAssignmentRequestSchema,
   projectIdParamSchema,
   updateProjectMembershipRequestSchema,
   updateProjectMembershipResponseSchema,
+  updateProjectRoleAssignmentResponseSchema,
   updateProjectRequestSchema,
   updateProjectResponseSchema,
 } from "./projects.contracts.js";
@@ -96,6 +99,42 @@ export class ProjectsController {
 
     return updateProjectMembershipResponseSchema.parse(
       await this.projectsService.replaceProjectMembers(
+        request.authContext!,
+        projectId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":projectId/roles/grant")
+  @HttpCode(200)
+  async grantProjectRole(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(projectRoleAssignmentRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return updateProjectRoleAssignmentResponseSchema.parse(
+      await this.projectsService.grantProjectRole(
+        request.authContext!,
+        projectId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":projectId/roles/revoke")
+  @HttpCode(200)
+  async revokeProjectRole(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(projectRoleAssignmentRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return updateProjectRoleAssignmentResponseSchema.parse(
+      await this.projectsService.revokeProjectRole(
         request.authContext!,
         projectId,
         body as never,

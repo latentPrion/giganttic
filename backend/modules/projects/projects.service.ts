@@ -8,17 +8,25 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
-  projectRoleCodes,
   projects,
   projectsTeams,
   projectsUsers,
-  systemRoleCodes,
   teamsUsers,
   users,
   usersProjectsProjectRoles,
 } from "../../../db/index.js";
-import { DatabaseService } from "../database/database.service.js";
+import {
+  assertUsersExistOrThrow,
+  hasDirectProjectMembership,
+  hasEffectiveProjectManagerRole,
+  hasProjectAccess,
+  hasSystemAdminRole,
+  listDirectProjectManagerUserIds,
+  listIndirectProjectManagerUserIds,
+  PROJECT_MANAGER_ROLE_CODE,
+} from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
+import { DatabaseService } from "../database/database.service.js";
 import type {
   CreateProjectRequest,
   DeleteProjectResponse,
@@ -26,16 +34,21 @@ import type {
   ListProjectsResponse,
   ProjectMember,
   ProjectResponse,
+  ProjectRoleAssignmentRequest,
   UpdateProjectMembershipRequest,
   UpdateProjectMembershipResponse,
   UpdateProjectRequest,
+  UpdateProjectRoleAssignmentResponse,
 } from "./projects.contracts.js";
 
-const PROJECT_MANAGER_ROLE_CODE = projectRoleCodes.projectManager;
-const PROJECT_ROLE_CODES = ["GGTC_PROJECTROLE_PROJECT_MANAGER"] as const;
-const SYSTEM_ADMIN_ROLE_CODE = systemRoleCodes.admin;
 const LAST_PROJECT_MANAGER_MESSAGE =
   "A project must retain at least one PROJECT_MANAGER member";
+const PROJECT_ROLE_ALREADY_ASSIGNED_MESSAGE =
+  "That project role is already assigned";
+const PROJECT_ROLE_NOT_ASSIGNED_MESSAGE =
+  "That project role assignment was not found";
+const PROJECT_ROLE_REQUIRES_DIRECT_MEMBERSHIP_MESSAGE =
+  "A direct project role requires direct project membership";
 
 function normalizeDescription(
   description: string | null | undefined,
@@ -79,12 +92,12 @@ function createProjectRoleRows(
     })));
 }
 
-function hasProjectManager(
+function extractDirectProjectManagerIds(
   payload: UpdateProjectMembershipRequest,
-): boolean {
-  return payload.members.some((member) =>
-    member.roleCodes.includes(PROJECT_MANAGER_ROLE_CODE),
-  );
+): number[] {
+  return payload.members
+    .filter((member) => member.roleCodes.includes(PROJECT_MANAGER_ROLE_CODE))
+    .map((member) => member.userId);
 }
 
 @Injectable()
@@ -104,9 +117,7 @@ export class ProjectsService {
           description: normalizeDescription(payload.description),
           name: payload.name.trim(),
         })
-        .returning({
-          id: projects.id,
-        })
+        .returning({ id: projects.id })
         .all();
 
       tx.insert(projectsUsers)
@@ -127,13 +138,11 @@ export class ProjectsService {
     });
     await this.databaseService.persist();
 
-    return {
-      project: this.getProjectRecordByIdOrThrow(createdProjectId),
-    };
+    return { project: this.getProjectRecordByIdOrThrow(createdProjectId) };
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {
-    if (this.hasSystemAdminRole(authContext)) {
+    if (hasSystemAdminRole(authContext)) {
       return {
         projects: this.databaseService.db
           .select()
@@ -192,9 +201,7 @@ export class ProjectsService {
     });
     await this.databaseService.persist();
 
-    return {
-      project: this.getProjectRecordByIdOrThrow(projectId),
-    };
+    return { project: this.getProjectRecordByIdOrThrow(projectId) };
   }
 
   async replaceProjectMembers(
@@ -205,10 +212,10 @@ export class ProjectsService {
     this.assertProjectExists(projectId);
     this.assertCanManageProject(authContext, projectId);
     this.assertUsersExist(payload.members.map((member) => member.userId));
-
-    if (!hasProjectManager(payload)) {
-      throw new ConflictException(LAST_PROJECT_MANAGER_MESSAGE);
-    }
+    this.assertProjectRetainsEffectiveManagerAfterMembershipReplace(
+      projectId,
+      payload,
+    );
 
     this.databaseService.db.transaction((tx) => {
       tx.delete(usersProjectsProjectRoles)
@@ -217,7 +224,6 @@ export class ProjectsService {
       tx.delete(projectsUsers)
         .where(eq(projectsUsers.projectId, projectId))
         .run();
-
       tx.insert(projectsUsers)
         .values(createProjectMembershipRows(projectId, payload))
         .run();
@@ -229,10 +235,61 @@ export class ProjectsService {
     });
     await this.databaseService.persist();
 
-    return {
-      members: this.listProjectMembers(projectId),
+    return this.buildProjectMembershipResponse(projectId);
+  }
+
+  async grantProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): Promise<UpdateProjectRoleAssignmentResponse> {
+    this.assertProjectExists(projectId);
+    this.assertUsersExist([payload.userId]);
+    this.assertCanGrantProjectRole(authContext, projectId, payload);
+    this.assertCanTargetDirectProjectRole(authContext, projectId, payload.userId);
+    this.assertProjectRoleAbsent(projectId, payload.userId, payload.roleCode);
+
+    this.databaseService.db.transaction((tx) => {
+      this.ensureDirectProjectMembershipForRoleGrant(tx, authContext, projectId, payload);
+      tx.insert(usersProjectsProjectRoles)
+        .values({
+          projectId,
+          roleCode: payload.roleCode,
+          userId: payload.userId,
+        })
+        .run();
+    });
+    await this.databaseService.persist();
+
+    return this.buildProjectMembershipResponse(projectId);
+  }
+
+  async revokeProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): Promise<UpdateProjectRoleAssignmentResponse> {
+    this.assertProjectExists(projectId);
+    this.assertUsersExist([payload.userId]);
+    this.assertCanRevokeProjectRole(authContext, projectId, payload);
+    this.assertProjectRolePresent(projectId, payload.userId, payload.roleCode);
+    this.assertProjectRetainsEffectiveManagerAfterRoleRevocation(
       projectId,
-    };
+      payload,
+    );
+
+    this.databaseService.db.transaction((tx) => {
+      tx.delete(usersProjectsProjectRoles)
+        .where(and(
+          eq(usersProjectsProjectRoles.projectId, projectId),
+          eq(usersProjectsProjectRoles.roleCode, payload.roleCode),
+          eq(usersProjectsProjectRoles.userId, payload.userId),
+        ))
+        .run();
+    });
+    await this.databaseService.persist();
+
+    return this.buildProjectMembershipResponse(projectId);
   }
 
   async deleteProject(
@@ -240,7 +297,7 @@ export class ProjectsService {
     projectId: number,
   ): Promise<DeleteProjectResponse> {
     this.assertProjectExists(projectId);
-    this.assertCanManageProject(authContext, projectId);
+    this.assertCanDeleteProject(authContext, projectId);
 
     this.databaseService.db.transaction((tx) => {
       tx.delete(usersProjectsProjectRoles)
@@ -258,37 +315,89 @@ export class ProjectsService {
     });
     await this.databaseService.persist();
 
-    return {
-      deletedProjectId: projectId,
-    };
+    return { deletedProjectId: projectId };
   }
 
-  private assertCanManageProject(authContext: AuthContext, projectId: number): void {
-    if (this.hasSystemAdminRole(authContext)) {
+  private assertCanDeleteProject(
+    authContext: AuthContext,
+    projectId: number,
+  ): void {
+    if (hasEffectiveProjectManagerRole(
+      this.databaseService.db,
+      projectId,
+      authContext.userId,
+    )) {
       return;
     }
 
-    const managerRow = this.databaseService.db
-      .select({ projectId: usersProjectsProjectRoles.projectId })
-      .from(usersProjectsProjectRoles)
-      .where(and(
-        eq(usersProjectsProjectRoles.projectId, projectId),
-        eq(usersProjectsProjectRoles.roleCode, PROJECT_MANAGER_ROLE_CODE),
-        eq(usersProjectsProjectRoles.userId, authContext.userId),
-      ))
-      .get();
+    throw new ForbiddenException("Not permitted to delete that project");
+  }
 
-    if (!managerRow) {
-      throw new ForbiddenException("Not permitted to manage that project");
+  private assertCanGrantProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): void {
+    if (this.canSelfGrantProjectManager(authContext, payload)) {
+      return;
     }
+
+    if (this.canManageProject(authContext, projectId)) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to grant that project role");
+  }
+
+  private assertCanManageProject(
+    authContext: AuthContext,
+    projectId: number,
+  ): void {
+    if (this.canManageProject(authContext, projectId)) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to manage that project");
+  }
+
+  private assertCanRevokeProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): void {
+    if (this.canSelfGrantProjectManager(authContext, payload)) {
+      return;
+    }
+
+    if (this.canManageProject(authContext, projectId)) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to revoke that project role");
+  }
+
+  private assertCanTargetDirectProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+    userId: number,
+  ): void {
+    if (hasDirectProjectMembership(this.databaseService.db, projectId, userId)) {
+      return;
+    }
+
+    if (hasSystemAdminRole(authContext) && authContext.userId === userId) {
+      return;
+    }
+
+    throw new ConflictException(PROJECT_ROLE_REQUIRES_DIRECT_MEMBERSHIP_MESSAGE);
   }
 
   private assertCanViewProject(authContext: AuthContext, projectId: number): void {
-    if (this.hasSystemAdminRole(authContext)) {
+    if (hasSystemAdminRole(authContext)) {
       return;
     }
 
-    if (!this.hasProjectAccess(authContext.userId, projectId)) {
+    if (!hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
       throw new ForbiddenException("Not permitted to access that project");
     }
   }
@@ -305,18 +414,135 @@ export class ProjectsService {
     }
   }
 
-  private assertUsersExist(userIds: number[]): void {
-    const distinctUserIds = [...new Set(userIds)];
-    const existingIds = this.databaseService.db
-      .select({ id: users.id })
-      .from(users)
-      .where(inArray(users.id, distinctUserIds))
-      .all()
-      .map((row) => row.id);
+  private assertProjectRetainsEffectiveManagerAfterMembershipReplace(
+    projectId: number,
+    payload: UpdateProjectMembershipRequest,
+  ): void {
+    const effectiveManagerIds = new Set([
+      ...extractDirectProjectManagerIds(payload),
+      ...listIndirectProjectManagerUserIds(this.databaseService.db, projectId),
+    ]);
 
-    if (existingIds.length !== distinctUserIds.length) {
+    if (effectiveManagerIds.size === 0) {
+      throw new ConflictException(LAST_PROJECT_MANAGER_MESSAGE);
+    }
+  }
+
+  private assertProjectRetainsEffectiveManagerAfterRoleRevocation(
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): void {
+    if (payload.roleCode !== PROJECT_MANAGER_ROLE_CODE) {
+      return;
+    }
+
+    const remainingManagerIds = new Set([
+      ...listDirectProjectManagerUserIds(this.databaseService.db, projectId)
+        .filter((userId) => userId !== payload.userId),
+      ...listIndirectProjectManagerUserIds(this.databaseService.db, projectId),
+    ]);
+
+    if (remainingManagerIds.size === 0) {
+      throw new ConflictException(LAST_PROJECT_MANAGER_MESSAGE);
+    }
+  }
+
+  private assertProjectRoleAbsent(
+    projectId: number,
+    userId: number,
+    roleCode: string,
+  ): void {
+    const existingRow = this.databaseService.db
+      .select({ id: usersProjectsProjectRoles.id })
+      .from(usersProjectsProjectRoles)
+      .where(and(
+        eq(usersProjectsProjectRoles.projectId, projectId),
+        eq(usersProjectsProjectRoles.roleCode, roleCode),
+        eq(usersProjectsProjectRoles.userId, userId),
+      ))
+      .get();
+
+    if (existingRow) {
+      throw new ConflictException(PROJECT_ROLE_ALREADY_ASSIGNED_MESSAGE);
+    }
+  }
+
+  private assertProjectRolePresent(
+    projectId: number,
+    userId: number,
+    roleCode: string,
+  ): void {
+    const existingRow = this.databaseService.db
+      .select({ id: usersProjectsProjectRoles.id })
+      .from(usersProjectsProjectRoles)
+      .where(and(
+        eq(usersProjectsProjectRoles.projectId, projectId),
+        eq(usersProjectsProjectRoles.roleCode, roleCode),
+        eq(usersProjectsProjectRoles.userId, userId),
+      ))
+      .get();
+
+    if (!existingRow) {
+      throw new NotFoundException(PROJECT_ROLE_NOT_ASSIGNED_MESSAGE);
+    }
+  }
+
+  private assertUsersExist(userIds: number[]): void {
+    if (!assertUsersExistOrThrow(this.databaseService.db, userIds)) {
       throw new NotFoundException("One or more users were not found");
     }
+  }
+
+  private buildProjectMembershipResponse(
+    projectId: number,
+  ): UpdateProjectRoleAssignmentResponse {
+    return {
+      members: this.listProjectMembers(projectId),
+      projectId,
+    };
+  }
+
+  private canManageProject(authContext: AuthContext, projectId: number): boolean {
+    if (hasSystemAdminRole(authContext)) {
+      return true;
+    }
+
+    return hasEffectiveProjectManagerRole(
+      this.databaseService.db,
+      projectId,
+      authContext.userId,
+    );
+  }
+
+  private canSelfGrantProjectManager(
+    authContext: AuthContext,
+    payload: ProjectRoleAssignmentRequest,
+  ): boolean {
+    return hasSystemAdminRole(authContext) &&
+      payload.roleCode === PROJECT_MANAGER_ROLE_CODE &&
+      payload.userId === authContext.userId;
+  }
+
+  private ensureDirectProjectMembershipForRoleGrant(
+    tx: DatabaseService["db"],
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectRoleAssignmentRequest,
+  ): void {
+    if (
+      !hasSystemAdminRole(authContext) ||
+      authContext.userId !== payload.userId ||
+      hasDirectProjectMembership(this.databaseService.db, projectId, payload.userId)
+    ) {
+      return;
+    }
+
+    tx.insert(projectsUsers)
+      .values({
+        projectId,
+        userId: payload.userId,
+      })
+      .run();
   }
 
   private getProjectRecordByIdOrThrow(projectId: number): ProjectResponse {
@@ -333,53 +559,22 @@ export class ProjectsService {
     return toProjectResponse(project);
   }
 
-  private hasProjectAccess(userId: number, projectId: number): boolean {
-    const directAccessRow = this.databaseService.db
-      .select({ projectId: projectsUsers.projectId })
-      .from(projectsUsers)
-      .where(and(
-        eq(projectsUsers.projectId, projectId),
-        eq(projectsUsers.userId, userId),
-      ))
-      .get();
-
-    if (directAccessRow) {
-      return true;
-    }
-
-    const teamAccessRow = this.databaseService.db
-      .select({ projectId: projectsTeams.projectId })
-      .from(projectsTeams)
-      .innerJoin(teamsUsers, eq(teamsUsers.teamId, projectsTeams.teamId))
-      .where(and(
-        eq(projectsTeams.projectId, projectId),
-        eq(teamsUsers.userId, userId),
-      ))
-      .get();
-
-    return Boolean(teamAccessRow);
-  }
-
-  private hasSystemAdminRole(authContext: AuthContext): boolean {
-    return authContext.roleCodes.includes(SYSTEM_ADMIN_ROLE_CODE);
-  }
-
   private listAccessibleProjectIds(userId: number): number[] {
-    const directProjectIds = this.databaseService.db
-      .select({ projectId: projectsUsers.projectId })
-      .from(projectsUsers)
-      .where(eq(projectsUsers.userId, userId))
-      .all()
-      .map((row) => row.projectId);
-    const teamDerivedProjectIds = this.databaseService.db
-      .select({ projectId: projectsTeams.projectId })
-      .from(projectsTeams)
-      .innerJoin(teamsUsers, eq(teamsUsers.teamId, projectsTeams.teamId))
-      .where(eq(teamsUsers.userId, userId))
-      .all()
-      .map((row) => row.projectId);
-
-    return [...new Set([...directProjectIds, ...teamDerivedProjectIds])];
+    return [...new Set([
+      ...this.databaseService.db
+        .select({ projectId: projectsUsers.projectId })
+        .from(projectsUsers)
+        .where(eq(projectsUsers.userId, userId))
+        .all()
+        .map((row) => row.projectId),
+      ...this.databaseService.db
+        .select({ projectId: projectsTeams.projectId })
+        .from(projectsTeams)
+        .innerJoin(teamsUsers, eq(teamsUsers.teamId, projectsTeams.teamId))
+        .where(eq(teamsUsers.userId, userId))
+        .all()
+        .map((row) => row.projectId),
+    ])];
   }
 
   private listProjectMembers(projectId: number): ProjectMember[] {
@@ -400,25 +595,14 @@ export class ProjectsService {
       })
       .from(usersProjectsProjectRoles)
       .where(eq(usersProjectsProjectRoles.projectId, projectId))
-      .orderBy(
-        asc(usersProjectsProjectRoles.userId),
-        asc(usersProjectsProjectRoles.roleCode),
-      )
       .all();
-    const roleCodesByUserId = new Map<number, Array<(typeof PROJECT_ROLE_CODES)[number]>>();
 
-    for (const roleRow of roleRows) {
-      const currentRoleCodes = roleCodesByUserId.get(roleRow.userId) ?? [];
-      currentRoleCodes.push(
-        roleRow.roleCode as (typeof PROJECT_ROLE_CODES)[number],
-      );
-      roleCodesByUserId.set(roleRow.userId, currentRoleCodes);
-    }
-
-    return membershipRows.map((membershipRow) => ({
-      roleCodes: roleCodesByUserId.get(membershipRow.userId) ?? [],
-      userId: membershipRow.userId,
-      username: membershipRow.username,
+    return membershipRows.map((member) => ({
+      roleCodes: roleRows
+        .filter((roleRow) => roleRow.userId === member.userId)
+        .map((roleRow) => roleRow.roleCode as typeof PROJECT_MANAGER_ROLE_CODE),
+      userId: member.userId,
+      username: member.username,
     }));
   }
 }

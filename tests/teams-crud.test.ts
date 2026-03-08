@@ -6,6 +6,7 @@ import {
   teams,
   teamsUsers,
   usersTeamsTeamRoles,
+  users,
 } from "../db/index.js";
 import {
   MISSING_ENTITY_ID,
@@ -117,6 +118,22 @@ describe("teams crud api", () => {
       harness.app.inject({
         method: "DELETE",
         url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}`,
+      }),
+      harness.app.inject({
+        method: "POST",
+        payload: {
+          roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+          userId: 1,
+        },
+        url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}/roles/grant`,
+      }),
+      harness.app.inject({
+        method: "POST",
+        payload: {
+          roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+          userId: 1,
+        },
+        url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}/roles/revoke`,
       }),
     ]);
 
@@ -335,6 +352,24 @@ describe("teams crud api", () => {
         method: "DELETE",
         url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}`,
       }),
+      harness.app.inject({
+        headers: harness.createAuthHeaders(admin.accessToken),
+        method: "POST",
+        payload: {
+          roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+          userId: admin.user.id,
+        },
+        url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}/roles/grant`,
+      }),
+      harness.app.inject({
+        headers: harness.createAuthHeaders(admin.accessToken),
+        method: "POST",
+        payload: {
+          roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+          userId: admin.user.id,
+        },
+        url: `/stc-proj-mgmt/api/teams/${MISSING_ENTITY_ID}/roles/revoke`,
+      }),
     ]);
 
     for (const response of responses) {
@@ -465,9 +500,8 @@ describe("teams crud api", () => {
     expect(roleRows[0]?.userId).toBe(otherManager.user.id);
   });
 
-  it("allows a team manager or sysadmin to delete a team and bypass the last-manager guard", async () => {
+  it("requires a sysadmin to self-grant team management before deleting a team", async () => {
     const creator = await harness.registerUser("team-delete-manager");
-    const outsider = await harness.registerUser("team-delete-outsider");
     const admin = await harness.loginSeededAdmin();
     const createResponse = await createTeam(creator.accessToken, {
       name: "Delete Team",
@@ -476,20 +510,28 @@ describe("teams crud api", () => {
       createResponse.payload,
     );
 
-    const forbiddenDelete = await harness.app.inject({
-      headers: harness.createAuthHeaders(outsider.accessToken),
+    const blockedDelete = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
       method: "DELETE",
       url: `/stc-proj-mgmt/api/teams/${team.id}`,
     });
-
-    expect(forbiddenDelete.statusCode).toBe(403);
-
+    const selfGrantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
     const deleteResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "DELETE",
       url: `/stc-proj-mgmt/api/teams/${team.id}`,
     });
 
+    expect(blockedDelete.statusCode).toBe(403);
+    expect(selfGrantResponse.statusCode).toBe(200);
     expect(deleteResponse.statusCode).toBe(200);
     expect(
       harness.databaseService.db
@@ -498,6 +540,524 @@ describe("teams crud api", () => {
         .where(eq(teams.id, team.id))
         .get(),
     ).toBeUndefined();
+  });
+
+  it("supports granting and revoking team manager roles", async () => {
+    const creator = await harness.registerUser("team-role-grant-creator");
+    const target = await harness.registerUser("team-role-grant-target");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team Role Grant",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: [],
+            userId: target.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/revoke`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(revokeResponse.statusCode).toBe(200);
+  });
+
+  it("rejects invalid team role payloads and unauthorized grant attempts", async () => {
+    const creator = await harness.registerUser("team-role-invalid-creator");
+    const outsider = await harness.registerUser("team-role-invalid-outsider");
+    const target = await harness.registerUser("team-role-invalid-target");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team Role Invalid",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const invalidRoleResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_NOT_REAL",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const invalidUserIdResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: 0,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const unauthorizedResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+
+    expect(invalidRoleResponse.statusCode).toBe(400);
+    expect(invalidUserIdResponse.statusCode).toBe(400);
+    expect(unauthorizedResponse.statusCode).toBe(403);
+  });
+
+  it("allows a team project manager to grant and revoke team project manager on the same team", async () => {
+    const creator = await harness.registerUser("team-pm-grant-creator");
+    const grantor = await harness.registerUser("team-pm-grant-grantor");
+    const target = await harness.registerUser("team-pm-grant-target");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team PM Grant",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: creator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: grantor.user.id },
+          { roleCodes: [], userId: target.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(grantor.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(grantor.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/revoke`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(revokeResponse.statusCode).toBe(200);
+  });
+
+  it("forbids cross-team team-project-manager grants and team-manager-only grants of team PM", async () => {
+    const firstCreator = await harness.registerUser("team-cross-grant-first-creator");
+    const secondCreator = await harness.registerUser("team-cross-grant-second-creator");
+    const grantor = await harness.registerUser("team-cross-grant-grantor");
+    const target = await harness.registerUser("team-cross-grant-target");
+    const teamOneResponse = await createTeam(firstCreator.accessToken, {
+      name: "Cross Grant Team One",
+    });
+    const teamTwoResponse = await createTeam(secondCreator.accessToken, {
+      name: "Cross Grant Team Two",
+    });
+    const { team: teamOne } = harness.parseJson<{ team: { id: number } }>(
+      teamOneResponse.payload,
+    );
+    const { team: teamTwo } = harness.parseJson<{ team: { id: number } }>(
+      teamTwoResponse.payload,
+    );
+    const teamOneMembership = await harness.app.inject({
+      headers: harness.createAuthHeaders(firstCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: firstCreator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: grantor.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamOne.id}/members`,
+    });
+    const teamTwoMembership = await harness.app.inject({
+      headers: harness.createAuthHeaders(secondCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: secondCreator.user.id },
+          { roleCodes: [], userId: target.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamTwo.id}/members`,
+    });
+
+    expect(teamOneMembership.statusCode).toBe(200);
+    expect(teamTwoMembership.statusCode).toBe(200);
+
+    const crossTeamGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(grantor.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamTwo.id}/roles/grant`,
+    });
+    const teamManagerOnlyGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(secondCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamTwo.id}/roles/grant`,
+    });
+
+    expect(crossTeamGrant.statusCode).toBe(403);
+    expect(teamManagerOnlyGrant.statusCode).toBe(403);
+  });
+
+  it("blocks revoking a team project manager when linked projects would be orphaned and keeps rows unchanged", async () => {
+    const creator = await harness.registerUser("team-revoke-orphan-creator");
+    const projectManager = await harness.registerUser("team-revoke-orphan-pm");
+    const projectOwner = await harness.registerUser("team-revoke-orphan-owner");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team Revoke Orphan",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: creator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: projectManager.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    const projectOneResponse = await createProject(projectOwner.accessToken, {
+      name: "Team Revoke Orphan Project One",
+    });
+    const projectTwoResponse = await createProject(projectOwner.accessToken, {
+      name: "Team Revoke Orphan Project Two",
+    });
+    const { project: projectOne } = harness.parseJson<{ project: { id: number } }>(
+      projectOneResponse.payload,
+    );
+    const { project: projectTwo } = harness.parseJson<{ project: { id: number } }>(
+      projectTwoResponse.payload,
+    );
+
+    expect(membershipResponse.statusCode).toBe(200);
+
+    harness.databaseService.db.insert(projectsTeams).values([
+      { projectId: projectOne.id, teamId: team.id },
+      { projectId: projectTwo.id, teamId: team.id },
+    ]).run();
+    await harness.databaseService.persist();
+    const demoteFirstOwner = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectManager.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectOne.id}/members`,
+    });
+    const demoteSecondOwner = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectManager.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectTwo.id}/members`,
+    });
+
+    const beforeRows = harness.databaseService.db
+      .select()
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.teamId, team.id))
+      .all();
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectManager.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: projectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/revoke`,
+    });
+    const afterRows = harness.databaseService.db
+      .select()
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.teamId, team.id))
+      .all();
+
+    expect(demoteFirstOwner.statusCode).toBe(200);
+    expect(demoteSecondOwner.statusCode).toBe(200);
+    expect(revokeResponse.statusCode).toBe(409);
+    expect(afterRows).toEqual(beforeRows);
+  });
+
+  it("allows deleting one of two linked teams when another linked team still preserves project-manager coverage", async () => {
+    const projectOwner = await harness.registerUser("team-delete-covered-owner");
+    const firstCreator = await harness.registerUser("team-delete-covered-first");
+    const firstPm = await harness.registerUser("team-delete-covered-first-pm");
+    const secondCreator = await harness.registerUser("team-delete-covered-second");
+    const secondPm = await harness.registerUser("team-delete-covered-second-pm");
+    const teamOneResponse = await createTeam(firstCreator.accessToken, {
+      name: "Delete Covered Team One",
+    });
+    const teamTwoResponse = await createTeam(secondCreator.accessToken, {
+      name: "Delete Covered Team Two",
+    });
+    const { team: teamOne } = harness.parseJson<{ team: { id: number } }>(
+      teamOneResponse.payload,
+    );
+    const { team: teamTwo } = harness.parseJson<{ team: { id: number } }>(
+      teamTwoResponse.payload,
+    );
+    const teamOneMembership = await harness.app.inject({
+      headers: harness.createAuthHeaders(firstCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: firstCreator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: firstPm.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamOne.id}/members`,
+    });
+    const teamTwoMembership = await harness.app.inject({
+      headers: harness.createAuthHeaders(secondCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: secondCreator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: secondPm.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamTwo.id}/members`,
+    });
+    const projectResponse = await createProject(projectOwner.accessToken, {
+      name: "Delete Covered Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      projectResponse.payload,
+    );
+
+    expect(teamOneMembership.statusCode).toBe(200);
+    expect(teamTwoMembership.statusCode).toBe(200);
+
+    harness.databaseService.db.insert(projectsTeams).values([
+      { projectId: project.id, teamId: teamOne.id },
+      { projectId: project.id, teamId: teamTwo.id },
+    ]).run();
+    await harness.databaseService.persist();
+
+    const ownerDemotion = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(firstCreator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/teams/${teamOne.id}`,
+    });
+
+    expect(ownerDemotion.statusCode).toBe(200);
+    expect(deleteResponse.statusCode).toBe(200);
+  });
+
+  it("rejects duplicate admin self-grants and 404s on team reads after deletion", async () => {
+    const creator = await harness.registerUser("team-admin-self-dup-creator");
+    const admin = await harness.loginSeededAdmin();
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team Admin Self Dup",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const firstGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const duplicateGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+    const getResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+
+    expect(firstGrant.statusCode).toBe(200);
+    expect(duplicateGrant.statusCode).toBe(409);
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(getResponse.statusCode).toBe(404);
+  });
+
+  it("removes admin self-granted team membership and roles when deleting a team", async () => {
+    const creator = await harness.registerUser("team-admin-cleanup-creator");
+    const admin = await harness.loginSeededAdmin();
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Team Admin Cleanup",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+    const lingeringMembership = harness.databaseService.db
+      .select()
+      .from(teamsUsers)
+      .where(eq(teamsUsers.userId, admin.user.id))
+      .all();
+    const lingeringRoles = harness.databaseService.db
+      .select()
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.userId, admin.user.id))
+      .all();
+
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(lingeringMembership).toHaveLength(0);
+    expect(lingeringRoles).toHaveLength(0);
+  });
+
+  it("blocks deleting a team when that would remove the final effective project manager from a linked project", async () => {
+    const creator = await harness.registerUser("team-delete-block-creator");
+    const teamProjectManager = await harness.registerUser("team-delete-block-pm");
+    const projectOwner = await harness.registerUser("team-delete-block-project-owner");
+    const teamCreateResponse = await createTeam(creator.accessToken, {
+      name: "Linked Team",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      teamCreateResponse.payload,
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"],
+            userId: teamProjectManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    const projectCreateResponse = await createProject(projectOwner.accessToken, {
+      name: "Linked Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      projectCreateResponse.payload,
+    );
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId: project.id,
+      teamId: team.id,
+    }).run();
+    await harness.databaseService.persist();
+
+    const projectMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [],
+            userId: projectOwner.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    expect(membershipResponse.statusCode).toBe(200);
+    expect(projectMembershipResponse.statusCode).toBe(200);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(409);
   });
 
   it("deleting a team cascades its memberships, role assignments, and project links", async () => {
