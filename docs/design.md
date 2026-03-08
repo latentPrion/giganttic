@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Gigantt is a TypeScript-first project management system intended to evolve into
+Giganttic is a TypeScript-first project management system intended to evolve into
 an application that turns conversations, documents, and other external inputs
 into structured project artifacts such as Gantt charts and related views.
 
@@ -133,7 +133,7 @@ test accounts for development and test use:
 - `testadminuser`
 - `testnoroleuser`
 
-The admin test account is granted `GGTT_ROLE_ADMIN`.
+The admin test account is granted `GGTC_ROLE_ADMIN`.
 
 ## Current Module Layout
 

@@ -7,8 +7,8 @@ Guidelines:
 
 Local auth test fixtures:
 
-- `testadminuser` / `testadminuser@gigantt.com`
-- `testnoroleuser` / `testnoroleuser@gigantt.com`
+- `testadminuser` / `testadminuser@giganttic.com`
+- `testnoroleuser` / `testnoroleuser@giganttic.com`
 - plaintext password for both seeded local accounts: `1234`
 
 Seeded Argon2id hashes used by backend bootstrap:

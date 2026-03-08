@@ -9,7 +9,7 @@ const config = JSON.parse(
 
 export const runtimeSqliteDbPath = path.resolve(
   process.cwd(),
-  "run/gigantt.sqlite",
+  "run/giganttic.sqlite",
 );
 
 export function getGeneratedSqlDdlDir(

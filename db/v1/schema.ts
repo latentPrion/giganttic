@@ -8,12 +8,12 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 export const credentialTypeCodes = {
-  usernamePassword: "GGTT_CREDTYPE_USERNAME_PASSWORD",
+  usernamePassword: "GGTC_CREDTYPE_USERNAME_PASSWORD",
 } as const;
 
 export const roleCodes = {
-  admin: "GGTT_ROLE_ADMIN",
-  projectManager: "GGTT_ROLE_PROJECT_MANAGER",
+  admin: "GGTC_ROLE_ADMIN",
+  projectManager: "GGTC_ROLE_PROJECT_MANAGER",
 } as const;
 
 const nowTimestampExpression = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
@@ -257,12 +257,12 @@ export const authSeedData = {
     {
       code: roleCodes.projectManager,
       displayName: "Project Manager",
-      description: "Standard project management access within Gigantt.",
+      description: "Standard project management access within Giganttic.",
     },
     {
       code: roleCodes.admin,
       displayName: "Administrator",
-      description: "Full administrative access within Gigantt.",
+      description: "Full administrative access within Giganttic.",
     },
   ],
 } as const;

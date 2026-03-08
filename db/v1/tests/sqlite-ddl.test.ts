@@ -107,10 +107,10 @@ describe("generated sqlite ddl", () => {
       "INSERT INTO Users (id, username, email) VALUES (1, 'bob', 'bob@example.com');",
     );
     db.exec(
-      "INSERT INTO CredentialTypes (code, displayName) VALUES ('GGTT_CREDTYPE_USERNAME_PASSWORD', 'Username and Password');",
+      "INSERT INTO CredentialTypes (code, displayName) VALUES ('GGTC_CREDTYPE_USERNAME_PASSWORD', 'Username and Password');",
     );
     db.exec(
-      "INSERT INTO Users_CredentialTypes (id, userId, credentialTypeCode) VALUES (1, 1, 'GGTT_CREDTYPE_USERNAME_PASSWORD');",
+      "INSERT INTO Users_CredentialTypes (id, userId, credentialTypeCode) VALUES (1, 1, 'GGTC_CREDTYPE_USERNAME_PASSWORD');",
     );
     db.exec(
       "INSERT INTO Users_PasswordCredentials (userCredentialTypeId, passwordHash) VALUES (1, 'argon2id$hash1');",
@@ -118,7 +118,7 @@ describe("generated sqlite ddl", () => {
 
     expect(() =>
       db.exec(
-        "INSERT INTO Users_CredentialTypes (id, userId, credentialTypeCode) VALUES (2, 1, 'GGTT_CREDTYPE_USERNAME_PASSWORD');",
+        "INSERT INTO Users_CredentialTypes (id, userId, credentialTypeCode) VALUES (2, 1, 'GGTC_CREDTYPE_USERNAME_PASSWORD');",
       ),
     ).toThrow(/unique/i);
     expect(() =>

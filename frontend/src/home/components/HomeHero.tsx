@@ -11,7 +11,7 @@ import { LoggedOutSessionManager } from "../../auth/components/LoggedOutSessionM
 
 const GITHUB_HREF = "https://github.com/latentprion";
 const GITHUB_LABEL = "github.com/latentprion";
-const HERO_MESSAGE = "GiGantt, built by LatentPrion";
+const HERO_MESSAGE = "Giganttic, built by LatentPrion";
 const LINKEDIN_HREF = "https://www.linkedin.com/in/kofi-doku-atuah-0142054a/";
 const LINKEDIN_LABEL = "LinkedIn";
 

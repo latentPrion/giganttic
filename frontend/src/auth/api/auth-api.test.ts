@@ -38,7 +38,7 @@ describe("authApi", () => {
         user: {
           email: "user@example.com",
           id: 7,
-          roles: ["GGTT_ROLE_ADMIN"],
+          roles: ["GGTC_ROLE_ADMIN"],
           username: "user7",
         },
       }),

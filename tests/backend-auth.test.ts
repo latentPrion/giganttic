@@ -73,7 +73,7 @@ describe("backend auth api", () => {
   }
 
   beforeAll(async () => {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), "gigantt-auth-"));
+    tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-auth-"));
     app = await buildApp();
     databaseService = app.get(DatabaseService);
   });
@@ -148,7 +148,7 @@ describe("backend auth api", () => {
 
     expect(meResponse.statusCode).toBe(200);
     expect(meBody.user.username).toBe("testadminuser");
-    expect(meBody.user.roles).toContain("GGTT_ROLE_ADMIN");
+    expect(meBody.user.roles).toContain("GGTC_ROLE_ADMIN");
   });
 
   it("stores plain IPv6 unchanged and uses the first forwarded IP when proxies are present", async () => {
@@ -726,7 +726,7 @@ describe("backend auth api", () => {
       .where(eq(usersRoles.userId, noRoleRows[0]!.id))
       .all();
 
-    expect(adminRoles.map((row) => row.roleCode)).toEqual(["GGTT_ROLE_ADMIN"]);
+    expect(adminRoles.map((row) => row.roleCode)).toEqual(["GGTC_ROLE_ADMIN"]);
     expect(noRoleUserRoles).toEqual([]);
 
     const loginResponse = await app.inject({

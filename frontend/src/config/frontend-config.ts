@@ -1,6 +1,6 @@
 const DEFAULT_API_BASE_URL = "";
 const DEFAULT_ROUTE_PREFIX = "/stc-proj-mgmt/api";
-const DEFAULT_AUTH_TOKEN_STORAGE_KEY = "gigantt.auth.bearerToken";
+const DEFAULT_AUTH_TOKEN_STORAGE_KEY = "giganttic.auth.bearerToken";
 
 interface FrontendConfig {
   apiBaseUrl: string;

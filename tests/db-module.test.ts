@@ -31,7 +31,7 @@ describe("db module facade", () => {
     expect(parsedUser.username).toBe("facade-user");
     expect(parsedSession.id).toBe("facade-session");
     expect(credentialTypeCodes.usernamePassword).toBe(
-      "GGTT_CREDTYPE_USERNAME_PASSWORD",
+      "GGTC_CREDTYPE_USERNAME_PASSWORD",
     );
   });
 });

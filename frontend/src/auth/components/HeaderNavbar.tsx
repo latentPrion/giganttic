@@ -12,7 +12,7 @@ import { useSessionManager } from "../hooks/useSessionManager.js";
 import { LoggedInSessionManager } from "./LoggedInSessionManager.js";
 import { LoggedOutSessionManager } from "./LoggedOutSessionManager.js";
 
-const PRODUCT_NAME = "Gigantt";
+const PRODUCT_NAME = "Giganttic";
 const PRODUCT_TAGLINE = "Structured project control";
 const LOADING_SIZE = 20;
 

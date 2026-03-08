@@ -728,7 +728,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(
-      createAuthenticatedResponse(["GGTT_ROLE_PROJECT_MANAGER"]),
+      createAuthenticatedResponse(["GGTC_ROLE_PROJECT_MANAGER"]),
     );
 
     renderWithTheme(<App />);
@@ -743,7 +743,7 @@ describe("SessionManager", () => {
     const user = userEvent.setup();
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(
-      createAuthenticatedResponse(["GGTT_ROLE_ADMIN"]),
+      createAuthenticatedResponse(["GGTC_ROLE_ADMIN"]),
     );
 
     renderWithTheme(<App />);
@@ -761,8 +761,8 @@ describe("SessionManager", () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(
       createAuthenticatedResponse([
-        "GGTT_ROLE_PROJECT_MANAGER",
-        "GGTT_ROLE_ADMIN",
+        "GGTC_ROLE_PROJECT_MANAGER",
+        "GGTC_ROLE_ADMIN",
       ]),
     );
 

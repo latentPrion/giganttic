@@ -106,7 +106,7 @@ Behavior:
 - Multiple rows for the same `(userId, credentialTypeCode)` are allowed for
   credential types that support multiple credentials per user.
 - Password credentials are a special case: each user may have at most one
-  `GGTT_CREDTYPE_USERNAME_PASSWORD` credential instance.
+  `GGTC_CREDTYPE_USERNAME_PASSWORD` credential instance.
 
 `Users_PasswordCredentials`
 - `id`
@@ -150,11 +150,11 @@ Constraints and behavior:
 Current auth seed data includes:
 
 Credential types:
-- `GGTT_CREDTYPE_USERNAME_PASSWORD`
+- `GGTC_CREDTYPE_USERNAME_PASSWORD`
 
 Roles:
-- `GGTT_ROLE_PROJECT_MANAGER`
-- `GGTT_ROLE_ADMIN`
+- `GGTC_ROLE_PROJECT_MANAGER`
+- `GGTC_ROLE_ADMIN`
 
 ## Auth Model Notes
 

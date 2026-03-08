@@ -38,7 +38,7 @@ CREATE TABLE `Users_CredentialTypes` (
 	FOREIGN KEY (`credentialTypeCode`) REFERENCES `CredentialTypes`(`code`) ON UPDATE cascade ON DELETE restrict
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `Users_CredentialTypes_password_singleton_unique` ON `Users_CredentialTypes` (`userId`) WHERE "Users_CredentialTypes"."credentialTypeCode" = 'GGTT_CREDTYPE_USERNAME_PASSWORD';--> statement-breakpoint
+CREATE UNIQUE INDEX `Users_CredentialTypes_password_singleton_unique` ON `Users_CredentialTypes` (`userId`) WHERE "Users_CredentialTypes"."credentialTypeCode" = 'GGTC_CREDTYPE_USERNAME_PASSWORD';--> statement-breakpoint
 CREATE TABLE `Users_PasswordCredentials` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`userCredentialTypeId` integer NOT NULL,

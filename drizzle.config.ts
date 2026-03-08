@@ -5,7 +5,7 @@ export default defineConfig({
   out: "./db/v1/generated-sql-ddl",
   dialect: "sqlite",
   dbCredentials: {
-    url: "./run/gigantt.sqlite",
+    url: "./run/giganttic.sqlite",
   },
   strict: true,
   verbose: true,
