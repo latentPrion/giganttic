@@ -11,7 +11,8 @@ import {
   readGeneratedSqlStatements,
   runtimeSqliteDbPath,
 } from "../../apply-sql-ddl.mjs";
-import { activeSchemaVersion } from "../../config.js";
+
+const SCHEMA_VERSION = "v1";
 
 function querySingleValue(
   db: Database,
@@ -30,20 +31,24 @@ function querySingleValue(
 
 describe("generated sqlite ddl", () => {
   it("contains executable SQL statements", async () => {
-    const statements = await readGeneratedSqlStatements();
+    const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
     expect(statements.length).toBeGreaterThan(0);
-    expect(statements[0]).toContain("CREATE TABLE `CredentialTypes`");
-    expect(getGeneratedSqlDdlDir()).toContain(
-      `db/${activeSchemaVersion}/generated-sql-ddl`,
+    expect(
+      statements.some((statement) =>
+        statement.includes("CREATE TABLE `CredentialTypes`"),
+      ),
+    ).toBe(true);
+    expect(getGeneratedSqlDdlDir(SCHEMA_VERSION)).toContain(
+      `db/${SCHEMA_VERSION}/generated-sql-ddl`,
     );
-    expect(getGeneratedSqlDdlFilePath()).toContain(
-      `db/${activeSchemaVersion}/generated-sql-ddl/schema.sql`,
+    expect(getGeneratedSqlDdlFilePath(SCHEMA_VERSION)).toContain(
+      `db/${SCHEMA_VERSION}/generated-sql-ddl/schema.sql`,
     );
   });
 
   it("applies cleanly and creates the expected tables", async () => {
-    const outputPath = await applySqlDdl();
+    const outputPath = await applySqlDdl(runtimeSqliteDbPath, SCHEMA_VERSION);
     const SQL = await initSqlJs();
     const db = new SQL.Database(new Uint8Array(await readFile(outputPath)));
 
@@ -69,7 +74,7 @@ describe("generated sqlite ddl", () => {
   it("enforces unique username and email constraints", async () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
-    const statements = await readGeneratedSqlStatements();
+    const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
     db.exec("PRAGMA foreign_keys = ON;");
     for (const statement of statements) {
@@ -96,7 +101,7 @@ describe("generated sqlite ddl", () => {
   it("enforces singleton password credentials and session timestamp checks", async () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
-    const statements = await readGeneratedSqlStatements();
+    const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
     db.exec("PRAGMA foreign_keys = ON;");
     for (const statement of statements) {

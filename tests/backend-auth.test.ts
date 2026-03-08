@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
-import { users, usersRoles, usersSessions } from "../db/index.js";
+import { users, usersSessions, usersSystemRoles } from "../db/index.js";
 
 describe("backend auth api", () => {
   let app: NestFastifyApplication;
@@ -148,7 +148,7 @@ describe("backend auth api", () => {
 
     expect(meResponse.statusCode).toBe(200);
     expect(meBody.user.username).toBe("testadminuser");
-    expect(meBody.user.roles).toContain("GGTC_ROLE_ADMIN");
+    expect(meBody.user.roles).toContain("GGTC_SYSTEMROLE_ADMIN");
   });
 
   it("stores plain IPv6 unchanged and uses the first forwarded IP when proxies are present", async () => {
@@ -716,17 +716,19 @@ describe("backend auth api", () => {
     expect(noRoleRows).toHaveLength(1);
 
     const adminRoles = databaseService.db
-      .select({ roleCode: usersRoles.roleCode })
-      .from(usersRoles)
-      .where(eq(usersRoles.userId, adminRows[0]!.id))
+      .select({ roleCode: usersSystemRoles.roleCode })
+      .from(usersSystemRoles)
+      .where(eq(usersSystemRoles.userId, adminRows[0]!.id))
       .all();
     const noRoleUserRoles = databaseService.db
-      .select({ roleCode: usersRoles.roleCode })
-      .from(usersRoles)
-      .where(eq(usersRoles.userId, noRoleRows[0]!.id))
+      .select({ roleCode: usersSystemRoles.roleCode })
+      .from(usersSystemRoles)
+      .where(eq(usersSystemRoles.userId, noRoleRows[0]!.id))
       .all();
 
-    expect(adminRoles.map((row) => row.roleCode)).toEqual(["GGTC_ROLE_ADMIN"]);
+    expect(adminRoles.map((row) => row.roleCode)).toEqual([
+      "GGTC_SYSTEMROLE_ADMIN",
+    ]);
     expect(noRoleUserRoles).toEqual([]);
 
     const loginResponse = await app.inject({

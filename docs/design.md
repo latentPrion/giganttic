@@ -133,7 +133,7 @@ test accounts for development and test use:
 - `testadminuser`
 - `testnoroleuser`
 
-The admin test account is granted `GGTC_ROLE_ADMIN`.
+The admin test account is granted `GGTC_SYSTEMROLE_ADMIN`.
 
 ## Current Module Layout
 
@@ -158,14 +158,15 @@ Current DB structure is documented in
 At a high level:
 
 - version-agnostic DB helpers live directly in `db/`
-- version-specific schema code lives in `db/v1/`
-- version-specific tests live in `db/v1/tests/`
+- version-specific schema code lives in `db/<version>/`
+- version-specific tests live in `db/<version>/tests/`
 
 ### Tests
 
 Current automated tests live in:
 
 - `db/v1/tests/`
+- `db/v2/tests/`
 - `tests/`
 
 The current integration suite verifies both the auth/session backend behavior

@@ -21,13 +21,17 @@ import {
   authSeedData,
   credentialTypes,
   credentialTypeCodes,
-  roleCodes,
-  roles,
+  projectRoles,
+  systemRoleCodes,
+  systemRoles,
+  teamRoles,
   users,
   usersCredentialTypes,
   usersPasswordCredentials,
-  usersRoles,
+  usersProjectsProjectRoles,
   usersSessions,
+  usersSystemRoles,
+  usersTeamsTeamRoles,
 } from "../../../db/index.js";
 import {
   BACKEND_CONFIG,
@@ -60,20 +64,34 @@ export class AuthService {
         .values([...authSeedData.credentialTypes])
         .onConflictDoNothing()
         .run();
-      tx.insert(roles).values([...authSeedData.roles]).onConflictDoNothing().run();
+      tx
+        .insert(systemRoles)
+        .values([...authSeedData.systemRoles])
+        .onConflictDoNothing()
+        .run();
+      tx
+        .insert(projectRoles)
+        .values([...authSeedData.projectRoles])
+        .onConflictDoNothing()
+        .run();
+      tx
+        .insert(teamRoles)
+        .values([...authSeedData.teamRoles])
+        .onConflictDoNothing()
+        .run();
     });
     await this.databaseService.persist();
 
     await this.seedUser({
       email: seededTestAccounts.admin.email,
       passwordHash: seededTestAccounts.admin.passwordHash,
-      roleCode: roleCodes.admin,
+      systemRoleCode: systemRoleCodes.admin,
       username: seededTestAccounts.admin.username,
     });
     await this.seedUser({
       email: seededTestAccounts.noRole.email,
       passwordHash: seededTestAccounts.noRole.passwordHash,
-      roleCode: null,
+      systemRoleCode: null,
       username: seededTestAccounts.noRole.username,
     });
   }
@@ -240,10 +258,10 @@ export class AuthService {
 
     const roleRows = this.databaseService.db
       .select({
-        roleCode: usersRoles.roleCode,
+        roleCode: usersSystemRoles.roleCode,
       })
-      .from(usersRoles)
-      .where(eq(usersRoles.userId, session.userId))
+      .from(usersSystemRoles)
+      .where(eq(usersSystemRoles.userId, session.userId))
       .all();
 
     return {
@@ -357,9 +375,9 @@ export class AuthService {
 
   private async seedUser(seed: {
     email: string;
-    passwordHash: string;
-    roleCode: string | null;
-    username: string;
+      passwordHash: string;
+      systemRoleCode: string | null;
+      username: string;
   }): Promise<void> {
     this.databaseService.db.transaction((tx) => {
       let user = tx
@@ -452,16 +470,18 @@ export class AuthService {
           .run();
       }
 
-      if (seed.roleCode) {
-        tx.insert(usersRoles)
+      if (seed.systemRoleCode) {
+        tx.insert(usersSystemRoles)
           .values({
-            roleCode: seed.roleCode,
+            roleCode: seed.systemRoleCode,
             userId: user.id,
           })
           .onConflictDoNothing()
           .run();
       } else {
-        tx.delete(usersRoles).where(eq(usersRoles.userId, user.id)).run();
+        tx.delete(usersSystemRoles)
+          .where(eq(usersSystemRoles.userId, user.id))
+          .run();
       }
     });
 
@@ -485,10 +505,10 @@ export class AuthService {
 
     const roleRows = this.databaseService.db
       .select({
-        roleCode: usersRoles.roleCode,
+        roleCode: usersSystemRoles.roleCode,
       })
-      .from(usersRoles)
-      .where(eq(usersRoles.userId, userId))
+      .from(usersSystemRoles)
+      .where(eq(usersSystemRoles.userId, userId))
       .all();
 
     return {
@@ -543,7 +563,7 @@ export class AuthService {
   ): void {
     if (
       authContext.userId !== targetUserId &&
-      !authContext.roleCodes.includes(roleCodes.admin)
+      !authContext.roleCodes.includes(systemRoleCodes.admin)
     ) {
       throw new ForbiddenException("Not permitted to access those sessions");
     }

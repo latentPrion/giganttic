@@ -2,6 +2,9 @@ import {
   activeSchemaVersion,
   availableSchemaVersions,
   credentialTypeCodes,
+  projectsInsertSchema,
+  systemRoleCodes,
+  teamsInsertSchema,
   users,
   usersInsertSchema,
   usersSessionsInsertSchema,
@@ -11,6 +14,7 @@ import { describe, expect, it } from "vitest";
 describe("db module facade", () => {
   it("resolves the configured schema version through the db alias", () => {
     expect(availableSchemaVersions).toContain(activeSchemaVersion);
+    expect(activeSchemaVersion).toBe("v2");
     expect(users).toBeDefined();
   });
 
@@ -27,11 +31,22 @@ describe("db module facade", () => {
       startTimestamp: new Date("2026-03-07T12:00:00.000Z"),
       expirationTimestamp: new Date("2026-03-07T13:00:00.000Z"),
     });
+    const parsedProject = projectsInsertSchema.parse({
+      description: "Project description",
+      name: "Shared Name",
+    });
+    const parsedTeam = teamsInsertSchema.parse({
+      description: null,
+      name: "Shared Name",
+    });
 
     expect(parsedUser.username).toBe("facade-user");
     expect(parsedSession.id).toBe("facade-session");
+    expect(parsedProject.name).toBe("Shared Name");
+    expect(parsedTeam.name).toBe("Shared Name");
     expect(credentialTypeCodes.usernamePassword).toBe(
       "GGTC_CREDTYPE_USERNAME_PASSWORD",
     );
+    expect(systemRoleCodes.admin).toBe("GGTC_SYSTEMROLE_ADMIN");
   });
 });

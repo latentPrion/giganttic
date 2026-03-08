@@ -1,7 +1,7 @@
 # Data Model
 
 This document describes the current database layout and the active auth-oriented
-data model implemented in [db/v1/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v1/schema.ts).
+data model implemented in [db/v2/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts).
 
 ## DB Structure
 
@@ -17,9 +17,9 @@ db/
 ├── index.ts
 ├── migrations/
 │   ├── README.md
-│   └── v1--v2/
+│   └── <from-version>--<to-version>/
 │       └── .gitkeep
-└── v1/
+└── <version-subdir>/
     ├── generated-sql-ddl/
     │   └── schema.sql
     ├── generated-zod/
@@ -47,7 +47,7 @@ Notes:
 
 - Primary table names use `UpperCamelCase`.
 - Relationship tables join primary table names with underscores, for example
-  `Users_Roles`.
+  `Users_Projects_ProjectRoles`.
 - Column names use `lowerCamelCase`.
 
 ## Current Schema
@@ -68,7 +68,33 @@ Constraints:
 - `username` is globally unique.
 - `email` is globally unique.
 
-`Roles`
+`Projects`
+- `id`
+- `name`
+- `description`
+- `createdAt`
+- `updatedAt`
+
+`Teams`
+- `id`
+- `name`
+- `description`
+- `createdAt`
+- `updatedAt`
+
+`SystemRoles`
+- `code`
+- `displayName`
+- `description`
+- `createdAt`
+
+`ProjectRoles`
+- `code`
+- `displayName`
+- `description`
+- `createdAt`
+
+`TeamRoles`
 - `code`
 - `displayName`
 - `description`
@@ -83,7 +109,34 @@ Constraints:
 
 ### Relationship and Auth Tables
 
-`Users_Roles`
+`Projects_Users`
+- `id`
+- `projectId`
+- `userId`
+- `createdAt`
+
+Constraints:
+- unique on `(projectId, userId)`
+
+`Teams_Users`
+- `id`
+- `teamId`
+- `userId`
+- `createdAt`
+
+Constraints:
+- unique on `(teamId, userId)`
+
+`Projects_Teams`
+- `id`
+- `projectId`
+- `teamId`
+- `createdAt`
+
+Constraints:
+- unique on `(projectId, teamId)`
+
+`Users_SystemRoles`
 - `id`
 - `userId`
 - `roleCode`
@@ -91,6 +144,26 @@ Constraints:
 
 Constraints:
 - unique on `(userId, roleCode)`
+
+`Users_Projects_ProjectRoles`
+- `id`
+- `userId`
+- `projectId`
+- `roleCode`
+- `createdAt`
+
+Constraints:
+- unique on `(userId, projectId, roleCode)`
+
+`Users_Teams_TeamRoles`
+- `id`
+- `userId`
+- `teamId`
+- `roleCode`
+- `createdAt`
+
+Constraints:
+- unique on `(userId, teamId, roleCode)`
 
 `Users_CredentialTypes`
 - `id`
@@ -152,13 +225,22 @@ Current auth seed data includes:
 Credential types:
 - `GGTC_CREDTYPE_USERNAME_PASSWORD`
 
-Roles:
-- `GGTC_ROLE_PROJECT_MANAGER`
-- `GGTC_ROLE_ADMIN`
+System roles:
+- `GGTC_SYSTEMROLE_ADMIN`
+
+Project roles:
+- `GGTC_PROJECTROLE_PROJECT_MANAGER`
+
+Team roles:
+- `GGTC_TEAMROLE_TEAM_MANAGER`
+- `GGTC_TEAMROLE_PROJECT_MANAGER`
 
 ## Auth Model Notes
 
-- A user may have zero or more roles.
+- A user may have zero or more system roles.
+- A user may have zero or more project-role assignments and team-role assignments.
+- A user may access a project directly through `Projects_Users` or indirectly
+  through team membership plus `Projects_Teams`.
 - A user must have at least one credential instance at registration time; that
   rule is enforced by application logic rather than a standalone SQLite schema
   constraint.
@@ -170,6 +252,6 @@ Roles:
 
 The current source of truth is:
 
-- Drizzle schema: [db/v1/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v1/schema.ts)
-- Versioned DB facade: [db/v1/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v1/index.ts)
+- Drizzle schema: [db/v2/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts)
+- Versioned DB facade: [db/v2/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/index.ts)
 - Root schema-agnostic facade: [db/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/index.ts)

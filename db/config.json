@@ -1,4 +1,4 @@
 {
-  "availableSchemaVersions": ["v1"],
-  "activeSchemaVersion": "v1"
+  "availableSchemaVersions": ["v1", "v2"],
+  "activeSchemaVersion": "v2"
 }

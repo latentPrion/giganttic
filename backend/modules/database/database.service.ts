@@ -9,12 +9,21 @@ import initSqlJs, { type Database as SqlJsDatabaseClient } from "sql.js";
 import {
   activeSchemaVersion,
   credentialTypes,
-  roles,
+  projectRoles,
+  projects,
+  projectsTeams,
+  projectsUsers,
+  systemRoles,
+  teamRoles,
+  teams,
+  teamsUsers,
   users,
   usersCredentialTypes,
   usersPasswordCredentials,
-  usersRoles,
+  usersProjectsProjectRoles,
   usersSessions,
+  usersSystemRoles,
+  usersTeamsTeamRoles,
 } from "../../../db/index.js";
 import {
   BACKEND_CONFIG,
@@ -24,12 +33,21 @@ import {
 
 const dbSchema = {
   credentialTypes,
-  roles,
+  projectRoles,
+  projects,
+  projectsTeams,
+  projectsUsers,
+  systemRoles,
+  teamRoles,
+  teams,
+  teamsUsers,
   users,
   usersCredentialTypes,
   usersPasswordCredentials,
-  usersRoles,
+  usersProjectsProjectRoles,
   usersSessions,
+  usersSystemRoles,
+  usersTeamsTeamRoles,
 } as const;
 
 @Injectable()
