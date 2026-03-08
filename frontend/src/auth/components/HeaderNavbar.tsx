@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 
 import { useSessionManager } from "../hooks/useSessionManager.js";
+import { HomeLink } from "./HomeLink.js";
 import { LoggedInSessionManager } from "./LoggedInSessionManager.js";
 import { LoggedOutSessionManager } from "./LoggedOutSessionManager.js";
 
@@ -47,12 +48,14 @@ export function HeaderNavbar({ navigation }: HeaderNavbarProps) {
           }}
         >
           <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: "100%", sm: "auto" } }}>
-            <Typography color="primary.main" variant="h6">
-              {PRODUCT_NAME}
-            </Typography>
-            <Typography color="rgba(255, 255, 255, 0.72)" variant="body2">
-              {PRODUCT_TAGLINE}
-            </Typography>
+            <HomeLink>
+              <Typography color="primary.main" variant="h6">
+                {PRODUCT_NAME}
+              </Typography>
+              <Typography color="rgba(255, 255, 255, 0.72)" variant="body2">
+                {PRODUCT_TAGLINE}
+              </Typography>
+            </HomeLink>
             {navigation ? (
               <Stack
                 direction="row"

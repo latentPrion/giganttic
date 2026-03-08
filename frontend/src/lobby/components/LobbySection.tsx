@@ -1,42 +1,34 @@
 import React from "react";
 import {
-  Button,
-  Paper,
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Stack,
   Typography,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 interface LobbySectionProps {
   children?: React.ReactNode;
   isOpen: boolean;
   title: string;
-  onToggle(): void;
+  onExpandedChange(expanded: boolean): void;
 }
 
 export function LobbySection(
-  { children, isOpen, onToggle, title }: LobbySectionProps,
+  { children, isOpen, onExpandedChange, title }: LobbySectionProps,
 ) {
   return (
-    <Paper className="lobby-section" elevation={0}>
-      <Button
-        className="lobby-section__toggle"
-        color="inherit"
-        fullWidth
-        onClick={onToggle}
-        sx={{ justifyContent: "space-between" }}
-      >
-        <Typography component="span" variant="h6">
-          {title}
-        </Typography>
-        <Typography component="span" variant="body2">
-          {isOpen ? "Hide" : "Show"}
-        </Typography>
-      </Button>
-      {isOpen ? (
-        <Stack className="lobby-section__body" spacing={1.5}>
-          {children}
-        </Stack>
-      ) : null}
-    </Paper>
+    <Accordion
+      expanded={isOpen}
+      onChange={(_, expanded) => onExpandedChange(expanded)}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography variant="h6">{title}</Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={1.5}>{children}</Stack>
+      </AccordionDetails>
+    </Accordion>
   );
 }

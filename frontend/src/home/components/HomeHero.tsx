@@ -25,36 +25,73 @@ export function HomeHero() {
     || authState.status === "loading";
 
   return (
-    <Box className="home-hero">
-      <Paper className="home-hero__paper" elevation={0}>
-        <Stack className="home-hero__content" spacing={3}>
-          <Typography className="home-hero__title" component="h1" variant="h1">
+    <Box
+      sx={{
+        alignItems: "center",
+        display: "flex",
+        flex: 1,
+        justifyContent: "center",
+        minHeight: 0,
+        padding: { xs: 1.5, sm: 2 },
+        width: "100%",
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          maxWidth: 832,
+          padding: { xs: 1.75, sm: 2.5 },
+          width: "100%",
+        }}
+      >
+        <Stack
+          alignItems="center"
+          spacing={3}
+          sx={{ maxWidth: 832, textAlign: "center", width: "100%" }}
+        >
+          <Typography
+            component="h1"
+            variant="h1"
+            sx={{
+              fontSize: { xs: "clamp(2.35rem, 12vw, 3.8rem)", sm: "clamp(2.8rem, 7vw, 5.8rem)" },
+              fontWeight: 900,
+              letterSpacing: "0.04em",
+              lineHeight: 1.02,
+              overflowWrap: "anywhere",
+            }}
+          >
             {HERO_MESSAGE}
           </Typography>
-          <Box className="home-hero__links-wrap">
-            <Stack
-              className="home-hero__links"
-              direction={{ sm: "row", xs: "column" }}
-              justifyContent="center"
-              spacing={2}
-            >
-              <Link href={GITHUB_HREF} rel="noreferrer" target="_blank" underline="hover">
-                {GITHUB_LABEL}
-              </Link>
-              <Divider
-                flexItem
-                orientation="vertical"
-                sx={{ display: { xs: "none", sm: "block" } }}
-              />
-              <Divider
-                flexItem
-                sx={{ display: { xs: "block", sm: "none" } }}
-              />
-              <Link href={LINKEDIN_HREF} rel="noreferrer" target="_blank" underline="hover">
-                {LINKEDIN_LABEL}
-              </Link>
-            </Stack>
-          </Box>
+          <Stack
+            direction={{ sm: "row", xs: "column" }}
+            justifyContent="center"
+            spacing={2}
+            sx={(theme) => ({
+              alignItems: "center",
+              backgroundColor: theme.palette.action.hover,
+              border: 1,
+              borderColor: theme.palette.divider,
+              borderRadius: 999,
+              padding: "0.5rem 1.25rem",
+              width: "100%",
+            })}
+          >
+            <Link href={GITHUB_HREF} rel="noreferrer" target="_blank" underline="hover">
+              {GITHUB_LABEL}
+            </Link>
+            <Divider
+              flexItem
+              orientation="vertical"
+              sx={{ display: { xs: "none", sm: "block" } }}
+            />
+            <Divider
+              flexItem
+              sx={{ display: { xs: "block", sm: "none" } }}
+            />
+            <Link href={LINKEDIN_HREF} rel="noreferrer" target="_blank" underline="hover">
+              {LINKEDIN_LABEL}
+            </Link>
+          </Stack>
         {shouldShowAuthCta ? (
           <LoggedOutSessionManager
             buttonSize="large"

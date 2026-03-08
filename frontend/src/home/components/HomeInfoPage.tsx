@@ -13,13 +13,28 @@ interface HomeInfoPageProps {
 
 export function HomeInfoPage({ body, title }: HomeInfoPageProps) {
   return (
-    <Box className="home-page">
-      <Paper className="home-page__paper" elevation={0}>
+    <Box
+      sx={{
+        display: "flex",
+        flex: 1,
+        justifyContent: "center",
+        padding: { xs: 1.5, sm: 2 },
+        width: "100%",
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          maxWidth: 832,
+          padding: { xs: 1.75, sm: 2.5 },
+          width: "100%",
+        }}
+      >
         <Stack spacing={2}>
-          <Typography className="home-page__title" component="h1" variant="h3">
+          <Typography component="h1" variant="h3">
             {title}
           </Typography>
-          <Typography className="home-page__body" variant="body1">
+          <Typography color="text.secondary" variant="body1" sx={{ lineHeight: 1.75 }}>
             {body}
           </Typography>
         </Stack>

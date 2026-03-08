@@ -21,7 +21,7 @@ const USER_LOBBY_ROUTES_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
   "spas/user-lobby/routes",
 );
-const STYLES_DIRECTORY = path.resolve(FRONTEND_SOURCE_DIRECTORY, "styles");
+const THEME_DIRECTORY = path.resolve(FRONTEND_SOURCE_DIRECTORY, "theme");
 
 function readFrontendFile(...relativeSegments: string[]) {
   return fs.readFileSync(
@@ -58,27 +58,30 @@ function readUserLobbyRouteFile(filename: string) {
   );
 }
 
-function readStylesFile(filename: string) {
-  return fs.readFileSync(path.resolve(STYLES_DIRECTORY, filename), "utf8");
+function readThemeFile(filename: string) {
+  return fs.readFileSync(path.resolve(THEME_DIRECTORY, filename), "utf8");
 }
 
 describe("responsive layout contracts", () => {
-  it("uses mobile-safe viewport sizing and overflow guards in the app shell css", () => {
-    const stylesheet = readStylesFile("app.css");
+  it("uses theme CssBaseline for viewport sizing and overflow guards", () => {
+    const appShellSource = readFrontendFile("app/shell/AppShell.tsx");
+    const themeSource = readThemeFile("app-theme.ts");
 
-    expect(stylesheet).toContain("box-sizing: border-box;");
-    expect(stylesheet).toContain("overflow-x: hidden;");
-    expect(stylesheet).toContain("min-height: 100dvh;");
-    expect(stylesheet).toContain("width: 100%;");
+    expect(themeSource).toContain("MuiCssBaseline");
+    expect(themeSource).toContain("overflowX");
+    expect(themeSource).toContain("minHeight");
+    expect(appShellSource).toContain("100dvh");
+    expect(appShellSource).toContain("flex");
   });
 
-  it("keeps hero content wrappable and defines a narrow-screen media rule", () => {
-    const stylesheet = readStylesFile("app.css");
+  it("keeps hero content wrappable and responsive via sx", () => {
+    const source = readHomeComponentFile("HomeHero.tsx");
 
-    expect(stylesheet).toContain(".home-hero__content");
-    expect(stylesheet).toContain("overflow-wrap: anywhere;");
-    expect(stylesheet).toContain("@media (max-width: 640px)");
-    expect(stylesheet).toContain("font-size: clamp(2.35rem, 12vw, 3.8rem);");
+    expect(source).toContain("overflowWrap");
+    expect(source).toContain("anywhere");
+    expect(source).toContain("clamp(");
+    expect(source).toContain("xs");
+    expect(source).toContain("sm");
   });
 
   it("makes the navbar toolbar wrap and release width pressure on small screens", () => {

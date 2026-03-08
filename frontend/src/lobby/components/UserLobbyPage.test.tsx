@@ -154,17 +154,22 @@ describe("UserLobbyPage", () => {
     renderLobbyPage();
 
     expect(await screen.findByText("Apollo")).toBeVisible();
+    const projectsButton = screen.getByRole("button", { name: /Projects/i });
+    expect(projectsButton).toHaveAttribute("aria-expanded", "true");
 
-    await user.click(screen.getByRole("button", { name: /Projects/i }));
+    await user.click(projectsButton);
 
     await waitFor(() => {
-      expect(screen.queryByText("Apollo")).not.toBeInTheDocument();
+      expect(projectsButton).toHaveAttribute("aria-expanded", "false");
     });
-    expect(screen.getByText("Show")).toBeVisible();
+    expect(screen.getByText("Apollo")).not.toBeVisible();
 
-    await user.click(screen.getByRole("button", { name: /Projects/i }));
+    await user.click(projectsButton);
 
-    expect(await screen.findByText("Apollo")).toBeVisible();
+    await waitFor(() => {
+      expect(projectsButton).toHaveAttribute("aria-expanded", "true");
+    });
+    expect(screen.getByText("Apollo")).toBeVisible();
   });
 
   it("deletes a project and removes it from the lobby list", async () => {

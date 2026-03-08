@@ -11,7 +11,14 @@ interface AppShellProps {
 
 export function AppShell({ children, navigation }: AppShellProps) {
   return (
-    <Box className="app-shell">
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100dvh",
+        width: "100%",
+      }}
+    >
       <HeaderNavbar navigation={navigation} />
       <SessionManager />
       {children}

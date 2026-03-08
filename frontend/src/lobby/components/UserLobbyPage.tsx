@@ -184,23 +184,31 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
   const organizations = useMemo(() => lobbyData.organizations, [lobbyData.organizations]);
 
   return (
-    <Box className="lobby-page">
-      <Stack className="lobby-page__content" spacing={3}>
+    <Box
+      sx={{
+        display: "flex",
+        flex: 1,
+        justifyContent: "center",
+        padding: { xs: 1.5, sm: 2 },
+        width: "100%",
+      }}
+    >
+      <Stack spacing={3} sx={{ maxWidth: 1024, width: "100%" }}>
         <Stack spacing={1}>
-          <Typography className="lobby-page__eyebrow" variant="overline">
+          <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             User Lobby
           </Typography>
-          <Typography className="lobby-page__title" component="h1" variant="h3">
+          <Typography component="h1" variant="h3">
             Your projects, teams, and organizations
           </Typography>
-          <Typography color="rgba(255, 255, 255, 0.88)" variant="body1">
+          <Typography color="text.secondary" variant="body1">
             Manage the workspaces you belong to and take membership actions from a
             single dashboard.
           </Typography>
         </Stack>
         {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
         {isLoading ? (
-          <Paper className="lobby-page__paper" elevation={0}>
+          <Paper elevation={0} sx={{ padding: { xs: 1.75, sm: 2.5 } }}>
             <Stack alignItems="center" direction="row" spacing={1.5}>
               <CircularProgress size={22} />
               <Typography>Loading your lobby...</Typography>
@@ -210,16 +218,16 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
           <Stack spacing={2.5}>
             <LobbySection
               isOpen={isProjectsOpen}
-              onToggle={() => setIsProjectsOpen((currentValue) => !currentValue)}
+              onExpandedChange={setIsProjectsOpen}
               title="Projects"
             >
               {projects.length === 0 ? (
-                <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                <Typography color="text.secondary" variant="body2">
                   You do not have any associated projects yet.
                 </Typography>
               ) : (
                 projects.map((project) => (
-                  <Paper className="lobby-entity-card" elevation={0} key={project.id}>
+                  <Paper elevation={0} key={project.id} sx={{ padding: "1rem 1.25rem" }}>
                     <Stack
                       alignItems={{ sm: "center", xs: "flex-start" }}
                       direction={{ sm: "row", xs: "column" }}
@@ -229,7 +237,7 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
                       <Stack spacing={0.5}>
                         <Typography variant="h6">{project.name}</Typography>
                         {project.description ? (
-                          <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                          <Typography color="text.secondary" variant="body2">
                             {project.description}
                           </Typography>
                         ) : null}
@@ -249,16 +257,16 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
             </LobbySection>
             <LobbySection
               isOpen={isTeamsOpen}
-              onToggle={() => setIsTeamsOpen((currentValue) => !currentValue)}
+              onExpandedChange={setIsTeamsOpen}
               title="Teams"
             >
               {teams.length === 0 ? (
-                <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                <Typography color="text.secondary" variant="body2">
                   You do not have any associated teams yet.
                 </Typography>
               ) : (
                 teams.map((team) => (
-                  <Paper className="lobby-entity-card" elevation={0} key={team.id}>
+                  <Paper elevation={0} key={team.id} sx={{ padding: "1rem 1.25rem" }}>
                     <Stack
                       alignItems={{ sm: "center", xs: "flex-start" }}
                       direction={{ sm: "row", xs: "column" }}
@@ -268,7 +276,7 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
                       <Stack spacing={0.5}>
                         <Typography variant="h6">{team.name}</Typography>
                         {team.description ? (
-                          <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                          <Typography color="text.secondary" variant="body2">
                             {team.description}
                           </Typography>
                         ) : null}
@@ -289,16 +297,20 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
             </LobbySection>
             <LobbySection
               isOpen={isOrganizationsOpen}
-              onToggle={() => setIsOrganizationsOpen((currentValue) => !currentValue)}
+              onExpandedChange={setIsOrganizationsOpen}
               title="Organizations"
             >
               {organizations.length === 0 ? (
-                <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                <Typography color="text.secondary" variant="body2">
                   You do not have any associated organizations yet.
                 </Typography>
               ) : (
                 organizations.map((organization) => (
-                  <Paper className="lobby-entity-card" elevation={0} key={organization.id}>
+                  <Paper
+                    elevation={0}
+                    key={organization.id}
+                    sx={{ padding: "1rem 1.25rem" }}
+                  >
                     <Stack
                       alignItems={{ sm: "center", xs: "flex-start" }}
                       direction={{ sm: "row", xs: "column" }}
@@ -308,7 +320,7 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
                       <Stack spacing={0.5}>
                         <Typography variant="h6">{organization.name}</Typography>
                         {organization.description ? (
-                          <Typography color="rgba(255, 255, 255, 0.84)" variant="body2">
+                          <Typography color="text.secondary" variant="body2">
                             {organization.description}
                           </Typography>
                         ) : null}
