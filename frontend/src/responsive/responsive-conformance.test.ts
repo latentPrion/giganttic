@@ -13,6 +13,14 @@ const HOME_COMPONENTS_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
   "home/components",
 );
+const PUBLIC_HOME_LAYOUTS_DIRECTORY = path.resolve(
+  FRONTEND_SOURCE_DIRECTORY,
+  "spas/public-home/layouts",
+);
+const USER_LOBBY_ROUTES_DIRECTORY = path.resolve(
+  FRONTEND_SOURCE_DIRECTORY,
+  "spas/user-lobby/routes",
+);
 const STYLES_DIRECTORY = path.resolve(FRONTEND_SOURCE_DIRECTORY, "styles");
 
 function readFrontendFile(...relativeSegments: string[]) {
@@ -32,6 +40,20 @@ function readAuthComponentFile(filename: string) {
 function readHomeComponentFile(filename: string) {
   return fs.readFileSync(
     path.resolve(HOME_COMPONENTS_DIRECTORY, filename),
+    "utf8",
+  );
+}
+
+function readPublicHomeLayoutFile(filename: string) {
+  return fs.readFileSync(
+    path.resolve(PUBLIC_HOME_LAYOUTS_DIRECTORY, filename),
+    "utf8",
+  );
+}
+
+function readUserLobbyRouteFile(filename: string) {
+  return fs.readFileSync(
+    path.resolve(USER_LOBBY_ROUTES_DIRECTORY, filename),
     "utf8",
   );
 }
@@ -84,9 +106,12 @@ describe("responsive layout contracts", () => {
   });
 
   it("wires the landing shell through the shared app entry point", () => {
-    const source = readFrontendFile("App.tsx");
+    const appSource = readFrontendFile("App.tsx");
+    const publicLayoutSource = readPublicHomeLayoutFile("PublicHomeLayout.tsx");
+    const lobbyRouteSource = readUserLobbyRouteFile("LobbyRoute.tsx");
 
-    expect(source).toContain("<HeaderNavbar />");
-    expect(source).toContain("<HomeHero />");
+    expect(appSource).toContain("<AppRoutes />");
+    expect(publicLayoutSource).toContain("<AppShell");
+    expect(lobbyRouteSource).toContain("<UserLobbyPage");
   });
 });
