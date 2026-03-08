@@ -1,5 +1,6 @@
 import React from "react";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { authApi } from "./auth/api/auth-api.js";
@@ -104,6 +105,19 @@ describe("app routing", () => {
     expect(
       await screen.findByRole("link", { name: "Go to your lobby" }),
     ).toHaveAttribute("href", "/lobby");
+  });
+
+  it("navigates to the lobby when the authenticated username chip is clicked", async () => {
+    const user = userEvent.setup();
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />);
+
+    await user.click(await screen.findByRole("link", { name: "Go to your lobby" }));
+
+    expect(await screen.findByText("User Lobby")).toBeVisible();
+    expect(await screen.findByText("Your projects, teams, and organizations")).toBeVisible();
   });
 
   it("redirects unauthenticated lobby requests to the public home route", async () => {
