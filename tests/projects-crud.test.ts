@@ -144,7 +144,7 @@ describe("projects crud api", () => {
     }
   });
 
-  it("limits project visibility to direct members, team-derived access, and sysadmins", async () => {
+  it("limits project lobby visibility to direct members and team-derived access even for sysadmins", async () => {
     const creator = await harness.registerUser("project-view-creator");
     const teamCreator = await harness.registerUser("project-view-team-creator");
     const teamMember = await harness.registerUser("project-view-team-member");
@@ -200,12 +200,48 @@ describe("projects crud api", () => {
       method: "GET",
       url: `/stc-proj-mgmt/api/projects/${project.id}`,
     });
+    const creatorList = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects",
+    });
+    const teamMemberList = await harness.app.inject({
+      headers: harness.createAuthHeaders(teamMember.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects",
+    });
+    const outsiderList = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects",
+    });
+    const adminList = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects",
+    });
     const adminGet = await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "GET",
       url: `/stc-proj-mgmt/api/projects/${project.id}`,
     });
 
+    expect(
+      harness.parseJson<{ projects: Array<{ id: number }> }>(creatorList.payload).projects
+        .map((entry) => entry.id),
+    ).toContain(project.id);
+    expect(
+      harness.parseJson<{ projects: Array<{ id: number }> }>(teamMemberList.payload).projects
+        .map((entry) => entry.id),
+    ).toContain(project.id);
+    expect(
+      harness.parseJson<{ projects: Array<{ id: number }> }>(outsiderList.payload).projects
+        .map((entry) => entry.id),
+    ).not.toContain(project.id);
+    expect(
+      harness.parseJson<{ projects: Array<{ id: number }> }>(adminList.payload).projects
+        .map((entry) => entry.id),
+    ).not.toContain(project.id);
     expect(teamMemberGet.statusCode).toBe(200);
     expect(outsiderGet.statusCode).toBe(403);
     expect(adminGet.statusCode).toBe(200);

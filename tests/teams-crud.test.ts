@@ -143,7 +143,7 @@ describe("teams crud api", () => {
     }
   });
 
-  it("limits team visibility to members and sysadmins", async () => {
+  it("limits team lobby visibility to members even for sysadmins", async () => {
     const creator = await harness.registerUser("team-view-creator");
     const outsider = await harness.registerUser("team-view-outsider");
     const admin = await harness.loginSeededAdmin();
@@ -169,6 +169,11 @@ describe("teams crud api", () => {
       method: "GET",
       url: `/stc-proj-mgmt/api/teams/${team.id}`,
     });
+    const adminList = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/teams",
+    });
     const adminGet = await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "GET",
@@ -181,6 +186,10 @@ describe("teams crud api", () => {
     ).toContain(team.id);
     expect(
       harness.parseJson<{ teams: Array<{ id: number }> }>(outsiderList.payload).teams
+        .map((entry) => entry.id),
+    ).not.toContain(team.id);
+    expect(
+      harness.parseJson<{ teams: Array<{ id: number }> }>(adminList.payload).teams
         .map((entry) => entry.id),
     ).not.toContain(team.id);
     expect(outsiderGet.statusCode).toBe(403);

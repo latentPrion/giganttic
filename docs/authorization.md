@@ -62,11 +62,16 @@ Creation and visibility:
 - any authenticated user may create an organization
 - creator is inserted into `Users_Organizations`
 - creator is granted `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
-- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any organization
-- non-admin users may list and fetch organizations where xe is:
+- `GET /organizations` is user-scoped for everyone, including `GGTC_SYSTEMROLE_ADMIN`
+- users may list organizations where xe is:
   - a direct member
   - an indirect member through an org-owned team
   - or an org-role holder
+- `GET /organizations/:organizationId` remains broader than the lobby list surface:
+  - visible to org members under the rules above
+  - also visible to `GGTC_SYSTEMROLE_ADMIN`
+- broad admin discovery is intentionally deferred to a separate future admin SPA;
+  the current lobby is a normal user view even for admins
 
 Management authority:
 
@@ -107,8 +112,11 @@ Creation and visibility:
 - any authenticated user may create a team
 - creator is inserted into `Teams_Users`
 - creator is granted `GGTC_TEAMROLE_TEAM_MANAGER`
-- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any team
-- non-admin users may list and fetch only teams where they are members
+- `GET /teams` is user-scoped for everyone, including `GGTC_SYSTEMROLE_ADMIN`
+- users may list only teams where they are members
+- `GET /teams/:teamId` remains accessible to `GGTC_SYSTEMROLE_ADMIN`
+- broad admin discovery is intentionally deferred to a separate future admin SPA;
+  the current lobby remains membership-scoped
 
 Effective team-manager authority means:
 
@@ -160,10 +168,13 @@ Visibility:
 - any authenticated user may create a project
 - creator is inserted into `Projects_Users`
 - creator is granted `GGTC_PROJECTROLE_PROJECT_MANAGER`
-- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any project
-- non-admin users may fetch a project if xe has:
+- `GET /projects` is user-scoped for everyone, including `GGTC_SYSTEMROLE_ADMIN`
+- users may list or fetch a project if xe has:
   - direct membership through `Projects_Users`, or
   - indirect access through `Teams_Users` plus `Projects_Teams`
+- `GET /projects/:projectId` is also visible to `GGTC_SYSTEMROLE_ADMIN`
+- broad admin discovery is intentionally deferred to a separate future admin SPA;
+  the current lobby remains association-scoped
 
 Effective project-manager authority means:
 

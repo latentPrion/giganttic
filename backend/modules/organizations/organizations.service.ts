@@ -157,17 +157,6 @@ export class OrganizationsService {
   }
 
   listOrganizations(authContext: AuthContext): ListOrganizationsResponse {
-    if (hasSystemAdminRole(authContext)) {
-      return {
-        organizations: this.databaseService.db
-          .select()
-          .from(organizations)
-          .orderBy(asc(organizations.id))
-          .all()
-          .map(toOrganizationResponse),
-      };
-    }
-
     const visibleOrganizationIds = this.listVisibleOrganizationIds(authContext.userId);
     if (visibleOrganizationIds.length === 0) {
       return { organizations: [] };

@@ -212,11 +212,15 @@ Current responsibilities:
 
 - render the application shell header/navbar
 - host session-aware login, registration, current-session lookup, and logout UI
+- host the normal user lobby SPA for the current user's associated projects,
+  teams, and organizations
 - validate auth REST payloads at the transport boundary with Zod before data
   enters frontend state
 
 Planned future responsibilities:
 
+- add a separate admin SPA for broad administrative discovery and management of
+  entities outside the current user's normal associations
 - host DHTMLX Gantt
 - render future project-management views
 - communicate with the backend REST API

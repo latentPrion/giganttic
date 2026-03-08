@@ -157,17 +157,6 @@ export class TeamsService {
   }
 
   listTeams(authContext: AuthContext): ListTeamsResponse {
-    if (hasSystemAdminRole(authContext)) {
-      return {
-        teams: this.databaseService.db
-          .select()
-          .from(teams)
-          .orderBy(asc(teams.id))
-          .all()
-          .map(toTeamResponse),
-      };
-    }
-
     const teamIds = this.databaseService.db
       .select({ teamId: teamsUsers.teamId })
       .from(teamsUsers)

@@ -146,17 +146,6 @@ export class ProjectsService {
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {
-    if (hasSystemAdminRole(authContext)) {
-      return {
-        projects: this.databaseService.db
-          .select()
-          .from(projects)
-          .orderBy(asc(projects.id))
-          .all()
-          .map(toProjectResponse),
-      };
-    }
-
     const accessibleProjectIds = this.listAccessibleProjectIds(authContext.userId);
     if (accessibleProjectIds.length === 0) {
       return { projects: [] };

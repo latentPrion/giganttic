@@ -669,6 +669,7 @@ describe("organizations crud api", () => {
     const creator = await harness.registerUser("org-indirect-creator");
     const teamOwner = await harness.registerUser("org-indirect-team-owner");
     const indirectMember = await harness.registerUser("org-indirect-member");
+    const admin = await harness.loginSeededAdmin();
     const orgResponse = await createOrganization(creator.accessToken, { name: "Indirect Visibility Org" });
     const teamResponse = await createTeam(teamOwner.accessToken, { name: "Indirect Visibility Team" });
     const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
@@ -692,16 +693,22 @@ describe("organizations crud api", () => {
       url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
     });
     const listResponse = await listOrganizations(indirectMember.accessToken);
+    const adminListResponse = await listOrganizations(admin.accessToken);
     const getResponse = await getOrganization(indirectMember.accessToken, organization.id);
     const listBody = harness.parseJson<{ organizations: Array<{ id: number }> }>(
       listResponse.payload,
+    );
+    const adminListBody = harness.parseJson<{ organizations: Array<{ id: number }> }>(
+      adminListResponse.payload,
     );
 
     expect(membershipResponse.statusCode).toBe(200);
     expect(teamAssign.statusCode).toBe(200);
     expect(listResponse.statusCode).toBe(200);
+    expect(adminListResponse.statusCode).toBe(200);
     expect(getResponse.statusCode).toBe(200);
     expect(listBody.organizations.some((row) => row.id === organization.id)).toBe(true);
+    expect(adminListBody.organizations.some((row) => row.id === organization.id)).toBe(false);
   });
 
   it("allows targeting org roles at indirect org members on org-owned teams", async () => {
