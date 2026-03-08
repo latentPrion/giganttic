@@ -8,10 +8,12 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  projectsOrganizations,
   projectsTeams,
   teams,
   teamsUsers,
   users,
+  usersOrganizationsOrganizationRoles,
   usersTeamsTeamRoles,
 } from "../../../db/index.js";
 import {
@@ -25,10 +27,10 @@ import {
   hasTeamProjectManagerRole,
   listDirectProjectManagerUserIds,
   listEffectiveTeamManagerUserIds,
-  listOrganizationProjectManagerUserIdsForProject,
   listProjectIdsForTeam,
   listTeamIdsForProject,
   listTeamProjectManagerUserIds,
+  ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
 } from "../access-control/access-control.utils.js";
@@ -235,6 +237,7 @@ export class TeamsService {
     this.assertLinkedProjectsRetainManagers(
       teamId,
       extractTeamProjectManagerIds(payload),
+      false,
     );
 
     this.databaseService.db.transaction((tx) => {
@@ -316,7 +319,7 @@ export class TeamsService {
   ): Promise<DeleteTeamResponse> {
     this.assertTeamExists(teamId);
     this.assertCanDeleteTeam(authContext, teamId);
-    this.assertLinkedProjectsRetainManagers(teamId, []);
+    this.assertLinkedProjectsRetainManagers(teamId, [], true);
 
     this.databaseService.db.transaction((tx) => {
       tx.delete(usersTeamsTeamRoles)
@@ -450,6 +453,7 @@ export class TeamsService {
   private assertLinkedProjectsRetainManagers(
     teamId: number,
     replacementTeamProjectManagerIds: number[],
+    treatChangedTeamAsRemoved: boolean,
   ): void {
     const linkedProjectIds = listProjectIdsForTeam(this.databaseService.db, teamId);
     for (const projectId of linkedProjectIds) {
@@ -458,6 +462,7 @@ export class TeamsService {
           projectId,
           teamId,
           replacementTeamProjectManagerIds,
+          treatChangedTeamAsRemoved,
         ).length === 0
       ) {
         throw new ConflictException(LAST_LINKED_PROJECT_MANAGER_MESSAGE);
@@ -478,7 +483,11 @@ export class TeamsService {
       teamId,
     ).filter((userId) => userId !== payload.userId);
 
-    this.assertLinkedProjectsRetainManagers(teamId, replacementTeamProjectManagerIds);
+    this.assertLinkedProjectsRetainManagers(
+      teamId,
+      replacementTeamProjectManagerIds,
+      false,
+    );
   }
 
   private assertTeamExists(teamId: number): void {
@@ -627,14 +636,16 @@ export class TeamsService {
     projectId: number,
     changedTeamId: number,
     replacementTeamProjectManagerIds: number[],
+    treatChangedTeamAsRemoved: boolean,
   ): number[] {
     const managerIds = new Set(listDirectProjectManagerUserIds(
       this.databaseService.db,
       projectId,
     ));
-    for (const userId of listOrganizationProjectManagerUserIdsForProject(
-      this.databaseService.db,
+    for (const userId of this.listOrganizationProjectManagerIdsForTeamChange(
       projectId,
+      changedTeamId,
+      treatChangedTeamAsRemoved,
     )) {
       managerIds.add(userId);
     }
@@ -656,6 +667,50 @@ export class TeamsService {
     }
 
     return [...managerIds];
+  }
+
+  private listOrganizationProjectManagerIdsForTeamChange(
+    projectId: number,
+    changedTeamId: number,
+    treatChangedTeamAsRemoved: boolean,
+  ): number[] {
+    const directOrganizationIds = this.databaseService.db
+      .select({ organizationId: projectsOrganizations.organizationId })
+      .from(projectsOrganizations)
+      .where(eq(projectsOrganizations.projectId, projectId))
+      .all()
+      .map((row) => row.organizationId);
+    const survivingTeamOrganizationIds = listTeamIdsForProject(
+      this.databaseService.db,
+      projectId,
+    )
+      .filter((teamId) => !treatChangedTeamAsRemoved || teamId !== changedTeamId)
+      .flatMap((teamId) => {
+        const organizationId = getOrganizationIdForTeam(this.databaseService.db, teamId);
+
+        return organizationId === null ? [] : [organizationId];
+      });
+    const organizationIds = [...new Set([
+      ...directOrganizationIds,
+      ...survivingTeamOrganizationIds,
+    ])];
+
+    if (organizationIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select({ userId: usersOrganizationsOrganizationRoles.userId })
+      .from(usersOrganizationsOrganizationRoles)
+      .where(and(
+        inArray(usersOrganizationsOrganizationRoles.organizationId, organizationIds),
+        eq(
+          usersOrganizationsOrganizationRoles.roleCode,
+          ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
+        ),
+      ))
+      .all()
+      .map((row) => row.userId);
   }
 
   private canOrganizationTeamManagerBootstrapMembership(

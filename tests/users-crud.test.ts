@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  projectsOrganizations,
   organizationsTeams,
   projects,
   projectsTeams,
@@ -10,6 +11,8 @@ import {
   teamsUsers,
   users,
   usersCredentialTypes,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
   usersPasswordCredentials,
   usersProjectsProjectRoles,
   usersSessions,
@@ -608,6 +611,275 @@ describe("users delete api", () => {
       url: `/stc-proj-mgmt/api/users/${target.user.id}`,
     });
 
+    expect(deleteResponse.statusCode).toBe(200);
+  });
+
+  it("blocks user deletion atomically when mixed direct, team-derived, and org-derived project coverage would be orphaned", async () => {
+    const manager = await harness.registerUser("users-mixed-project-manager");
+    const teamOwner = await harness.registerUser("users-mixed-team-owner");
+    const projectTwoOwner = await harness.registerUser("users-mixed-project-two-owner");
+    const projectThreeOwner = await harness.registerUser("users-mixed-project-three-owner");
+    const orgCreator = await harness.registerUser("users-mixed-org-creator");
+    const projectOneResponse = await createProject(manager.accessToken, {
+      name: "Mixed Direct Project",
+    });
+    const teamResponse = await createTeam(teamOwner.accessToken, {
+      name: "Mixed Project Team",
+    });
+    const projectTwoResponse = await createProject(projectTwoOwner.accessToken, {
+      name: "Mixed Team Project",
+    });
+    const projectThreeResponse = await createProject(projectThreeOwner.accessToken, {
+      name: "Mixed Org Project",
+    });
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Mixed Source Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const { project: projectOne } = harness.parseJson<{ project: { id: number } }>(
+      projectOneResponse.payload,
+    );
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamResponse.payload);
+    const { project: projectTwo } = harness.parseJson<{ project: { id: number } }>(
+      projectTwoResponse.payload,
+    );
+    const { project: projectThree } = harness.parseJson<{ project: { id: number } }>(
+      projectThreeResponse.payload,
+    );
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(teamOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: teamOwner.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: manager.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId: projectTwo.id,
+      teamId: team.id,
+    }).run();
+    await harness.databaseService.persist();
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { members: [{ userId: orgCreator.user.id }, { userId: manager.user.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: projectThree.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: manager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+
+    const beforeProjectRoles = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.userId, manager.user.id))
+      .all();
+    const beforeTeamRoles = harness.databaseService.db
+      .select()
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.userId, manager.user.id))
+      .all();
+    const beforeOrgRoles = harness.databaseService.db
+      .select()
+      .from(usersOrganizationsOrganizationRoles)
+      .where(eq(usersOrganizationsOrganizationRoles.userId, manager.user.id))
+      .all();
+
+    expect(projectOne.id).toBeGreaterThan(0);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(manager.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/users/${manager.user.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(409);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(usersProjectsProjectRoles)
+        .where(eq(usersProjectsProjectRoles.userId, manager.user.id))
+        .all(),
+    ).toEqual(beforeProjectRoles);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(usersTeamsTeamRoles)
+        .where(eq(usersTeamsTeamRoles.userId, manager.user.id))
+        .all(),
+    ).toEqual(beforeTeamRoles);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, manager.user.id))
+        .all(),
+    ).toEqual(beforeOrgRoles);
+  });
+
+  it("blocks user deletion when direct and org-derived team management would both be orphaned", async () => {
+    const manager = await harness.registerUser("users-mixed-team-manager");
+    const orgCreator = await harness.registerUser("users-mixed-team-org-creator");
+    const otherTeamOwner = await harness.registerUser("users-mixed-team-owner");
+    const directTeamResponse = await createTeam(manager.accessToken, {
+      name: "Direct Managed Team",
+    });
+    const orgTeamResponse = await createTeam(otherTeamOwner.accessToken, {
+      name: "Org Managed Team",
+    });
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Team Coverage Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const { team: directTeam } = harness.parseJson<{ team: { id: number } }>(
+      directTeamResponse.payload,
+    );
+    const { team: orgTeam } = harness.parseJson<{ team: { id: number } }>(
+      orgTeamResponse.payload,
+    );
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { members: [{ userId: orgCreator.user.id }, { userId: manager.user.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(otherTeamOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: otherTeamOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/teams/${orgTeam.id}/members`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { teamId: orgTeam.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
+        userId: manager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+
+    const beforeTeamRows = harness.databaseService.db
+      .select()
+      .from(teamsUsers)
+      .where(eq(teamsUsers.userId, manager.user.id))
+      .all();
+    const beforeOrgRows = harness.databaseService.db
+      .select()
+      .from(usersOrganizationsOrganizationRoles)
+      .where(eq(usersOrganizationsOrganizationRoles.userId, manager.user.id))
+      .all();
+
+    expect(directTeam.id).toBeGreaterThan(0);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(manager.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/users/${manager.user.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(409);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(teamsUsers)
+        .where(eq(teamsUsers.userId, manager.user.id))
+        .all(),
+    ).toEqual(beforeTeamRows);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, manager.user.id))
+        .all(),
+    ).toEqual(beforeOrgRows);
+  });
+
+  it("removes org visibility when a user is deleted and the org was only directly visible to that user", async () => {
+    const creator = await harness.registerUser("users-delete-org-vis-creator");
+    const target = await harness.registerUser("users-delete-org-vis-target");
+    const replacement = await harness.registerUser("users-delete-org-vis-replacement");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Delete User Visibility Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const projectResponse = await createProject(target.accessToken, {
+      name: "Delete User Visibility Project",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      projectResponse.payload,
+    );
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { members: [{ userId: creator.user.id }, { userId: target.user.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(target.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: target.user.id },
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: replacement.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    const beforeGet = await harness.app.inject({
+      headers: harness.createAuthHeaders(target.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(target.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/users/${target.user.id}`,
+    });
+
+    expect(beforeGet.statusCode).toBe(200);
     expect(deleteResponse.statusCode).toBe(200);
   });
 });

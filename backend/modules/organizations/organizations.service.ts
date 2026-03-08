@@ -28,11 +28,9 @@ import {
   hasSystemAdminRole,
   listDirectProjectManagerUserIds,
   listDirectTeamManagerUserIds,
-  listEffectiveProjectManagerUserIds,
   listIndirectProjectManagerUserIds,
   listOrganizationIdsForProject,
   listOrganizationRoleUserIds,
-  listProjectIdsForOrganization,
   listTeamIdsForOrganization,
   ORGANIZATION_MANAGER_ROLE_CODE,
   ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
@@ -489,24 +487,18 @@ export class OrganizationsService {
   }
 
   private assertOrganizationDeletionPreservesCoverage(organizationId: number): void {
-    const associatedProjectIds = listProjectIdsForOrganization(
-      this.databaseService.db,
-      organizationId,
-    );
     const associatedTeamIds = listTeamIdsForOrganization(
       this.databaseService.db,
       organizationId,
     );
-
-    if (associatedProjectIds.length > 0) {
-      throw new ConflictException(LAST_PROJECT_MANAGER_MESSAGE);
-    }
+    const directlyAssociatedProjectIds = this.listOrganizationProjects(organizationId)
+      .map((project) => project.projectId);
 
     if (associatedTeamIds.length > 0) {
       throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
     }
 
-    for (const projectId of associatedProjectIds) {
+    for (const projectId of directlyAssociatedProjectIds) {
       if (this.listRemainingProjectManagerUserIdsAfterOrganizationDelete(
         organizationId,
         projectId,

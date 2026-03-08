@@ -1,7 +1,7 @@
 # Data Model
 
-This document describes the current database layout and the active auth-oriented
-data model implemented in [db/v2/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts).
+This document describes the active `db/v2` schema implemented in
+[schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts).
 
 ## DB Structure
 
@@ -33,26 +33,18 @@ db/
 
 Notes:
 
-- Each schema version lives in `db/<version>/`.
-- The canonical schema is written in TypeScript with Drizzle.
-- Zod artifacts for that schema version live in `generated-zod/`.
-- SQL DDL for that schema version is generated into `generated-sql-ddl/schema.sql`.
-- The repo currently keeps one full-schema DDL file per version, not a chain of
-  checked-in migration SQL files.
-- Version-agnostic helpers live directly under `db/`.
-- The active schema version is selected via `db/config.json` and surfaced through
-  the root `db` module.
+- Each schema version lives under `db/<version-subdir>/`.
+- The active version is selected through `db/config.json`.
+- Drizzle schema, generated Zod output, and generated SQL DDL are all version-driven.
+- The root DB facade in [db/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/index.ts) re-exports the active version.
 
 ## Naming Rules
 
 - Primary table names use `UpperCamelCase`.
-- Relationship tables join primary table names with underscores, for example
-  `Users_Projects_ProjectRoles`.
-- Column names use `lowerCamelCase`.
+- Join tables use underscore-separated names such as `Users_Projects_ProjectRoles`.
+- Columns use `lowerCamelCase`.
 
-## Current Schema
-
-### Primary and Reference Tables
+## Primary and Reference Tables
 
 `Users`
 - `id`
@@ -120,7 +112,7 @@ Constraints:
 - `allowsMultiplePerUser`
 - `createdAt`
 
-### Relationship and Auth Tables
+## Join and Auth Tables
 
 `Projects_Users`
 - `id`
@@ -128,7 +120,7 @@ Constraints:
 - `userId`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(projectId, userId)`
 
 `Teams_Users`
@@ -137,7 +129,7 @@ Constraints:
 - `userId`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(teamId, userId)`
 
 `Projects_Teams`
@@ -146,7 +138,7 @@ Constraints:
 - `teamId`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(projectId, teamId)`
 
 `Users_Organizations`
@@ -155,7 +147,7 @@ Constraints:
 - `userId`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(organizationId, userId)`
 
 `Projects_Organizations`
@@ -164,7 +156,7 @@ Constraints:
 - `projectId`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(organizationId, projectId)`
 
 `Organizations_Teams`
@@ -175,7 +167,11 @@ Constraints:
 
 Constraints:
 - unique on `(organizationId, teamId)`
-- unique on `teamId`, enforcing one organization per team
+- unique on `teamId`
+
+Meaning:
+- a team may belong to at most one organization
+- an organization may own many teams
 
 `Users_SystemRoles`
 - `id`
@@ -183,7 +179,7 @@ Constraints:
 - `roleCode`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(userId, roleCode)`
 
 `Users_Projects_ProjectRoles`
@@ -193,7 +189,7 @@ Constraints:
 - `roleCode`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(userId, projectId, roleCode)`
 
 `Users_Teams_TeamRoles`
@@ -203,7 +199,7 @@ Constraints:
 - `roleCode`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(userId, teamId, roleCode)`
 
 `Users_Organizations_OrganizationRoles`
@@ -213,7 +209,7 @@ Constraints:
 - `roleCode`
 - `createdAt`
 
-Constraints:
+Constraint:
 - unique on `(userId, organizationId, roleCode)`
 
 `Users_CredentialTypes`
@@ -226,11 +222,9 @@ Constraints:
 - `revokedAt`
 
 Behavior:
-- This table represents concrete credential instances owned by a user.
-- Multiple rows for the same `(userId, credentialTypeCode)` are allowed for
-  credential types that support multiple credentials per user.
-- Password credentials are a special case: each user may have at most one
-  `GGTC_CREDTYPE_USERNAME_PASSWORD` credential instance.
+- represents concrete credential instances owned by a user
+- multiple rows per `(userId, credentialTypeCode)` are allowed only for credential types that opt into it
+- password credentials are currently single-instance per user
 
 `Users_PasswordCredentials`
 - `id`
@@ -243,9 +237,9 @@ Behavior:
 - `updatedAt`
 
 Behavior:
-- This is a 1:1 extension of a password-type row in `Users_CredentialTypes`.
-- Passwords are stored as hashes only.
-- The current implementation uses `argon2id`.
+- 1:1 extension row for a password credential instance
+- stores password hashes only
+- current algorithm is `argon2id`
 
 `Users_Sessions`
 - `id`
@@ -263,15 +257,13 @@ Behavior:
 - `updatedAt`
 
 Constraints and behavior:
-- `sessionTokenHash` is unique.
-- `expirationTimestamp` must be greater than `startTimestamp`.
-- The backend stores only the token hash, not the raw bearer token.
-- `ipAddress` stores either IPv4 or IPv6 text.
-- OAuth-related columns are reserved for later work.
+- `sessionTokenHash` is unique
+- `expirationTimestamp` must be greater than `startTimestamp`
+- only token hashes are stored, never raw bearer tokens
+- IP text may be IPv4 or IPv6
+- OAuth columns are reserved for later work
 
-## Seed Data
-
-Current auth seed data includes:
+## Seeded Role and Credential Codes
 
 Credential types:
 - `GGTC_CREDTYPE_USERNAME_PASSWORD`
@@ -291,29 +283,46 @@ Organization roles:
 - `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
 - `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
 
-## Auth Model Notes
+## Access and Membership Semantics
 
-- A user may have zero or more system roles.
-- A user may have zero or more organization roles scoped to an organization.
-- A user may have zero or more team roles scoped to a team.
-- A user may have zero or more project roles scoped to a project.
-- Projects may be associated directly to organizations and indirectly to
-  organizations through teams.
+- Users may belong directly to many projects through `Projects_Users`.
+- Users may belong directly to many teams through `Teams_Users`.
+- Users may belong directly to many organizations through `Users_Organizations`.
+- Users may also count as organization members indirectly by belonging to a team owned by that organization.
+- Projects may be associated directly to many organizations through `Projects_Organizations`.
+- Projects may also be associated to organizations indirectly when an org-owned team is linked through `Projects_Teams`.
 - Teams belong to at most one organization through `Organizations_Teams`.
-- A user may have zero or more project-role assignments and team-role assignments.
-- A user may access a project directly through `Projects_Users` or indirectly
-  through team membership plus `Projects_Teams`.
-- A user must have at least one credential instance at registration time; that
-  rule is enforced by application logic rather than a standalone SQLite schema
-  constraint.
-- A user may have multiple credential instances over time.
-- Only the username/password credential type is implemented today.
-- Sessions are revocable and expire independently.
+
+## Effective Authority Model
+
+The schema stores scoped role assignments, but some authorization and orphan-prevention rules use computed effective authority.
+
+Effective project manager may come from:
+- direct `GGTC_PROJECTROLE_PROJECT_MANAGER`
+- `GGTC_TEAMROLE_PROJECT_MANAGER` on a linked team
+- `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER` on an organization directly associated to the project
+- `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER` on an organization that owns a linked team
+
+Effective project manager does not include:
+- `GGTC_ORGANIZATIONROLE_TEAM_MANAGER` by itself
+
+Effective team manager may come from:
+- direct `GGTC_TEAMROLE_TEAM_MANAGER`
+- `GGTC_ORGANIZATIONROLE_TEAM_MANAGER` on the team's owning organization
+
+## Current Application-Level Invariants
+
+These are enforced by backend services, not just by FK or uniqueness constraints:
+
+- a team must retain at least one effective team manager unless the team itself is being deleted
+- a project must retain at least one effective project manager after direct membership replacement or direct project-role revoke
+- an organization must retain at least one `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+- organization deletion is blocked while the organization still owns any team
+- direct org-project associations block organization deletion only when removing that organization would strand a directly associated project without any remaining effective project manager
+- user deletion is blocked if the user is the final effective team manager for any team or the final effective project manager for any project
 
 ## Source of Truth
 
-The current source of truth is:
-
-- Drizzle schema: [db/v2/schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts)
-- Versioned DB facade: [db/v2/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/index.ts)
-- Root schema-agnostic facade: [db/index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/index.ts)
+- Drizzle schema: [schema.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/schema.ts)
+- Versioned DB facade: [index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/v2/index.ts)
+- Root DB facade: [index.ts](/media/latentprion/aafe96c9-7fcd-40ce-991d-ca2d23b5ba17/gits/gigantt-git/db/index.ts)

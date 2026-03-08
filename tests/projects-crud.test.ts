@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  organizationsTeams,
   projects,
   projectsOrganizations,
   projectsTeams,
@@ -1435,5 +1436,155 @@ describe("projects crud api", () => {
         .where(eq(projectsTeams.projectId, project.id))
         .all(),
     ).toEqual([]);
+  });
+
+  it("allows revoking the last linked-team project manager when organization project manager fallback remains", async () => {
+    const orgCreator = await harness.registerUser("project-revoke-team-pm-org-creator");
+    const orgProjectManager = await harness.registerUser("project-revoke-team-pm-org-pm");
+    const teamCreator = await harness.registerUser("project-revoke-team-pm-team-creator");
+    const teamProjectManager = await harness.registerUser("project-revoke-team-pm-member");
+    const projectOwner = await harness.registerUser("project-revoke-team-pm-owner");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Revoke Team PM Fallback Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const teamResponse = await createTeam(teamCreator.accessToken, { name: "Revoke Team PM Team" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Revoke Team PM Project" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(teamCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: teamCreator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: teamProjectManager.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { members: [{ userId: orgCreator.user.id }, { userId: orgProjectManager.user.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: orgProjectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId: project.id,
+      teamId: team.id,
+    }).run();
+    await harness.databaseService.persist();
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(teamProjectManager.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: teamProjectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/revoke`,
+    });
+
+    expect(revokeResponse.statusCode).toBe(200);
+  });
+
+  it("allows revoking organization project manager when linked-team project manager fallback remains", async () => {
+    const orgCreator = await harness.registerUser("project-revoke-org-pm-creator");
+    const orgProjectManager = await harness.registerUser("project-revoke-org-pm-manager");
+    const teamCreator = await harness.registerUser("project-revoke-org-pm-team-creator");
+    const teamProjectManager = await harness.registerUser("project-revoke-org-pm-team-pm");
+    const projectOwner = await harness.registerUser("project-revoke-org-pm-owner");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Revoke Org PM Fallback Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const teamResponse = await createTeam(teamCreator.accessToken, { name: "Revoke Org PM Team" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Revoke Org PM Project" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(teamCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"], userId: teamCreator.user.id },
+          { roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"], userId: teamProjectManager.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { members: [{ userId: orgCreator.user.id }, { userId: orgProjectManager.user.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: orgProjectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId: project.id,
+      teamId: team.id,
+    }).run();
+    await harness.databaseService.persist();
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: orgProjectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/revoke`,
+    });
+
+    expect(revokeResponse.statusCode).toBe(200);
   });
 });

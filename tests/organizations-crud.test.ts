@@ -445,22 +445,202 @@ describe("organizations crud api", () => {
     expect(projectUpdate.statusCode).toBe(403);
   });
 
-  it("blocks deleting an organization if that would orphan a project or team", async () => {
-    const creator = await harness.registerUser("org-delete-block-creator");
-    const projectOwner = await harness.registerUser("org-delete-block-project-owner");
-    const teamOwner = await harness.registerUser("org-delete-block-team-owner");
-    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Block Org" });
-    const projectResponse = await createProject(projectOwner.accessToken, { name: "Delete Block Project" });
-    const teamResponse = await createTeam(teamOwner.accessToken, { name: "Delete Block Team" });
-    const { organization } = harness.parseJson<{ organization: { id: number } }>(
-      orgResponse.payload,
-    );
-    const { project } = harness.parseJson<{ project: { id: number } }>(
-      projectResponse.payload,
-    );
-    const { team } = harness.parseJson<{ team: { id: number } }>(
-      teamResponse.payload,
-    );
+  it("allows deleting an organization when it has a direct project association but no org project manager coverage on that project", async () => {
+    const creator = await harness.registerUser("org-delete-direct-project-safe-creator");
+    const projectOwner = await harness.registerUser("org-delete-direct-project-safe-owner");
+    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Safe Org" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Delete Safe Project" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+
+    const projectAssociation = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+
+    expect(projectAssociation.statusCode).toBe(200);
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, project.id))
+        .all(),
+    ).toHaveLength(1);
+  });
+
+  it("allows deleting an organization when its org project manager coverage is not the last effective project manager", async () => {
+    const creator = await harness.registerUser("org-delete-fallback-creator");
+    const orgProjectManager = await harness.registerUser("org-delete-fallback-org-pm");
+    const projectOwner = await harness.registerUser("org-delete-fallback-project-owner");
+    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Fallback Org" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Delete Fallback Project" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ userId: creator.user.id }, { userId: orgProjectManager.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: orgProjectManager.user.id,
+    });
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+  });
+
+  it("blocks deleting an organization when its org project manager coverage is the last effective project manager for a directly associated project", async () => {
+    const creator = await harness.registerUser("org-delete-last-pm-creator");
+    const orgProjectManager = await harness.registerUser("org-delete-last-pm-user");
+    const projectOwner = await harness.registerUser("org-delete-last-pm-project-owner");
+    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Last PM Org" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Delete Last PM Project" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ userId: creator.user.id }, { userId: orgProjectManager.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: orgProjectManager.user.id,
+    });
+    const membershipReplace = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+
+    expect(membershipReplace.statusCode).toBe(200);
+    expect(deleteResponse.statusCode).toBe(409);
+  });
+
+  it("blocks organization deletion atomically when one directly associated project would lose its last effective project manager", async () => {
+    const creator = await harness.registerUser("org-delete-multi-project-creator");
+    const orgProjectManager = await harness.registerUser("org-delete-multi-project-org-pm");
+    const safeProjectOwner = await harness.registerUser("org-delete-multi-project-safe-owner");
+    const orphanProjectOwner = await harness.registerUser("org-delete-multi-project-orphan-owner");
+    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Multi Project Org" });
+    const safeProjectResponse = await createProject(safeProjectOwner.accessToken, { name: "Delete Multi Project Safe" });
+    const orphanProjectResponse = await createProject(orphanProjectOwner.accessToken, { name: "Delete Multi Project Orphan" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { project: safeProject } = harness.parseJson<{ project: { id: number } }>(safeProjectResponse.payload);
+    const { project: orphanProject } = harness.parseJson<{ project: { id: number } }>(orphanProjectResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ userId: creator.user.id }, { userId: orgProjectManager.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        projects: [{ projectId: safeProject.id }, { projectId: orphanProject.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: orgProjectManager.user.id,
+    });
+    const orphanMembershipReplace = await harness.app.inject({
+      headers: harness.createAuthHeaders(orphanProjectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: orphanProjectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${orphanProject.id}/members`,
+    });
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+
+    expect(orphanMembershipReplace.statusCode).toBe(200);
+    expect(deleteResponse.statusCode).toBe(409);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, organization.id))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projectsOrganizations)
+        .where(eq(projectsOrganizations.organizationId, organization.id))
+        .all(),
+    ).toHaveLength(2);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.organizationId, organization.id))
+        .all(),
+    ).toHaveLength(2);
+  });
+
+  it("blocks deleting an organization when it still owns any teams even if project coverage would otherwise remain safe", async () => {
+    const creator = await harness.registerUser("org-delete-team-owned-creator");
+    const projectOwner = await harness.registerUser("org-delete-team-owned-project-owner");
+    const teamOwner = await harness.registerUser("org-delete-team-owned-team-owner");
+    const orgResponse = await createOrganization(creator.accessToken, { name: "Delete Team Owned Org" });
+    const projectResponse = await createProject(projectOwner.accessToken, { name: "Delete Team Owned Project" });
+    const teamResponse = await createTeam(teamOwner.accessToken, { name: "Delete Team Owned Team" });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(orgResponse.payload);
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectResponse.payload);
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamResponse.payload);
 
     const projectAssociation = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
@@ -566,8 +746,9 @@ describe("organizations crud api", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps organization rows unchanged after a blocked delete", async () => {
+  it("keeps organization rows unchanged after a blocked delete caused by last project-manager coverage", async () => {
     const creator = await harness.registerUser("org-delete-atomic-creator");
+    const orgProjectManager = await harness.registerUser("org-delete-atomic-org-pm");
     const projectOwner = await harness.registerUser("org-delete-atomic-project-owner");
     const orgResponse = await createOrganization(creator.accessToken, { name: "Atomic Org" });
     const projectResponse = await createProject(projectOwner.accessToken, { name: "Atomic Project" });
@@ -577,8 +758,28 @@ describe("organizations crud api", () => {
     await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
+      payload: {
+        members: [{ userId: creator.user.id }, { userId: orgProjectManager.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
       payload: { projects: [{ projectId: project.id }] },
       url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: orgProjectManager.user.id,
+    });
+    const membershipReplace = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 
     const deleteResponse = await harness.app.inject({
@@ -587,6 +788,7 @@ describe("organizations crud api", () => {
       url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
     });
 
+    expect(membershipReplace.statusCode).toBe(200);
     expect(deleteResponse.statusCode).toBe(409);
     expect(
       harness.databaseService.db
@@ -608,7 +810,7 @@ describe("organizations crud api", () => {
         .from(usersOrganizationsOrganizationRoles)
         .where(eq(usersOrganizationsOrganizationRoles.organizationId, organization.id))
         .all(),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 
   it("allows an organization project manager to manage a project through an org-owned linked team", async () => {
