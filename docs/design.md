@@ -127,13 +127,43 @@ Important rules:
 
 ### Seed Data
 
-Backend bootstrap ensures the core auth lookup rows exist and seeds two local
-test accounts for development and test use:
+Backend bootstrap ensures the core auth lookup rows exist and seeds local
+development and test accounts for manual testing and backend integration
+coverage:
 
 - `testadminuser`
 - `testnoroleuser`
+- `testorgorgmanageruser`
+- `testorgprojectmanageruser`
+- `testorgteammanageruser`
+- `testprojectprojectmanageruser`
+- `testteamprojectmanageruser`
+- `testteamteammanageruser`
 
-The admin test account is granted `GGTC_SYSTEMROLE_ADMIN`.
+All seeded local accounts use plaintext password `1234`.
+
+The seeded capability fixtures are:
+
+- `testadminuser`: granted `GGTC_SYSTEMROLE_ADMIN`
+- `testnoroleuser`: no scoped or system roles
+- `testorgorgmanageruser`: seeded with `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+- `testorgprojectmanageruser`: seeded with
+  `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
+- `testorgteammanageruser`: seeded with `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
+- `testprojectprojectmanageruser`: seeded with
+  `GGTC_PROJECTROLE_PROJECT_MANAGER`
+- `testteamprojectmanageruser`: seeded with
+  `GGTC_TEAMROLE_PROJECT_MANAGER`
+- `testteamteammanageruser`: seeded with `GGTC_TEAMROLE_TEAM_MANAGER`
+
+Backend bootstrap also seeds deterministic fixture entities used by those
+accounts:
+
+- organizations for the org-scoped role fixtures
+- teams for the org-team-manager, team-project-manager, and team-team-manager
+  fixtures
+- projects for the org-project-manager, team-project-manager, and
+  project-project-manager fixtures
 
 ## Current Module Layout
 

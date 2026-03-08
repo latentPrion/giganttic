@@ -15,7 +15,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
-import { users, usersSessions, usersSystemRoles } from "../db/index.js";
+import {
+  organizations,
+  organizationsTeams,
+  projects,
+  projectsOrganizations,
+  projectsTeams,
+  projectsUsers,
+  teams,
+  teamsUsers,
+  users,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
+  usersProjectsProjectRoles,
+  usersSessions,
+  usersSystemRoles,
+  usersTeamsTeamRoles,
+} from "../db/index.js";
 
 describe("backend auth api", () => {
   let app: NestFastifyApplication;
@@ -165,6 +181,165 @@ describe("backend auth api", () => {
       },
     });
     expect(proxiedLogin.session.ipAddress).toBe("198.51.100.10");
+  });
+
+  it("seeds scoped-role fixture users together with usable organizations, teams, and projects", async () => {
+    const seededLogins = await Promise.all([
+      loginAs("testorgorgmanageruser"),
+      loginAs("testorgteammanageruser"),
+      loginAs("testorgprojectmanageruser"),
+      loginAs("testteamteammanageruser"),
+      loginAs("testteamprojectmanageruser"),
+      loginAs("testprojectprojectmanageruser"),
+    ]);
+
+    expect(seededLogins.map((login) => login.user.username)).toEqual([
+      "testorgorgmanageruser",
+      "testorgteammanageruser",
+      "testorgprojectmanageruser",
+      "testteamteammanageruser",
+      "testteamprojectmanageruser",
+      "testprojectprojectmanageruser",
+    ]);
+
+    const orgOrganizationManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testorgorgmanageruser"))
+      .get()!.id;
+    const orgProjectManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testorgprojectmanageruser"))
+      .get()!.id;
+    const orgTeamManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testorgteammanageruser"))
+      .get()!.id;
+    const projectProjectManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testprojectprojectmanageruser"))
+      .get()!.id;
+    const teamProjectManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testteamprojectmanageruser"))
+      .get()!.id;
+    const teamTeamManagerUserId = databaseService.db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, "testteamteammanageruser"))
+      .get()!.id;
+
+    const organizationProjectManagerProject = databaseService.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.name, "Seed Fixture Organization Project Managed Project"))
+      .get();
+    const organizationTeamManagerTeam = databaseService.db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.name, "Seed Fixture Organization Team Managed Team"))
+      .get();
+    const teamProjectManagerProject = databaseService.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.name, "Seed Fixture Team Project Managed Project"))
+      .get();
+
+    expect(
+      databaseService.db
+        .select()
+        .from(usersOrganizations)
+        .where(eq(usersOrganizations.userId, orgOrganizationManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, orgOrganizationManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, orgProjectManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, orgTeamManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersProjectsProjectRoles)
+        .where(eq(usersProjectsProjectRoles.userId, projectProjectManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersTeamsTeamRoles)
+        .where(eq(usersTeamsTeamRoles.userId, teamProjectManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(usersTeamsTeamRoles)
+        .where(eq(usersTeamsTeamRoles.userId, teamTeamManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(projectsOrganizations)
+        .where(eq(projectsOrganizations.projectId, organizationProjectManagerProject!.id))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(projectsUsers)
+        .where(eq(projectsUsers.userId, orgProjectManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(organizationsTeams)
+        .where(eq(organizationsTeams.teamId, organizationTeamManagerTeam!.id))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(teamsUsers)
+        .where(eq(teamsUsers.userId, orgTeamManagerUserId))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(projectsTeams)
+        .where(eq(projectsTeams.projectId, teamProjectManagerProject!.id))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.name, "Seed Fixture Organization Manager Org"))
+        .all(),
+    ).toHaveLength(1);
   });
 
   it("stores only a session token hash in the database", async () => {

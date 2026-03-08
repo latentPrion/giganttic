@@ -21,12 +21,26 @@ import {
   authSeedData,
   credentialTypes,
   credentialTypeCodes,
+  organizationRoleCodes,
+  organizationRoles,
+  organizations,
+  organizationsTeams,
+  projectRoleCodes,
   projectRoles,
+  projects,
+  projectsOrganizations,
+  projectsTeams,
+  projectsUsers,
   systemRoleCodes,
   systemRoles,
+  teamRoleCodes,
   teamRoles,
+  teams,
+  teamsUsers,
   users,
   usersCredentialTypes,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
   usersPasswordCredentials,
   usersProjectsProjectRoles,
   usersSessions,
@@ -46,8 +60,20 @@ import {
   type SessionQuery,
   type SessionSummary,
 } from "./auth.contracts.js";
-import { seededTestAccounts } from "./auth.seed-data.js";
+import {
+  seededScopedFixtures,
+  seededTestAccounts,
+} from "./auth.seed-data.js";
 import type { AuthContext } from "./auth.types.js";
+
+type SeedDatabase = DatabaseService["db"];
+type SeededAccountKey = keyof typeof seededTestAccounts;
+type SeededUserIds = Record<SeededAccountKey, number>;
+
+interface NamedSeedEntity {
+  description: string;
+  name: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -75,6 +101,11 @@ export class AuthService {
         .onConflictDoNothing()
         .run();
       tx
+        .insert(organizationRoles)
+        .values([...authSeedData.organizationRoles])
+        .onConflictDoNothing()
+        .run();
+      tx
         .insert(teamRoles)
         .values([...authSeedData.teamRoles])
         .onConflictDoNothing()
@@ -82,18 +113,12 @@ export class AuthService {
     });
     await this.databaseService.persist();
 
-    await this.seedUser({
-      email: seededTestAccounts.admin.email,
-      passwordHash: seededTestAccounts.admin.passwordHash,
-      systemRoleCode: systemRoleCodes.admin,
-      username: seededTestAccounts.admin.username,
+    const seededUserIds = await this.ensureSeedUsers();
+
+    this.databaseService.db.transaction((tx) => {
+      this.ensureScopedSeedFixtures(tx, seededUserIds);
     });
-    await this.seedUser({
-      email: seededTestAccounts.noRole.email,
-      passwordHash: seededTestAccounts.noRole.passwordHash,
-      systemRoleCode: null,
-      username: seededTestAccounts.noRole.username,
-    });
+    await this.databaseService.persist();
   }
 
   async register(payload: RegisterRequest): Promise<{ user: AuthUserResponse }> {
@@ -373,13 +398,436 @@ export class AuthService {
     };
   }
 
+  private async ensureSeedUsers(): Promise<SeededUserIds> {
+    return {
+      admin: await this.seedUser({
+        email: seededTestAccounts.admin.email,
+        passwordHash: seededTestAccounts.admin.passwordHash,
+        systemRoleCode: systemRoleCodes.admin,
+        username: seededTestAccounts.admin.username,
+      }),
+      noRole: await this.seedUser({
+        email: seededTestAccounts.noRole.email,
+        passwordHash: seededTestAccounts.noRole.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.noRole.username,
+      }),
+      orgOrganizationManager: await this.seedUser({
+        email: seededTestAccounts.orgOrganizationManager.email,
+        passwordHash: seededTestAccounts.orgOrganizationManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.orgOrganizationManager.username,
+      }),
+      orgProjectManager: await this.seedUser({
+        email: seededTestAccounts.orgProjectManager.email,
+        passwordHash: seededTestAccounts.orgProjectManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.orgProjectManager.username,
+      }),
+      orgTeamManager: await this.seedUser({
+        email: seededTestAccounts.orgTeamManager.email,
+        passwordHash: seededTestAccounts.orgTeamManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.orgTeamManager.username,
+      }),
+      projectProjectManager: await this.seedUser({
+        email: seededTestAccounts.projectProjectManager.email,
+        passwordHash: seededTestAccounts.projectProjectManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.projectProjectManager.username,
+      }),
+      teamProjectManager: await this.seedUser({
+        email: seededTestAccounts.teamProjectManager.email,
+        passwordHash: seededTestAccounts.teamProjectManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.teamProjectManager.username,
+      }),
+      teamTeamManager: await this.seedUser({
+        email: seededTestAccounts.teamTeamManager.email,
+        passwordHash: seededTestAccounts.teamTeamManager.passwordHash,
+        systemRoleCode: null,
+        username: seededTestAccounts.teamTeamManager.username,
+      }),
+    };
+  }
+
+  private ensureScopedSeedFixtures(
+    tx: SeedDatabase,
+    seededUserIds: SeededUserIds,
+  ): void {
+    const organizationManagerOrganizationId = this.ensureOrganization(
+      tx,
+      seededScopedFixtures.organizations.orgOrganizationManager,
+    );
+    const organizationProjectManagerOrganizationId = this.ensureOrganization(
+      tx,
+      seededScopedFixtures.organizations.orgProjectManager,
+    );
+    const organizationTeamManagerOrganizationId = this.ensureOrganization(
+      tx,
+      seededScopedFixtures.organizations.orgTeamManager,
+    );
+    const directProjectManagerProjectId = this.ensureProject(
+      tx,
+      seededScopedFixtures.projects.projectProjectManager,
+    );
+    const organizationProjectManagerProjectId = this.ensureProject(
+      tx,
+      seededScopedFixtures.projects.orgProjectManager,
+    );
+    const teamProjectManagerProjectId = this.ensureProject(
+      tx,
+      seededScopedFixtures.projects.teamProjectManager,
+    );
+    const directTeamManagerTeamId = this.ensureTeam(
+      tx,
+      seededScopedFixtures.teams.teamTeamManager,
+    );
+    const organizationTeamManagerTeamId = this.ensureTeam(
+      tx,
+      seededScopedFixtures.teams.orgTeamManager,
+    );
+    const teamProjectManagerTeamId = this.ensureTeam(
+      tx,
+      seededScopedFixtures.teams.teamProjectManager,
+    );
+
+    this.ensureOrganizationMembership(
+      tx,
+      organizationManagerOrganizationId,
+      seededUserIds.orgOrganizationManager,
+    );
+    this.ensureOrganizationRole(
+      tx,
+      organizationManagerOrganizationId,
+      seededUserIds.orgOrganizationManager,
+      organizationRoleCodes.organizationManager,
+    );
+
+    this.ensureOrganizationMembership(
+      tx,
+      organizationProjectManagerOrganizationId,
+      seededUserIds.orgProjectManager,
+    );
+    this.ensureOrganizationRole(
+      tx,
+      organizationProjectManagerOrganizationId,
+      seededUserIds.orgProjectManager,
+      organizationRoleCodes.projectManager,
+    );
+    this.ensureProjectMembership(
+      tx,
+      organizationProjectManagerProjectId,
+      seededUserIds.orgProjectManager,
+    );
+    this.ensureProjectOrganizationAssociation(
+      tx,
+      organizationProjectManagerProjectId,
+      organizationProjectManagerOrganizationId,
+    );
+
+    this.ensureOrganizationMembership(
+      tx,
+      organizationTeamManagerOrganizationId,
+      seededUserIds.orgTeamManager,
+    );
+    this.ensureOrganizationRole(
+      tx,
+      organizationTeamManagerOrganizationId,
+      seededUserIds.orgTeamManager,
+      organizationRoleCodes.teamManager,
+    );
+    this.ensureTeamMembership(
+      tx,
+      organizationTeamManagerTeamId,
+      seededUserIds.orgTeamManager,
+    );
+    this.ensureOrganizationTeamAssociation(
+      tx,
+      organizationTeamManagerTeamId,
+      organizationTeamManagerOrganizationId,
+    );
+
+    this.ensureTeamMembership(
+      tx,
+      directTeamManagerTeamId,
+      seededUserIds.teamTeamManager,
+    );
+    this.ensureTeamRole(
+      tx,
+      directTeamManagerTeamId,
+      seededUserIds.teamTeamManager,
+      teamRoleCodes.teamManager,
+    );
+
+    this.ensureTeamMembership(
+      tx,
+      teamProjectManagerTeamId,
+      seededUserIds.teamProjectManager,
+    );
+    this.ensureTeamRole(
+      tx,
+      teamProjectManagerTeamId,
+      seededUserIds.teamProjectManager,
+      teamRoleCodes.projectManager,
+    );
+    this.ensureProjectTeamAssociation(
+      tx,
+      teamProjectManagerProjectId,
+      teamProjectManagerTeamId,
+    );
+
+    this.ensureProjectMembership(
+      tx,
+      directProjectManagerProjectId,
+      seededUserIds.projectProjectManager,
+    );
+    this.ensureProjectRole(
+      tx,
+      directProjectManagerProjectId,
+      seededUserIds.projectProjectManager,
+      projectRoleCodes.projectManager,
+    );
+  }
+
+  private ensureOrganization(
+    tx: SeedDatabase,
+    seed: NamedSeedEntity,
+  ): number {
+    const existingOrganization = tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.name, seed.name))
+      .get();
+
+    if (existingOrganization) {
+      tx.update(organizations)
+        .set({
+          description: seed.description,
+          updatedAt: new Date(),
+        })
+        .where(eq(organizations.id, existingOrganization.id))
+        .run();
+
+      return existingOrganization.id;
+    }
+
+    const [createdOrganization] = tx.insert(organizations)
+      .values({
+        description: seed.description,
+        name: seed.name,
+      })
+      .returning({ id: organizations.id })
+      .all();
+
+    return createdOrganization.id;
+  }
+
+  private ensureOrganizationMembership(
+    tx: SeedDatabase,
+    organizationId: number,
+    userId: number,
+  ): void {
+    tx.insert(usersOrganizations)
+      .values({
+        organizationId,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureOrganizationRole(
+    tx: SeedDatabase,
+    organizationId: number,
+    userId: number,
+    roleCode: string,
+  ): void {
+    tx.insert(usersOrganizationsOrganizationRoles)
+      .values({
+        organizationId,
+        roleCode,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureOrganizationTeamAssociation(
+    tx: SeedDatabase,
+    teamId: number,
+    organizationId: number,
+  ): void {
+    tx.insert(organizationsTeams)
+      .values({
+        organizationId,
+        teamId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureProject(
+    tx: SeedDatabase,
+    seed: NamedSeedEntity,
+  ): number {
+    const existingProject = tx
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.name, seed.name))
+      .get();
+
+    if (existingProject) {
+      tx.update(projects)
+        .set({
+          description: seed.description,
+          updatedAt: new Date(),
+        })
+        .where(eq(projects.id, existingProject.id))
+        .run();
+
+      return existingProject.id;
+    }
+
+    const [createdProject] = tx.insert(projects)
+      .values({
+        description: seed.description,
+        name: seed.name,
+      })
+      .returning({ id: projects.id })
+      .all();
+
+    return createdProject.id;
+  }
+
+  private ensureProjectMembership(
+    tx: SeedDatabase,
+    projectId: number,
+    userId: number,
+  ): void {
+    tx.insert(projectsUsers)
+      .values({
+        projectId,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureProjectOrganizationAssociation(
+    tx: SeedDatabase,
+    projectId: number,
+    organizationId: number,
+  ): void {
+    tx.insert(projectsOrganizations)
+      .values({
+        organizationId,
+        projectId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureProjectRole(
+    tx: SeedDatabase,
+    projectId: number,
+    userId: number,
+    roleCode: string,
+  ): void {
+    tx.insert(usersProjectsProjectRoles)
+      .values({
+        projectId,
+        roleCode,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureProjectTeamAssociation(
+    tx: SeedDatabase,
+    projectId: number,
+    teamId: number,
+  ): void {
+    tx.insert(projectsTeams)
+      .values({
+        projectId,
+        teamId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureTeam(
+    tx: SeedDatabase,
+    seed: NamedSeedEntity,
+  ): number {
+    const existingTeam = tx
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.name, seed.name))
+      .get();
+
+    if (existingTeam) {
+      tx.update(teams)
+        .set({
+          description: seed.description,
+          updatedAt: new Date(),
+        })
+        .where(eq(teams.id, existingTeam.id))
+        .run();
+
+      return existingTeam.id;
+    }
+
+    const [createdTeam] = tx.insert(teams)
+      .values({
+        description: seed.description,
+        name: seed.name,
+      })
+      .returning({ id: teams.id })
+      .all();
+
+    return createdTeam.id;
+  }
+
+  private ensureTeamMembership(
+    tx: SeedDatabase,
+    teamId: number,
+    userId: number,
+  ): void {
+    tx.insert(teamsUsers)
+      .values({
+        teamId,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
+  private ensureTeamRole(
+    tx: SeedDatabase,
+    teamId: number,
+    userId: number,
+    roleCode: string,
+  ): void {
+    tx.insert(usersTeamsTeamRoles)
+      .values({
+        roleCode,
+        teamId,
+        userId,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+
   private async seedUser(seed: {
     email: string;
       passwordHash: string;
       systemRoleCode: string | null;
       username: string;
-  }): Promise<void> {
-    this.databaseService.db.transaction((tx) => {
+  }): Promise<number> {
+    const userId = this.databaseService.db.transaction((tx) => {
       let user = tx
         .select({
           id: users.id,
@@ -483,9 +931,12 @@ export class AuthService {
           .where(eq(usersSystemRoles.userId, user.id))
           .run();
       }
+
+      return user.id;
     });
 
     await this.databaseService.persist();
+    return userId;
   }
 
   private buildAuthUser(userId: number): AuthUserResponse {
