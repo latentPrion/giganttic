@@ -4,6 +4,10 @@ import path from "node:path";
 
 import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  organizationsTeams,
+  organizationsTeamsInsertSchema,
+} from "../db/index.js";
 
 import {
   applySqlDdl,
@@ -54,5 +58,18 @@ describe("db version selection pipeline", () => {
 
     expect(result[0]?.values[0]?.[0]).toBe(3);
     db.close();
+  });
+
+  it("exports organization team artifacts from the active db facade", () => {
+    expect(organizationsTeams).toBeDefined();
+    expect(
+      organizationsTeamsInsertSchema.parse({
+        organizationId: 1,
+        teamId: 2,
+      }),
+    ).toMatchObject({
+      organizationId: 1,
+      teamId: 2,
+    });
   });
 });

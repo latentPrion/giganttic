@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   projects,
+  projectsOrganizations,
   projectsTeams,
   projectsUsers,
   usersProjectsProjectRoles,
@@ -1265,6 +1266,85 @@ describe("projects crud api", () => {
     expect(deleteResponse.statusCode).toBe(200);
     expect(lingeringMembership).toHaveLength(0);
     expect(lingeringRoles).toHaveLength(0);
+  });
+
+  it("allows an organization project manager to grant direct project manager on an organization-associated project", async () => {
+    const orgCreator = await harness.registerUser("project-org-grant-creator");
+    const orgProjectManager = await harness.registerUser("project-org-grant-manager");
+    const target = await harness.registerUser("project-org-grant-target");
+    const projectOwner = await harness.registerUser("project-org-grant-owner");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Project Grant Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const createResponse = await createProject(projectOwner.accessToken, {
+      name: "Project Grant Via Org",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const orgUsersUpdate = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [{ userId: orgCreator.user.id }, { userId: orgProjectManager.user.id }],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const projectMembership = await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: projectOwner.user.id },
+          { roleCodes: [], userId: target.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+    const orgProjectAssociation = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    const orgRoleGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: orgProjectManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+    const projectRoleGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgProjectManager.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+
+    expect(orgUsersUpdate.statusCode).toBe(200);
+    expect(projectMembership.statusCode).toBe(200);
+    expect(orgProjectAssociation.statusCode).toBe(200);
+    expect(orgRoleGrant.statusCode).toBe(200);
+    expect(projectRoleGrant.statusCode).toBe(200);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projectsOrganizations)
+        .where(eq(projectsOrganizations.projectId, project.id))
+        .all(),
+    ).toHaveLength(1);
   });
 
   it("returns 404 for unimplemented project-team mutation routes", async () => {

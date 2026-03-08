@@ -19,6 +19,12 @@ export const systemRoleCodes = {
   admin: "GGTC_SYSTEMROLE_ADMIN",
 } as const;
 
+export const organizationRoleCodes = {
+  organizationManager: "GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER",
+  projectManager: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+  teamManager: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
+} as const;
+
 export const teamRoleCodes = {
   projectManager: "GGTC_TEAMROLE_PROJECT_MANAGER",
   teamManager: "GGTC_TEAMROLE_TEAM_MANAGER",
@@ -79,6 +85,13 @@ export const teams = sqliteTable("Teams", {
   ...createTimestampColumns(),
 });
 
+export const organizations = sqliteTable("Organizations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  description: text("description"),
+  ...createTimestampColumns(),
+});
+
 function createRoleReferenceTable(tableName: string) {
   return sqliteTable(tableName, {
     code: text("code").primaryKey(),
@@ -93,6 +106,7 @@ function createRoleReferenceTable(tableName: string) {
 export const systemRoles = createRoleReferenceTable("SystemRoles");
 export const projectRoles = createRoleReferenceTable("ProjectRoles");
 export const teamRoles = createRoleReferenceTable("TeamRoles");
+export const organizationRoles = createRoleReferenceTable("OrganizationRoles");
 
 export const credentialTypes = sqliteTable("CredentialTypes", {
   code: text("code").primaryKey(),
@@ -184,6 +198,85 @@ export const projectsTeams = sqliteTable(
   ],
 );
 
+export const usersOrganizations = sqliteTable(
+  "Users_Organizations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    organizationId: integer("organizationId")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    ...createReferenceTimestampColumns(),
+  },
+  (table) => [
+    uniqueIndex("Users_Organizations_organizationId_userId_unique").on(
+      table.organizationId,
+      table.userId,
+    ),
+  ],
+);
+
+export const projectsOrganizations = sqliteTable(
+  "Projects_Organizations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    organizationId: integer("organizationId")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    projectId: integer("projectId")
+      .notNull()
+      .references(() => projects.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    ...createReferenceTimestampColumns(),
+  },
+  (table) => [
+    uniqueIndex("Projects_Organizations_organizationId_projectId_unique").on(
+      table.organizationId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const organizationsTeams = sqliteTable(
+  "Organizations_Teams",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    organizationId: integer("organizationId")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    teamId: integer("teamId")
+      .notNull()
+      .references(() => teams.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    ...createReferenceTimestampColumns(),
+  },
+  (table) => [
+    uniqueIndex("Organizations_Teams_organizationId_teamId_unique").on(
+      table.organizationId,
+      table.teamId,
+    ),
+    uniqueIndex("Organizations_Teams_teamId_unique").on(table.teamId),
+  ],
+);
+
 export const usersSystemRoles = sqliteTable(
   "Users_SystemRoles",
   {
@@ -270,6 +363,37 @@ export const usersTeamsTeamRoles = sqliteTable(
   ],
 );
 
+export const usersOrganizationsOrganizationRoles = sqliteTable(
+  "Users_Organizations_OrganizationRoles",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    organizationId: integer("organizationId")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    roleCode: text("roleCode")
+      .notNull()
+      .references(() => organizationRoles.code, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+    ...createReferenceTimestampColumns(),
+  },
+  (table) => [
+    uniqueIndex(
+      "Users_Organizations_OrganizationRoles_userId_organizationId_roleCode_unique",
+    ).on(table.userId, table.organizationId, table.roleCode),
+  ],
+);
+
 export const usersCredentialTypes = sqliteTable(
   "Users_CredentialTypes",
   {
@@ -352,6 +476,8 @@ export const usersSessions = sqliteTable(
 
 export const usersRelations = relations(users, ({ many }) => ({
   credentialInstances: many(usersCredentialTypes),
+  organizationMemberships: many(usersOrganizations),
+  organizationRoleAssignments: many(usersOrganizationsOrganizationRoles),
   projectAccess: many(projectsUsers),
   projectRoleAssignments: many(usersProjectsProjectRoles),
   sessions: many(usersSessions),
@@ -361,15 +487,24 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const projectsRelations = relations(projects, ({ many }) => ({
+  organizationAccess: many(projectsOrganizations),
   teamAccess: many(projectsTeams),
   userAccess: many(projectsUsers),
   userRoleAssignments: many(usersProjectsProjectRoles),
 }));
 
 export const teamsRelations = relations(teams, ({ many }) => ({
+  organizationAccess: many(organizationsTeams),
   projectAccess: many(projectsTeams),
   userMemberships: many(teamsUsers),
   userRoleAssignments: many(usersTeamsTeamRoles),
+}));
+
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  projectAccess: many(projectsOrganizations),
+  teamAccess: many(organizationsTeams),
+  userMemberships: many(usersOrganizations),
+  userRoleAssignments: many(usersOrganizationsOrganizationRoles),
 }));
 
 export const systemRolesRelations = relations(systemRoles, ({ many }) => ({
@@ -383,6 +518,13 @@ export const projectRolesRelations = relations(projectRoles, ({ many }) => ({
 export const teamRolesRelations = relations(teamRoles, ({ many }) => ({
   userRoleAssignments: many(usersTeamsTeamRoles),
 }));
+
+export const organizationRolesRelations = relations(
+  organizationRoles,
+  ({ many }) => ({
+    userRoleAssignments: many(usersOrganizationsOrganizationRoles),
+  }),
+);
 
 export const credentialTypesRelations = relations(
   credentialTypes,
@@ -423,6 +565,48 @@ export const projectsTeamsRelations = relations(projectsTeams, ({ one }) => ({
     references: [teams.id],
   }),
 }));
+
+export const usersOrganizationsRelations = relations(
+  usersOrganizations,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [usersOrganizations.organizationId],
+      references: [organizations.id],
+    }),
+    user: one(users, {
+      fields: [usersOrganizations.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const projectsOrganizationsRelations = relations(
+  projectsOrganizations,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [projectsOrganizations.organizationId],
+      references: [organizations.id],
+    }),
+    project: one(projects, {
+      fields: [projectsOrganizations.projectId],
+      references: [projects.id],
+    }),
+  }),
+);
+
+export const organizationsTeamsRelations = relations(
+  organizationsTeams,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationsTeams.organizationId],
+      references: [organizations.id],
+    }),
+    team: one(teams, {
+      fields: [organizationsTeams.teamId],
+      references: [teams.id],
+    }),
+  }),
+);
 
 export const usersSystemRolesRelations = relations(
   usersSystemRoles,
@@ -474,6 +658,24 @@ export const usersTeamsTeamRolesRelations = relations(
   }),
 );
 
+export const usersOrganizationsOrganizationRolesRelations = relations(
+  usersOrganizationsOrganizationRoles,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [usersOrganizationsOrganizationRoles.organizationId],
+      references: [organizations.id],
+    }),
+    role: one(organizationRoles, {
+      fields: [usersOrganizationsOrganizationRoles.roleCode],
+      references: [organizationRoles.code],
+    }),
+    user: one(users, {
+      fields: [usersOrganizationsOrganizationRoles.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
 export const usersCredentialTypesRelations = relations(
   usersCredentialTypes,
   ({ many, one }) => ({
@@ -520,6 +722,25 @@ export const authSeedData = {
       code: projectRoleCodes.projectManager,
       description: "Project-scoped project management access within Giganttic.",
       displayName: "Project Manager",
+    },
+  ],
+  organizationRoles: [
+    {
+      code: organizationRoleCodes.organizationManager,
+      description: "Organization-scoped organization management access within Giganttic.",
+      displayName: "Organization Manager",
+    },
+    {
+      code: organizationRoleCodes.projectManager,
+      description:
+        "Organization-scoped project management authority for projects associated to the organization.",
+      displayName: "Project Manager",
+    },
+    {
+      code: organizationRoleCodes.teamManager,
+      description:
+        "Organization-scoped team management authority for teams assigned to the organization.",
+      displayName: "Team Manager",
     },
   ],
   systemRoles: [

@@ -81,21 +81,27 @@ describe("generated sqlite ddl for v2", () => {
 
     const presentTableCount = querySingleValue(
       db,
-      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         "Users",
         "CredentialTypes",
         "Projects",
         "Teams",
+        "Organizations",
         "SystemRoles",
         "ProjectRoles",
         "TeamRoles",
+        "OrganizationRoles",
         "Projects_Users",
         "Teams_Users",
         "Projects_Teams",
+        "Users_Organizations",
+        "Projects_Organizations",
+        "Organizations_Teams",
         "Users_SystemRoles",
         "Users_Projects_ProjectRoles",
         "Users_Teams_TeamRoles",
+        "Users_Organizations_OrganizationRoles",
       ],
     );
     const removedTableCount = querySingleValue(
@@ -104,7 +110,7 @@ describe("generated sqlite ddl for v2", () => {
       ["Roles", "Users_Roles"],
     );
 
-    expect(presentTableCount).toBe(13);
+    expect(presentTableCount).toBe(19);
     expect(removedTableCount).toBe(0);
     db.close();
   });
@@ -133,20 +139,31 @@ describe("generated sqlite ddl for v2", () => {
 
     db.exec("INSERT INTO Users (id, username, email) VALUES (1, 'alice', 'alice@example.com');");
     db.exec("INSERT INTO Projects (id, name) VALUES (1, 'Apollo');");
-    db.exec("INSERT INTO Teams (id, name) VALUES (1, 'Platform');");
+    db.exec("INSERT INTO Teams (id, name) VALUES (1, 'Platform'), (2, 'Ops');");
+    db.exec("INSERT INTO Organizations (id, name) VALUES (1, 'Umbrella');");
     db.exec(
       "INSERT INTO SystemRoles (code, displayName) VALUES ('GGTC_SYSTEMROLE_ADMIN', 'Administrator');",
     );
     db.exec(
       "INSERT INTO TeamRoles (code, displayName) VALUES ('GGTC_TEAMROLE_PROJECT_MANAGER', 'Project Manager');",
     );
+    db.exec(
+      "INSERT INTO OrganizationRoles (code, displayName) VALUES ('GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER', 'Organization Manager');",
+    );
 
     db.exec("INSERT INTO Projects_Users (userId, projectId) VALUES (1, 1);");
     db.exec("INSERT INTO Users_SystemRoles (userId, roleCode) VALUES (1, 'GGTC_SYSTEMROLE_ADMIN');");
+    db.exec("INSERT INTO Organizations_Teams (organizationId, teamId) VALUES (1, 1);");
 
     expect(() =>
       db.exec("INSERT INTO Projects_Users (userId, projectId) VALUES (1, 1);"),
     ).toThrow(/unique/i);
+    expect(() =>
+      db.exec("INSERT INTO Organizations_Teams (organizationId, teamId) VALUES (1, 1);"),
+    ).toThrow(/unique/i);
+    expect(() =>
+      db.exec("INSERT INTO Organizations_Teams (organizationId, teamId) VALUES (999, 2);"),
+    ).toThrow(/foreign key/i);
     expect(() =>
       db.exec(
         "INSERT INTO Users_Teams_TeamRoles (userId, teamId, roleCode) VALUES (1, 999, 'GGTC_TEAMROLE_PROJECT_MANAGER');",

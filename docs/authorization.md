@@ -1,13 +1,17 @@
 # Authorization
 
 This document describes the backend authorization and role-transfer rules
-currently implemented for auth/session, teams, projects, and user deletion.
+currently implemented for auth/session, organizations, teams, projects, and
+user deletion.
 
 ## Core Role Domains
 
 Current role namespaces:
 
 - `GGTC_SYSTEMROLE_ADMIN`
+- `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+- `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
+- `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
 - `GGTC_PROJECTROLE_PROJECT_MANAGER`
 - `GGTC_TEAMROLE_TEAM_MANAGER`
 - `GGTC_TEAMROLE_PROJECT_MANAGER`
@@ -16,7 +20,65 @@ Important distinction:
 
 - auth/session payload `user.roles` contains system roles only
 - project and team role checks are evaluated from scoped assignment tables
-- effective project-manager authority is computed, not stored
+- organization, project, and team role checks are evaluated from scoped
+  assignment tables
+- effective project-manager and effective team-manager authority are computed,
+  not stored
+
+## Organizations
+
+Current organization routes:
+
+- `POST /stc-proj-mgmt/api/organizations`
+- `GET /stc-proj-mgmt/api/organizations`
+- `GET /stc-proj-mgmt/api/organizations/:organizationId`
+- `PATCH /stc-proj-mgmt/api/organizations/:organizationId`
+- `PUT /stc-proj-mgmt/api/organizations/:organizationId/users`
+- `PUT /stc-proj-mgmt/api/organizations/:organizationId/projects`
+- `POST /stc-proj-mgmt/api/organizations/:organizationId/teams`
+- `POST /stc-proj-mgmt/api/organizations/:organizationId/roles/grant`
+- `POST /stc-proj-mgmt/api/organizations/:organizationId/roles/revoke`
+- `DELETE /stc-proj-mgmt/api/organizations/:organizationId`
+
+### Organization creation and visibility
+
+- any authenticated user may create an organization
+- the creator is automatically inserted into `Users_Organizations`
+- the creator is automatically granted
+  `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+- `GGTC_SYSTEMROLE_ADMIN` may list and fetch any organization
+- non-admin users may list and fetch organizations where xe is:
+  - a direct member through `Users_Organizations`
+  - an indirect member through `Teams_Users` plus `Organizations_Teams`
+  - or a direct organization-role holder
+
+### Organization management authority
+
+- `PATCH`, `PUT /users`, `PUT /projects`, `POST /teams`, and org-role
+  grant/revoke require:
+  - `GGTC_SYSTEMROLE_ADMIN`, or
+  - `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER` on that organization
+- `DELETE /organizations/:organizationId` requires
+  `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER` on that organization
+- system admin may explicitly self-grant
+  `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER` on any organization and then use
+  that direct ownership to delete it
+
+### Organization role and grant rules
+
+- org roles require organization membership, except system-admin self-grant of
+  org manager, which auto-adds admin as a direct org member
+- current public org-role grant path supports:
+  - `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+  - `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
+  - `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
+- organization project manager counts as an effective project manager for a
+  project if the organization is directly associated with that project, or if
+  the organization owns a team linked to that project
+- organization team manager does not count as an effective project manager by
+  itself
+- organization team manager counts as an effective team manager for teams owned
+  by that organization
 
 ## Session and Auth Routes
 
@@ -60,15 +122,20 @@ Current team routes:
 
 - `PATCH /teams/:teamId` and `PUT /teams/:teamId/members` require either:
   - `GGTC_SYSTEMROLE_ADMIN`, or
-  - direct `GGTC_TEAMROLE_TEAM_MANAGER` on that team
-- `DELETE /teams/:teamId` requires direct `GGTC_TEAMROLE_TEAM_MANAGER`
+  - effective team-manager authority on that team
+- `DELETE /teams/:teamId` requires effective team-manager authority
 - system admin may explicitly self-grant `GGTC_TEAMROLE_TEAM_MANAGER` on any
   team and then use that direct ownership to delete it
 - `POST /teams/:teamId/roles/grant` and `.../revoke` use role-specific rules:
-  - `GGTC_TEAMROLE_TEAM_MANAGER` grant/revoke requires system admin or direct
-    `GGTC_TEAMROLE_TEAM_MANAGER`
+  - `GGTC_TEAMROLE_TEAM_MANAGER` grant/revoke requires system admin or
+    effective team-manager authority
   - `GGTC_TEAMROLE_PROJECT_MANAGER` grant/revoke requires direct
     `GGTC_TEAMROLE_PROJECT_MANAGER` on that same team
+
+Effective team-manager authority means either:
+
+- direct `GGTC_TEAMROLE_TEAM_MANAGER` on the team, or
+- `GGTC_ORGANIZATIONROLE_TEAM_MANAGER` on the organization that owns the team
 
 ### Team invariants
 
@@ -79,6 +146,8 @@ Current team routes:
 - a team must always retain at least one `GGTC_TEAMROLE_TEAM_MANAGER`
 - a team role target must already be a team member, except system admin
   self-grant of `GGTC_TEAMROLE_TEAM_MANAGER`, which auto-adds admin as a member
+- an organization team manager may also bootstrap team membership when granting
+  `GGTC_TEAMROLE_TEAM_MANAGER` to an organization member on an org-owned team
 - deleting a team is blocked if removing that team would eliminate the final
   effective project manager for any linked project
 
@@ -101,7 +170,10 @@ A user is treated as an effective project manager for a project if xe has either
 
 - direct `GGTC_PROJECTROLE_PROJECT_MANAGER` on that project, or
 - `GGTC_TEAMROLE_PROJECT_MANAGER` on a team linked to that project through
-  `Projects_Teams`
+  `Projects_Teams`, or
+- `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER` on an organization directly
+  associated with that project, or on an organization that owns a team linked
+  to that project
 
 This effective authority is used for currently supported project-management
 operations.
@@ -162,5 +234,5 @@ Authorization and integrity rules:
 - `GGTC_SYSTEMROLE_ADMIN` may delete another user
 - neither self-delete nor admin-delete may remove the final remaining:
   - effective project manager for any project
-  - `GGTC_TEAMROLE_TEAM_MANAGER` for any team
+  - effective team manager for any team
 - deletion succeeds only after management responsibility has been transferred

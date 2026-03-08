@@ -16,14 +16,18 @@ import {
 } from "../../../db/index.js";
 import {
   assertUsersExistOrThrow,
-  hasDirectTeamManagerRole,
+  getOrganizationIdForTeam,
+  hasEffectiveTeamManagerRole,
+  hasOrganizationMembership,
+  hasOrganizationTeamManagerRoleForTeam,
   hasSystemAdminRole,
   hasTeamMembership,
   hasTeamProjectManagerRole,
   listDirectProjectManagerUserIds,
+  listEffectiveTeamManagerUserIds,
+  listOrganizationProjectManagerUserIdsForProject,
   listProjectIdsForTeam,
   listTeamIdsForProject,
-  listTeamManagerUserIds,
   listTeamProjectManagerUserIds,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
@@ -227,7 +231,7 @@ export class TeamsService {
     this.assertTeamExists(teamId);
     this.assertCanManageTeam(authContext, teamId);
     this.assertUsersExist(payload.members.map((member) => member.userId));
-    this.assertTeamRetainsManagerAfterMembershipReplace(payload);
+    this.assertTeamRetainsManagerAfterMembershipReplace(teamId, payload);
     this.assertLinkedProjectsRetainManagers(
       teamId,
       extractTeamProjectManagerIds(payload),
@@ -334,7 +338,7 @@ export class TeamsService {
   }
 
   private assertCanDeleteTeam(authContext: AuthContext, teamId: number): void {
-    if (hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId)) {
+    if (hasEffectiveTeamManagerRole(this.databaseService.db, teamId, authContext.userId)) {
       return;
     }
 
@@ -349,7 +353,7 @@ export class TeamsService {
     if (payload.roleCode === TEAM_MANAGER_ROLE_CODE) {
       if (
         hasSystemAdminRole(authContext) ||
-        hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
+        hasEffectiveTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
       ) {
         return;
       }
@@ -357,7 +361,13 @@ export class TeamsService {
 
     if (
       payload.roleCode === TEAM_PROJECT_MANAGER_ROLE_CODE &&
-      hasTeamProjectManagerRole(this.databaseService.db, teamId, authContext.userId)
+      (
+        hasTeamProjectManagerRole(this.databaseService.db, teamId, authContext.userId) ||
+        this.canOrganizationTeamManagerGrantTeamProjectManager(
+          authContext,
+          teamId,
+        )
+      )
     ) {
       return;
     }
@@ -368,7 +378,7 @@ export class TeamsService {
   private assertCanManageTeam(authContext: AuthContext, teamId: number): void {
     if (
       hasSystemAdminRole(authContext) ||
-      hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
+      hasEffectiveTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
     ) {
       return;
     }
@@ -384,7 +394,7 @@ export class TeamsService {
     if (payload.roleCode === TEAM_MANAGER_ROLE_CODE) {
       if (
         hasSystemAdminRole(authContext) ||
-        hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
+        hasEffectiveTeamManagerRole(this.databaseService.db, teamId, authContext.userId)
       ) {
         return;
       }
@@ -413,6 +423,13 @@ export class TeamsService {
       hasSystemAdminRole(authContext) &&
       payload.userId === authContext.userId &&
       payload.roleCode === TEAM_MANAGER_ROLE_CODE
+    ) {
+      return;
+    }
+
+    if (
+      payload.roleCode === TEAM_MANAGER_ROLE_CODE &&
+      this.canOrganizationTeamManagerBootstrapMembership(authContext, teamId, payload.userId)
     ) {
       return;
     }
@@ -477,9 +494,15 @@ export class TeamsService {
   }
 
   private assertTeamRetainsManagerAfterMembershipReplace(
+    teamId: number,
     payload: UpdateTeamMembershipRequest,
   ): void {
-    if (extractTeamManagerIds(payload).length === 0) {
+    const effectiveManagerIds = new Set([
+      ...extractTeamManagerIds(payload),
+      ...this.listRetainedOrganizationTeamManagerIds(teamId),
+    ]);
+
+    if (effectiveManagerIds.size === 0) {
       throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
     }
   }
@@ -492,7 +515,7 @@ export class TeamsService {
       return;
     }
 
-    const remainingManagerIds = listTeamManagerUserIds(this.databaseService.db, teamId)
+    const remainingManagerIds = listEffectiveTeamManagerUserIds(this.databaseService.db, teamId)
       .filter((userId) => userId !== payload.userId);
 
     if (remainingManagerIds.length === 0) {
@@ -567,7 +590,15 @@ export class TeamsService {
       payload.roleCode !== TEAM_MANAGER_ROLE_CODE ||
       hasTeamMembership(this.databaseService.db, teamId, payload.userId)
     ) {
-      return;
+      if (
+        !this.canOrganizationTeamManagerBootstrapMembership(
+          authContext,
+          teamId,
+          payload.userId,
+        )
+      ) {
+        return;
+      }
     }
 
     tx.insert(teamsUsers)
@@ -601,6 +632,12 @@ export class TeamsService {
       this.databaseService.db,
       projectId,
     ));
+    for (const userId of listOrganizationProjectManagerUserIdsForProject(
+      this.databaseService.db,
+      projectId,
+    )) {
+      managerIds.add(userId);
+    }
 
     for (const teamId of listTeamIdsForProject(this.databaseService.db, projectId)) {
       if (teamId === changedTeamId) {
@@ -619,6 +656,56 @@ export class TeamsService {
     }
 
     return [...managerIds];
+  }
+
+  private canOrganizationTeamManagerBootstrapMembership(
+    authContext: AuthContext,
+    teamId: number,
+    userId: number,
+  ): boolean {
+    if (hasTeamMembership(this.databaseService.db, teamId, userId)) {
+      return false;
+    }
+
+    if (
+      !hasOrganizationTeamManagerRoleForTeam(
+        this.databaseService.db,
+        teamId,
+        authContext.userId,
+      )
+    ) {
+      return false;
+    }
+
+    const organizationId = getOrganizationIdForTeam(this.databaseService.db, teamId);
+
+    return organizationId !== null &&
+      hasOrganizationMembership(this.databaseService.db, organizationId, userId);
+  }
+
+  private canOrganizationTeamManagerGrantTeamProjectManager(
+    authContext: AuthContext,
+    teamId: number,
+  ): boolean {
+    return hasOrganizationTeamManagerRoleForTeam(
+      this.databaseService.db,
+      teamId,
+      authContext.userId,
+    ) &&
+      listProjectIdsForTeam(this.databaseService.db, teamId).length > 0;
+  }
+
+  private listRetainedOrganizationTeamManagerIds(teamId: number): number[] {
+    const organizationId = getOrganizationIdForTeam(this.databaseService.db, teamId);
+
+    if (organizationId === null) {
+      return [];
+    }
+
+    return listEffectiveTeamManagerUserIds(this.databaseService.db, teamId)
+      .filter((userId) =>
+        hasOrganizationTeamManagerRoleForTeam(this.databaseService.db, teamId, userId)
+      );
   }
 
   private listTeamMembers(teamId: number): TeamMember[] {

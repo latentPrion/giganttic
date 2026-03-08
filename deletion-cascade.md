@@ -11,9 +11,11 @@ The schema uses FK cascades for most child rows.
 
 - `Projects_Users`
 - `Teams_Users`
+- `Users_Organizations`
 - `Users_SystemRoles`
 - `Users_Projects_ProjectRoles`
 - `Users_Teams_TeamRoles`
+- `Users_Organizations_OrganizationRoles`
 - `Users_CredentialTypes`
 - `Users_Sessions`
 
@@ -26,12 +28,21 @@ Additional chained cascade:
 - `Teams_Users`
 - `Projects_Teams`
 - `Users_Teams_TeamRoles`
+- `Organizations_Teams`
 
 ### Deleting a Project cascades to
 
 - `Projects_Users`
 - `Projects_Teams`
 - `Users_Projects_ProjectRoles`
+- `Projects_Organizations`
+
+### Deleting an Organization cascades to
+
+- `Users_Organizations`
+- `Projects_Organizations`
+- `Organizations_Teams`
+- `Users_Organizations_OrganizationRoles`
 
 ## Integrity Before Physical Delete
 
@@ -42,6 +53,9 @@ coverage before allowing a destructive operation to continue.
 
 - a team must retain at least one `GGTC_TEAMROLE_TEAM_MANAGER` unless the team
   itself is being deleted
+- effective team manager means:
+  - direct `GGTC_TEAMROLE_TEAM_MANAGER`, or
+  - `GGTC_ORGANIZATIONROLE_TEAM_MANAGER` on the team's owning organization
 - deleting a team is blocked if that team's removal would strand any linked
   project without an effective project manager
 
@@ -52,16 +66,24 @@ coverage before allowing a destructive operation to continue.
   - direct project-role revocation
 - effective project manager means:
   - direct `GGTC_PROJECTROLE_PROJECT_MANAGER`, or
-  - linked-team `GGTC_TEAMROLE_PROJECT_MANAGER`
+  - linked-team `GGTC_TEAMROLE_PROJECT_MANAGER`, or
+  - `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER` on an associated organization
 - deleting the project itself is allowed once the caller is authorized, because
   the aggregate is disappearing
+
+### Organization integrity
+
+- organization delete is currently blocked while the organization still has any
+  associated projects or teams
+- this is stricter than raw FK safety and reflects the current absence of a
+  public ownership-transfer flow for org-owned teams and org-associated projects
 
 ### User integrity
 
 - a user cannot be deleted if xe is the final effective project manager for any
   project
-- a user cannot be deleted if xe is the final `GGTC_TEAMROLE_TEAM_MANAGER` for
-  any team
+- a user cannot be deleted if xe is the final effective team manager for any
+  team
 - these checks apply to self-delete and admin-delete
 
 ## Current Service Ordering
@@ -82,12 +104,13 @@ coverage before allowing a destructive operation to continue.
 ### Team deletion
 
 1. verify team exists
-2. verify caller has direct `TEAM_MANAGER` ownership
+2. verify caller has effective `TEAM_MANAGER` ownership
 3. verify deleting the team would not strand any linked project
 4. delete `Users_Teams_TeamRoles`
 5. delete `Teams_Users`
 6. delete `Projects_Teams`
-7. delete the `Teams` row
+7. delete `Organizations_Teams`
+8. delete the `Teams` row
 
 ### Project membership replacement
 
@@ -121,8 +144,10 @@ coverage before allowing a destructive operation to continue.
    - `Users_Sessions`
    - `Users_Projects_ProjectRoles`
    - `Users_Teams_TeamRoles`
+   - `Users_Organizations_OrganizationRoles`
    - `Projects_Users`
    - `Teams_Users`
+   - `Users_Organizations`
    - `Users_CredentialTypes`
 6. delete the `Users` row
 
@@ -134,6 +159,8 @@ Current implemented path:
 
 - admin may self-grant direct `GGTC_TEAMROLE_TEAM_MANAGER` on any team
 - admin may self-grant direct `GGTC_PROJECTROLE_PROJECT_MANAGER` on any project
+- admin may self-grant direct
+  `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER` on any organization
 - after taking explicit ownership, admin may proceed with delete if the
   remaining integrity checks still pass
 

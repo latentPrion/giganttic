@@ -995,6 +995,70 @@ describe("teams crud api", () => {
     expect(lingeringRoles).toHaveLength(0);
   });
 
+  it("allows an organization team manager to manage a team and grant team manager within the organization", async () => {
+    const orgCreator = await harness.registerUser("team-org-manager-creator");
+    const orgTeamManager = await harness.registerUser("team-org-manager-user");
+    const teamOwner = await harness.registerUser("team-org-manager-owner");
+    const target = await harness.registerUser("team-org-manager-target");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Team Manager Authority Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const teamResponse = await createTeam(teamOwner.accessToken, {
+      name: "Team Managed By Org",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      teamResponse.payload,
+    );
+
+    const orgUsersUpdate = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: orgCreator.user.id },
+          { userId: orgTeamManager.user.id },
+          { userId: target.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const teamAssign = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    const orgRoleGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
+        userId: orgTeamManager.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+    const teamGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgTeamManager.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_TEAM_MANAGER",
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+
+    expect(orgUsersUpdate.statusCode).toBe(200);
+    expect(teamAssign.statusCode).toBe(200);
+    expect(orgRoleGrant.statusCode).toBe(200);
+    expect(teamGrant.statusCode).toBe(200);
+  });
+
   it("blocks deleting a team when that would remove the final effective project manager from a linked project", async () => {
     const creator = await harness.registerUser("team-delete-block-creator");
     const teamProjectManager = await harness.registerUser("team-delete-block-pm");

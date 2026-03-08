@@ -8,19 +8,26 @@ import {
 import { eq } from "drizzle-orm";
 
 import {
+  organizationsTeams,
   projectsUsers,
   teamsUsers,
   users,
   usersCredentialTypes,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
   usersSessions,
   usersProjectsProjectRoles,
   usersTeamsTeamRoles,
 } from "../../../db/index.js";
 import {
+  getOrganizationIdForTeam,
+  hasOrganizationProjectManagerRoleForProject,
+  hasOrganizationTeamManagerRoleForTeam,
   hasSystemAdminRole,
   listEffectiveProjectManagerUserIds,
+  listEffectiveTeamManagerUserIds,
+  listProjectIdsForOrganization,
   listProjectIdsForTeam,
-  listTeamManagerUserIds,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
   uniqueNumberValues,
@@ -60,11 +67,17 @@ export class UsersService {
       tx.delete(usersTeamsTeamRoles)
         .where(eq(usersTeamsTeamRoles.userId, userId))
         .run();
+      tx.delete(usersOrganizationsOrganizationRoles)
+        .where(eq(usersOrganizationsOrganizationRoles.userId, userId))
+        .run();
       tx.delete(projectsUsers)
         .where(eq(projectsUsers.userId, userId))
         .run();
       tx.delete(teamsUsers)
         .where(eq(teamsUsers.userId, userId))
+        .run();
+      tx.delete(usersOrganizations)
+        .where(eq(usersOrganizations.userId, userId))
         .run();
       tx.delete(usersCredentialTypes)
         .where(eq(usersCredentialTypes.userId, userId))
@@ -101,7 +114,7 @@ export class UsersService {
 
   private assertUserDeletionPreservesTeamManagers(userId: number): void {
     for (const teamId of this.listManagedTeamIds(userId)) {
-      const remainingManagerIds = listTeamManagerUserIds(
+      const remainingManagerIds = listEffectiveTeamManagerUserIds(
         this.databaseService.db,
         teamId,
       ).filter((managerUserId) => managerUserId !== userId);
@@ -138,50 +151,33 @@ export class UsersService {
   }
 
   private listManagedTeamIds(userId: number): number[] {
-    return this.databaseService.db
+    const directTeamIds = this.databaseService.db
       .select({ teamId: usersTeamsTeamRoles.teamId })
       .from(usersTeamsTeamRoles)
       .where(eq(usersTeamsTeamRoles.userId, userId))
       .all()
       .filter((row) => row.teamId > 0)
       .map((row) => row.teamId)
-      .filter((teamId, index, values) => values.indexOf(teamId) === index)
-      .filter((teamId) => this.hasTeamManagerRole(userId, teamId));
+      .filter((teamId, index, values) => values.indexOf(teamId) === index);
+    const organizationTeamIds = this.listOrganizationManagedTeamIds(userId);
+
+    return uniqueNumberValues([...directTeamIds, ...organizationTeamIds])
+      .filter((teamId) => this.hasEffectiveTeamManagerRoleForDeletion(userId, teamId));
   }
 
   private listProjectManagerTeamIds(userId: number): number[] {
-    return this.databaseService.db
+    const directTeamIds = this.databaseService.db
       .select({ teamId: usersTeamsTeamRoles.teamId })
       .from(usersTeamsTeamRoles)
       .where(eq(usersTeamsTeamRoles.userId, userId))
       .all()
       .filter((row) => row.teamId > 0)
       .map((row) => row.teamId)
-      .filter((teamId, index, values) => values.indexOf(teamId) === index)
-      .filter((teamId) => this.hasTeamProjectManagerRole(userId, teamId));
-  }
+      .filter((teamId, index, values) => values.indexOf(teamId) === index);
+    const organizationProjectTeamIds = this.listOrganizationProjectManagerTeamIds(userId);
 
-  private hasTeamManagerRole(userId: number, teamId: number): boolean {
-    return Boolean(
-      this.databaseService.db
-        .select({ id: usersTeamsTeamRoles.id })
-        .from(usersTeamsTeamRoles)
-        .where(eq(usersTeamsTeamRoles.userId, userId))
-        .all()
-        .find((row) => row.id > 0) &&
-        this.databaseService.db
-          .select({ roleCode: usersTeamsTeamRoles.roleCode })
-          .from(usersTeamsTeamRoles)
-          .where(eq(usersTeamsTeamRoles.userId, userId))
-          .all()
-          .some((row) => row.roleCode === TEAM_MANAGER_ROLE_CODE) &&
-        this.databaseService.db
-          .select({ teamId: usersTeamsTeamRoles.teamId })
-          .from(usersTeamsTeamRoles)
-          .where(eq(usersTeamsTeamRoles.userId, userId))
-          .all()
-          .some((row) => row.teamId === teamId),
-    );
+    return uniqueNumberValues([...directTeamIds, ...organizationProjectTeamIds])
+      .filter((teamId) => this.hasEffectiveProjectManagerViaTeam(userId, teamId));
   }
 
   private hasTeamProjectManagerRole(userId: number, teamId: number): boolean {
@@ -197,5 +193,89 @@ export class UsersService {
         row.roleCode === TEAM_PROJECT_MANAGER_ROLE_CODE &&
         row.teamId === teamId
       );
+  }
+
+  private hasEffectiveProjectManagerViaTeam(userId: number, teamId: number): boolean {
+    if (this.hasTeamProjectManagerRole(userId, teamId)) {
+      return true;
+    }
+
+    return listProjectIdsForTeam(this.databaseService.db, teamId).some((projectId) =>
+      hasOrganizationProjectManagerRoleForProject(
+        this.databaseService.db,
+        projectId,
+        userId,
+      )
+    );
+  }
+
+  private hasEffectiveTeamManagerRoleForDeletion(userId: number, teamId: number): boolean {
+    return this.hasTeamManagerRole(userId, teamId) ||
+      hasOrganizationTeamManagerRoleForTeam(this.databaseService.db, teamId, userId);
+  }
+
+  private hasTeamManagerRole(userId: number, teamId: number): boolean {
+    return this.databaseService.db
+      .select({
+        roleCode: usersTeamsTeamRoles.roleCode,
+        teamId: usersTeamsTeamRoles.teamId,
+      })
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.userId, userId))
+      .all()
+      .some((row) =>
+        row.roleCode === TEAM_MANAGER_ROLE_CODE &&
+        row.teamId === teamId
+      );
+  }
+
+  private listOrganizationManagedTeamIds(userId: number): number[] {
+    const organizationIds = this.listOrganizationIdsForUser(userId);
+
+    return uniqueNumberValues(
+      organizationIds.flatMap((organizationId) =>
+        this.databaseService.db
+          .select({ teamId: organizationsTeams.teamId })
+          .from(organizationsTeams)
+          .where(eq(organizationsTeams.organizationId, organizationId))
+          .all()
+          .map((row) => row.teamId)
+      ),
+    );
+  }
+
+  private listOrganizationProjectManagerTeamIds(userId: number): number[] {
+    const organizationIds = this.listOrganizationIdsForUser(userId);
+    const organizationProjectIds = uniqueNumberValues(
+      organizationIds.flatMap((organizationId) =>
+        listProjectIdsForOrganization(this.databaseService.db, organizationId)
+      ),
+    );
+    const teamIds = this.databaseService.db
+      .select({ teamId: organizationsTeams.teamId })
+      .from(organizationsTeams)
+      .all()
+      .map((row) => row.teamId);
+
+    return uniqueNumberValues(
+      teamIds.filter((teamId) => {
+        const organizationId = getOrganizationIdForTeam(this.databaseService.db, teamId);
+
+        return organizationId !== null &&
+          organizationIds.includes(organizationId) &&
+          listProjectIdsForTeam(this.databaseService.db, teamId)
+            .some((projectId) => organizationProjectIds.includes(projectId));
+      }),
+    );
+  }
+
+  private listOrganizationIdsForUser(userId: number): number[] {
+    return this.databaseService.db
+      .select({ organizationId: usersOrganizationsOrganizationRoles.organizationId })
+      .from(usersOrganizationsOrganizationRoles)
+      .where(eq(usersOrganizationsOrganizationRoles.userId, userId))
+      .all()
+      .map((row) => row.organizationId)
+      .filter((organizationId, index, values) => values.indexOf(organizationId) === index);
   }
 }

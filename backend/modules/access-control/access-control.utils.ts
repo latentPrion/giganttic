@@ -1,14 +1,17 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import type { SQLJsDatabase } from "drizzle-orm/sql-js";
-
 import {
+  organizationRoleCodes,
+  organizationsTeams,
+  projectsOrganizations,
   projectRoleCodes,
   projectsTeams,
   projectsUsers,
   systemRoleCodes,
   teamsUsers,
   users,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
   usersProjectsProjectRoles,
   usersTeamsTeamRoles,
 } from "../../../db/index.js";
@@ -19,6 +22,12 @@ export const SYSTEM_ADMIN_ROLE_CODE = systemRoleCodes.admin;
 export const PROJECT_MANAGER_ROLE_CODE = projectRoleCodes.projectManager;
 export const TEAM_MANAGER_ROLE_CODE = "GGTC_TEAMROLE_TEAM_MANAGER";
 export const TEAM_PROJECT_MANAGER_ROLE_CODE = "GGTC_TEAMROLE_PROJECT_MANAGER";
+export const ORGANIZATION_MANAGER_ROLE_CODE =
+  organizationRoleCodes.organizationManager;
+export const ORGANIZATION_PROJECT_MANAGER_ROLE_CODE =
+  organizationRoleCodes.projectManager;
+export const ORGANIZATION_TEAM_MANAGER_ROLE_CODE =
+  organizationRoleCodes.teamManager;
 
 type AppDatabase = DatabaseService["db"];
 
@@ -83,6 +92,45 @@ export function hasTeamMembership(
   );
 }
 
+export function hasDirectOrganizationMembership(
+  database: AppDatabase,
+  organizationId: number,
+  userId: number,
+): boolean {
+  return Boolean(
+    database
+      .select({ organizationId: usersOrganizations.organizationId })
+      .from(usersOrganizations)
+      .where(and(
+        eq(usersOrganizations.organizationId, organizationId),
+        eq(usersOrganizations.userId, userId),
+      ))
+      .get(),
+  );
+}
+
+export function hasOrganizationMembership(
+  database: AppDatabase,
+  organizationId: number,
+  userId: number,
+): boolean {
+  if (hasDirectOrganizationMembership(database, organizationId, userId)) {
+    return true;
+  }
+
+  return Boolean(
+    database
+      .select({ organizationId: organizationsTeams.organizationId })
+      .from(organizationsTeams)
+      .innerJoin(teamsUsers, eq(teamsUsers.teamId, organizationsTeams.teamId))
+      .where(and(
+        eq(organizationsTeams.organizationId, organizationId),
+        eq(teamsUsers.userId, userId),
+      ))
+      .get(),
+  );
+}
+
 export function listProjectIdsForTeam(
   database: AppDatabase,
   teamId: number,
@@ -107,6 +155,74 @@ export function listTeamIdsForProject(
     .map((row) => row.teamId);
 }
 
+export function listOrganizationIdsForProject(
+  database: AppDatabase,
+  projectId: number,
+): number[] {
+  const directIds = database
+    .select({ organizationId: projectsOrganizations.organizationId })
+    .from(projectsOrganizations)
+    .where(eq(projectsOrganizations.projectId, projectId))
+    .all()
+    .map((row) => row.organizationId);
+  const viaTeams = database
+    .select({ organizationId: organizationsTeams.organizationId })
+    .from(organizationsTeams)
+    .innerJoin(projectsTeams, eq(projectsTeams.teamId, organizationsTeams.teamId))
+    .where(eq(projectsTeams.projectId, projectId))
+    .all()
+    .map((row) => row.organizationId);
+
+  return uniqueNumberValues([...directIds, ...viaTeams]);
+}
+
+export function getOrganizationIdForTeam(
+  database: AppDatabase,
+  teamId: number,
+): number | null {
+  return database
+    .select({ organizationId: organizationsTeams.organizationId })
+    .from(organizationsTeams)
+    .where(eq(organizationsTeams.teamId, teamId))
+    .get()?.organizationId ?? null;
+}
+
+export function listTeamIdsForOrganization(
+  database: AppDatabase,
+  organizationId: number,
+): number[] {
+  return database
+    .select({ teamId: organizationsTeams.teamId })
+    .from(organizationsTeams)
+    .where(eq(organizationsTeams.organizationId, organizationId))
+    .all()
+    .map((row) => row.teamId);
+}
+
+export function listProjectIdsForOrganization(
+  database: AppDatabase,
+  organizationId: number,
+): number[] {
+  const directIds = database
+    .select({ projectId: projectsOrganizations.projectId })
+    .from(projectsOrganizations)
+    .where(eq(projectsOrganizations.organizationId, organizationId))
+    .all()
+    .map((row) => row.projectId);
+  const viaTeams = database
+    .select({ projectId: projectsTeams.projectId })
+    .from(projectsTeams)
+    .innerJoin(
+      organizationsTeams,
+      eq(organizationsTeams.teamId, projectsTeams.teamId),
+    )
+    .where(eq(organizationsTeams.organizationId, organizationId))
+    .all()
+    .map((row) => row.projectId);
+
+  return uniqueNumberValues([...directIds, ...viaTeams]);
+}
+
 export function listDirectProjectManagerUserIds(
   database: AppDatabase,
   projectId: number,
@@ -122,7 +238,7 @@ export function listDirectProjectManagerUserIds(
     .map((row) => row.userId);
 }
 
-export function listTeamManagerUserIds(
+export function listDirectTeamManagerUserIds(
   database: AppDatabase,
   teamId: number,
 ): number[] {
@@ -134,6 +250,37 @@ export function listTeamProjectManagerUserIds(
   teamId: number,
 ): number[] {
   return listTeamRoleUserIds(database, teamId, TEAM_PROJECT_MANAGER_ROLE_CODE);
+}
+
+export function listOrganizationRoleUserIds(
+  database: AppDatabase,
+  organizationId: number,
+  roleCode: string,
+): number[] {
+  return database
+    .select({ userId: usersOrganizationsOrganizationRoles.userId })
+    .from(usersOrganizationsOrganizationRoles)
+    .where(and(
+      eq(usersOrganizationsOrganizationRoles.organizationId, organizationId),
+      eq(usersOrganizationsOrganizationRoles.roleCode, roleCode),
+    ))
+    .all()
+    .map((row) => row.userId);
+}
+
+export function listOrganizationProjectManagerUserIdsForProject(
+  database: AppDatabase,
+  projectId: number,
+): number[] {
+  return uniqueNumberValues(
+    listOrganizationIdsForProject(database, projectId).flatMap((organizationId) =>
+      listOrganizationRoleUserIds(
+        database,
+        organizationId,
+        ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
+      )
+    ),
+  );
 }
 
 export function listIndirectProjectManagerUserIds(
@@ -169,6 +316,25 @@ export function listEffectiveProjectManagerUserIds(
   return uniqueNumberValues([
     ...listDirectProjectManagerUserIds(database, projectId),
     ...listIndirectProjectManagerUserIds(database, projectId),
+    ...listOrganizationProjectManagerUserIdsForProject(database, projectId),
+  ]);
+}
+
+export function listEffectiveTeamManagerUserIds(
+  database: AppDatabase,
+  teamId: number,
+): number[] {
+  const organizationId = getOrganizationIdForTeam(database, teamId);
+
+  return uniqueNumberValues([
+    ...listDirectTeamManagerUserIds(database, teamId),
+    ...(organizationId === null
+      ? []
+      : listOrganizationRoleUserIds(
+        database,
+        organizationId,
+        ORGANIZATION_TEAM_MANAGER_ROLE_CODE,
+      )),
   ]);
 }
 
@@ -193,7 +359,15 @@ export function hasDirectTeamManagerRole(
   teamId: number,
   userId: number,
 ): boolean {
-  return listTeamManagerUserIds(database, teamId).includes(userId);
+  return listDirectTeamManagerUserIds(database, teamId).includes(userId);
+}
+
+export function hasEffectiveTeamManagerRole(
+  database: AppDatabase,
+  teamId: number,
+  userId: number,
+): boolean {
+  return listEffectiveTeamManagerUserIds(database, teamId).includes(userId);
 }
 
 export function hasTeamProjectManagerRole(
@@ -204,12 +378,55 @@ export function hasTeamProjectManagerRole(
   return listTeamProjectManagerUserIds(database, teamId).includes(userId);
 }
 
+export function hasOrganizationProjectManagerRoleForProject(
+  database: AppDatabase,
+  projectId: number,
+  userId: number,
+): boolean {
+  return listOrganizationProjectManagerUserIdsForProject(database, projectId)
+    .includes(userId);
+}
+
+export function hasOrganizationTeamManagerRoleForTeam(
+  database: AppDatabase,
+  teamId: number,
+  userId: number,
+): boolean {
+  const organizationId = getOrganizationIdForTeam(database, teamId);
+
+  if (organizationId === null) {
+    return false;
+  }
+
+  return listOrganizationRoleUserIds(
+    database,
+    organizationId,
+    ORGANIZATION_TEAM_MANAGER_ROLE_CODE,
+  ).includes(userId);
+}
+
+export function hasOrganizationManagerRole(
+  database: AppDatabase,
+  organizationId: number,
+  userId: number,
+): boolean {
+  return listOrganizationRoleUserIds(
+    database,
+    organizationId,
+    ORGANIZATION_MANAGER_ROLE_CODE,
+  ).includes(userId);
+}
+
 export function hasProjectAccess(
   database: AppDatabase,
   projectId: number,
   userId: number,
 ): boolean {
   if (hasDirectProjectMembership(database, projectId, userId)) {
+    return true;
+  }
+
+  if (hasEffectiveProjectManagerRole(database, projectId, userId)) {
     return true;
   }
 

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  organizationsTeams,
   projects,
   projectsTeams,
   projectsUsers,
@@ -513,5 +514,100 @@ describe("users delete api", () => {
         .where(eq(usersSessions.userId, creator.user.id))
         .all(),
     ).toHaveLength(0);
+  });
+
+  it("allows deleting a user when organization-derived project and team manager coverage remains", async () => {
+    const orgCreator = await harness.registerUser("users-org-coverage-creator");
+    const replacement = await harness.registerUser("users-org-coverage-replacement");
+    const target = await harness.registerUser("users-org-coverage-target");
+    const projectOwner = await harness.registerUser("users-org-coverage-project-owner");
+    const teamOwner = await harness.registerUser("users-org-coverage-team-owner");
+    const orgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { name: "Delete Coverage Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const projectResponse = await createProject(projectOwner.accessToken, {
+      name: "Delete Coverage Project",
+    });
+    const teamResponse = await createTeam(teamOwner.accessToken, {
+      name: "Delete Coverage Team",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      projectResponse.payload,
+    );
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      teamResponse.payload,
+    );
+
+    const orgUsersUpdate = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: orgCreator.user.id },
+          { userId: replacement.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const projectAssociation = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    const teamAssociation = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    const orgProjectRoleGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+        userId: replacement.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+    const orgTeamRoleGrant = await harness.app.inject({
+      headers: harness.createAuthHeaders(orgCreator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
+        userId: replacement.user.id,
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/roles/grant`,
+    });
+
+    expect(orgUsersUpdate.statusCode).toBe(200);
+    expect(projectAssociation.statusCode).toBe(200);
+    expect(teamAssociation.statusCode).toBe(200);
+    expect(orgProjectRoleGrant.statusCode).toBe(200);
+    expect(orgTeamRoleGrant.statusCode).toBe(200);
+    expect(organization.id).toBeGreaterThan(0);
+    expect(project.id).toBeGreaterThan(0);
+    expect(team.id).toBeGreaterThan(0);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(organizationsTeams)
+        .where(eq(organizationsTeams.teamId, team.id))
+        .all(),
+    ).toHaveLength(1);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(target.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/users/${target.user.id}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
   });
 });

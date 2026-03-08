@@ -6,6 +6,32 @@ CREATE TABLE `CredentialTypes` (
 	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE `OrganizationRoles` (
+	`code` text PRIMARY KEY NOT NULL,
+	`displayName` text NOT NULL,
+	`description` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `Organizations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	`updatedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `Organizations_Teams` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`organizationId` integer NOT NULL,
+	`teamId` integer NOT NULL,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	FOREIGN KEY (`organizationId`) REFERENCES `Organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`teamId`) REFERENCES `Teams`(`id`) ON UPDATE cascade ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `Organizations_Teams_organizationId_teamId_unique` ON `Organizations_Teams` (`organizationId`,`teamId`);--> statement-breakpoint
+CREATE UNIQUE INDEX `Organizations_Teams_teamId_unique` ON `Organizations_Teams` (`teamId`);--> statement-breakpoint
 CREATE TABLE `ProjectRoles` (
 	`code` text PRIMARY KEY NOT NULL,
 	`displayName` text NOT NULL,
@@ -21,6 +47,16 @@ CREATE TABLE `Projects` (
 	`updatedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE `Projects_Organizations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`organizationId` integer NOT NULL,
+	`projectId` integer NOT NULL,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	FOREIGN KEY (`organizationId`) REFERENCES `Organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`projectId`) REFERENCES `Projects`(`id`) ON UPDATE cascade ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `Projects_Organizations_organizationId_projectId_unique` ON `Projects_Organizations` (`organizationId`,`projectId`);--> statement-breakpoint
 CREATE TABLE `Projects_Teams` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`projectId` integer NOT NULL,
@@ -99,6 +135,28 @@ CREATE TABLE `Users_CredentialTypes` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `Users_CredentialTypes_password_singleton_unique` ON `Users_CredentialTypes` (`userId`) WHERE "Users_CredentialTypes"."credentialTypeCode" = 'GGTC_CREDTYPE_USERNAME_PASSWORD';--> statement-breakpoint
+CREATE TABLE `Users_Organizations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`organizationId` integer NOT NULL,
+	`userId` integer NOT NULL,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	FOREIGN KEY (`organizationId`) REFERENCES `Organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON UPDATE cascade ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `Users_Organizations_organizationId_userId_unique` ON `Users_Organizations` (`organizationId`,`userId`);--> statement-breakpoint
+CREATE TABLE `Users_Organizations_OrganizationRoles` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`userId` integer NOT NULL,
+	`organizationId` integer NOT NULL,
+	`roleCode` text NOT NULL,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	FOREIGN KEY (`userId`) REFERENCES `Users`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`organizationId`) REFERENCES `Organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`roleCode`) REFERENCES `OrganizationRoles`(`code`) ON UPDATE cascade ON DELETE restrict
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `Users_Organizations_OrganizationRoles_userId_organizationId_roleCode_unique` ON `Users_Organizations_OrganizationRoles` (`userId`,`organizationId`,`roleCode`);--> statement-breakpoint
 CREATE TABLE `Users_PasswordCredentials` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`userCredentialTypeId` integer NOT NULL,

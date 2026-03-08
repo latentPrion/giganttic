@@ -2,15 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   credentialTypeCodes,
+  organizationRoleCodes,
   projectRoleCodes,
   systemRoleCodes,
   teamRoleCodes,
 } from "../schema.js";
 import {
+  organizationsInsertSchema,
+  organizationsTeamsInsertSchema,
+  projectsOrganizationsInsertSchema,
   projectsInsertSchema,
   projectsTeamsInsertSchema,
   projectsUsersInsertSchema,
   teamsInsertSchema,
+  usersOrganizationsInsertSchema,
+  usersOrganizationsOrganizationRolesInsertSchema,
   usersProjectsProjectRolesInsertSchema,
   usersSystemRolesInsertSchema,
   usersTeamsTeamRolesInsertSchema,
@@ -55,6 +61,30 @@ describe("auth and access v2 zod schemas", () => {
     expect(teamRole.roleCode).toBe(teamRoleCodes.projectManager);
   });
 
+  it("accepts organization inserts and organization membership mappings", () => {
+    const organization = organizationsInsertSchema.parse({
+      description: "Umbrella org",
+      name: "Umbrella",
+    });
+    const userMembership = usersOrganizationsInsertSchema.parse({
+      organizationId: 2,
+      userId: 3,
+    });
+    const projectAssociation = projectsOrganizationsInsertSchema.parse({
+      organizationId: 2,
+      projectId: 9,
+    });
+    const teamAssociation = organizationsTeamsInsertSchema.parse({
+      organizationId: 2,
+      teamId: 7,
+    });
+
+    expect(organization.name).toBe("Umbrella");
+    expect(userMembership.organizationId).toBe(2);
+    expect(projectAssociation.projectId).toBe(9);
+    expect(teamAssociation.teamId).toBe(7);
+  });
+
   it("accepts split role assignments", () => {
     const systemRole = usersSystemRolesInsertSchema.parse({
       roleCode: systemRoleCodes.admin,
@@ -68,6 +98,18 @@ describe("auth and access v2 zod schemas", () => {
 
     expect(systemRole.roleCode).toBe("GGTC_SYSTEMROLE_ADMIN");
     expect(projectRole.roleCode).toBe("GGTC_PROJECTROLE_PROJECT_MANAGER");
+  });
+
+  it("accepts organization role assignments", () => {
+    const orgRole = usersOrganizationsOrganizationRolesInsertSchema.parse({
+      organizationId: 5,
+      roleCode: organizationRoleCodes.organizationManager,
+      userId: 1,
+    });
+
+    expect(orgRole.roleCode).toBe(
+      "GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER",
+    );
   });
 
   it("retains the existing username/password credential code", () => {

@@ -17,12 +17,16 @@ import {
 } from "../../../db/index.js";
 import {
   assertUsersExistOrThrow,
+  getOrganizationIdForTeam,
   hasDirectProjectMembership,
   hasEffectiveProjectManagerRole,
+  hasOrganizationTeamManagerRoleForTeam,
   hasProjectAccess,
   hasSystemAdminRole,
   listDirectProjectManagerUserIds,
+  listEffectiveProjectManagerUserIds,
   listIndirectProjectManagerUserIds,
+  listOrganizationProjectManagerUserIdsForProject,
   PROJECT_MANAGER_ROLE_CODE,
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
@@ -346,6 +350,10 @@ export class ProjectsService {
       return;
     }
 
+    if (this.canOrganizationTeamManagerGrantProjectRole(authContext, projectId)) {
+      return;
+    }
+
     throw new ForbiddenException("Not permitted to grant that project role");
   }
 
@@ -418,9 +426,17 @@ export class ProjectsService {
     projectId: number,
     payload: UpdateProjectMembershipRequest,
   ): void {
+    const currentDirectManagerIds = listDirectProjectManagerUserIds(
+      this.databaseService.db,
+      projectId,
+    );
+    const retainedNonDirectManagerIds = listEffectiveProjectManagerUserIds(
+      this.databaseService.db,
+      projectId,
+    ).filter((userId) => !currentDirectManagerIds.includes(userId));
     const effectiveManagerIds = new Set([
       ...extractDirectProjectManagerIds(payload),
-      ...listIndirectProjectManagerUserIds(this.databaseService.db, projectId),
+      ...retainedNonDirectManagerIds,
     ]);
 
     if (effectiveManagerIds.size === 0) {
@@ -436,10 +452,17 @@ export class ProjectsService {
       return;
     }
 
+    const currentDirectManagerIds = listDirectProjectManagerUserIds(
+      this.databaseService.db,
+      projectId,
+    );
     const remainingManagerIds = new Set([
-      ...listDirectProjectManagerUserIds(this.databaseService.db, projectId)
-        .filter((userId) => userId !== payload.userId),
+      ...currentDirectManagerIds.filter((userId) => userId !== payload.userId),
       ...listIndirectProjectManagerUserIds(this.databaseService.db, projectId),
+      ...listOrganizationProjectManagerUserIdsForProject(
+        this.databaseService.db,
+        projectId,
+      ),
     ]);
 
     if (remainingManagerIds.size === 0) {
@@ -543,6 +566,30 @@ export class ProjectsService {
         userId: payload.userId,
       })
       .run();
+  }
+
+  private canOrganizationTeamManagerGrantProjectRole(
+    authContext: AuthContext,
+    projectId: number,
+  ): boolean {
+    return this.listLinkedTeamIdsForProject(projectId)
+      .some((teamId) =>
+        hasOrganizationTeamManagerRoleForTeam(
+          this.databaseService.db,
+          teamId,
+          authContext.userId,
+        ) &&
+        getOrganizationIdForTeam(this.databaseService.db, teamId) !== null
+      );
+  }
+
+  private listLinkedTeamIdsForProject(projectId: number): number[] {
+    return this.databaseService.db
+      .select({ teamId: projectsTeams.teamId })
+      .from(projectsTeams)
+      .where(eq(projectsTeams.projectId, projectId))
+      .all()
+      .map((row) => row.teamId);
   }
 
   private getProjectRecordByIdOrThrow(projectId: number): ProjectResponse {

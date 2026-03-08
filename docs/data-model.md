@@ -82,6 +82,13 @@ Constraints:
 - `createdAt`
 - `updatedAt`
 
+`Organizations`
+- `id`
+- `name`
+- `description`
+- `createdAt`
+- `updatedAt`
+
 `SystemRoles`
 - `code`
 - `displayName`
@@ -95,6 +102,12 @@ Constraints:
 - `createdAt`
 
 `TeamRoles`
+- `code`
+- `displayName`
+- `description`
+- `createdAt`
+
+`OrganizationRoles`
 - `code`
 - `displayName`
 - `description`
@@ -136,6 +149,34 @@ Constraints:
 Constraints:
 - unique on `(projectId, teamId)`
 
+`Users_Organizations`
+- `id`
+- `organizationId`
+- `userId`
+- `createdAt`
+
+Constraints:
+- unique on `(organizationId, userId)`
+
+`Projects_Organizations`
+- `id`
+- `organizationId`
+- `projectId`
+- `createdAt`
+
+Constraints:
+- unique on `(organizationId, projectId)`
+
+`Organizations_Teams`
+- `id`
+- `organizationId`
+- `teamId`
+- `createdAt`
+
+Constraints:
+- unique on `(organizationId, teamId)`
+- unique on `teamId`, enforcing one organization per team
+
 `Users_SystemRoles`
 - `id`
 - `userId`
@@ -164,6 +205,16 @@ Constraints:
 
 Constraints:
 - unique on `(userId, teamId, roleCode)`
+
+`Users_Organizations_OrganizationRoles`
+- `id`
+- `userId`
+- `organizationId`
+- `roleCode`
+- `createdAt`
+
+Constraints:
+- unique on `(userId, organizationId, roleCode)`
 
 `Users_CredentialTypes`
 - `id`
@@ -235,9 +286,20 @@ Team roles:
 - `GGTC_TEAMROLE_TEAM_MANAGER`
 - `GGTC_TEAMROLE_PROJECT_MANAGER`
 
+Organization roles:
+- `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
+- `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
+- `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
+
 ## Auth Model Notes
 
 - A user may have zero or more system roles.
+- A user may have zero or more organization roles scoped to an organization.
+- A user may have zero or more team roles scoped to a team.
+- A user may have zero or more project roles scoped to a project.
+- Projects may be associated directly to organizations and indirectly to
+  organizations through teams.
+- Teams belong to at most one organization through `Organizations_Teams`.
 - A user may have zero or more project-role assignments and team-role assignments.
 - A user may access a project directly through `Projects_Users` or indirectly
   through team membership plus `Projects_Teams`.
