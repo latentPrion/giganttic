@@ -10,5 +10,6 @@ import { AuthService } from "./auth.service.js";
   controllers: [AuthController],
   imports: [DatabaseModule],
   providers: [AuthService, AuthSeedService, BearerAuthGuard],
+  exports: [AuthService, BearerAuthGuard],
 })
 export class AuthModule {}

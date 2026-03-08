@@ -304,7 +304,9 @@ describe("AuthSessionContext", () => {
 
     renderWithProvider();
 
-    expect(await screen.findByTestId("status")).toHaveTextContent("authenticated");
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+    });
     await user.click(screen.getByRole("button", { name: LOGOUT_BUTTON_LABEL }));
 
     await waitFor(() => {
