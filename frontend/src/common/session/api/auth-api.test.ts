@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../../api/api-error.js";
 import { authApi } from "./auth-api.js";
-import { ApiError } from "./api-error.js";
 
 const TEST_TOKEN = "test-token";
 const TEST_SESSION_ID = "session-1";

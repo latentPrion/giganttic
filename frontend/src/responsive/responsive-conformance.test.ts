@@ -5,9 +5,13 @@ import { describe, expect, it } from "vitest";
 
 const CURRENT_DIRECTORY = path.dirname(new URL(import.meta.url).pathname);
 const FRONTEND_SOURCE_DIRECTORY = path.resolve(CURRENT_DIRECTORY, "..");
-const AUTH_COMPONENTS_DIRECTORY = path.resolve(
+const COMMON_COMPONENTS_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
-  "auth/components",
+  "common/components",
+);
+const SESSION_COMPONENTS_DIRECTORY = path.resolve(
+  FRONTEND_SOURCE_DIRECTORY,
+  "common/session/components",
 );
 const HOME_COMPONENTS_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
@@ -30,9 +34,16 @@ function readFrontendFile(...relativeSegments: string[]) {
   );
 }
 
-function readAuthComponentFile(filename: string) {
+function readCommonComponentFile(filename: string) {
   return fs.readFileSync(
-    path.resolve(AUTH_COMPONENTS_DIRECTORY, filename),
+    path.resolve(COMMON_COMPONENTS_DIRECTORY, filename),
+    "utf8",
+  );
+}
+
+function readSessionComponentFile(filename: string) {
+  return fs.readFileSync(
+    path.resolve(SESSION_COMPONENTS_DIRECTORY, filename),
     "utf8",
   );
 }
@@ -85,7 +96,7 @@ describe("responsive layout contracts", () => {
   });
 
   it("makes the navbar toolbar wrap and release width pressure on small screens", () => {
-    const source = readAuthComponentFile("HeaderNavbar.tsx");
+    const source = readCommonComponentFile("HeaderNavbar.tsx");
 
     expect(source).toContain('flexWrap: "wrap"');
     expect(source).toContain('alignItems: { sm: "center", xs: "flex-start" }');
@@ -95,7 +106,7 @@ describe("responsive layout contracts", () => {
   });
 
   it("stacks logged-out auth controls vertically on narrow screens", () => {
-    const source = readAuthComponentFile("LoggedOutSessionManager.tsx");
+    const source = readSessionComponentFile("LoggedOutSessionManager.tsx");
 
     expect(source).toContain('direction={{ sm: "row", xs: "column" }}');
     expect(source).toContain('sx={{ width: { sm: "auto", xs: "100%" } }}');

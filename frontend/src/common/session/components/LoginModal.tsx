@@ -9,74 +9,65 @@ import {
   TextField,
 } from "@mui/material";
 
-import { isApiError } from "../api/api-error.js";
-import type { RegisterRequest } from "../contracts/auth.contracts.js";
+import { isApiError } from "../../api/api-error.js";
+import type { LoginRequest } from "../contracts/auth.contracts.js";
 import { AuthStatusDialog } from "./AuthStatusDialog.js";
 
-interface RegisterModalProps {
+interface LoginModalProps {
   isBusy: boolean;
   isOpen: boolean;
   onClose(): void;
-  onRegister(payload: RegisterRequest): Promise<void>;
-  successReturnFocusRef?: React.RefObject<HTMLElement | null>;
+  onLogin(payload: LoginRequest): Promise<void>;
 }
 
 interface FeedbackState {
   isOpen: boolean;
   message: string;
-  title: string;
 }
 
-interface RegisterFormState {
-  email: string;
+interface LoginFormState {
   password: string;
   username: string;
 }
 
-const DEFAULT_FORM_STATE: RegisterFormState = {
-  email: "",
+const DEFAULT_FORM_STATE: LoginFormState = {
   password: "",
   username: "",
 };
 const DEFAULT_FEEDBACK_STATE: FeedbackState = {
   isOpen: false,
   message: "",
-  title: "",
 };
-const CREATE_ACCOUNT_LABEL = "Create Account";
 const DIALOG_ACTIONS_PADDING = 3;
 const DIALOG_ACTIONS_TOP_PADDING = 1;
-const DIALOG_MAX_WIDTH = "sm";
-const DIALOG_TITLE = "Register";
+const DIALOG_MAX_WIDTH = "xs";
+const DIALOG_TITLE = "Login";
 const FORM_GAP = 2;
-const REGISTRATION_FAILURE_TITLE = "Registration Failed";
-const DEFAULT_REGISTRATION_FAILURE_MESSAGE = "Registration failed.";
-const REGISTRATION_SUCCESS_TITLE = "Registration Succeeded";
-const REGISTRATION_SUCCESS_MESSAGE =
-  "Registration succeeded. You can now log in.";
+const LOGIN_FAILURE_TITLE = "Login Failed";
+const DEFAULT_LOGIN_FAILURE_MESSAGE = "Login failed.";
+const SUBMIT_BUTTON_LABEL = "Log In";
 
-function toRegisterPayload(formState: RegisterFormState): RegisterRequest {
+function toLoginPayload(formState: LoginFormState): LoginRequest {
   return {
-    email: formState.email,
     password: formState.password,
     username: formState.username,
   };
 }
 
-function buildRegistrationFailureMessage(error: unknown): string {
+function buildLoginFailureMessage(error: unknown): string {
   if (!isApiError(error)) {
-    return DEFAULT_REGISTRATION_FAILURE_MESSAGE;
+    return DEFAULT_LOGIN_FAILURE_MESSAGE;
   }
 
   if (error.kind === "http" && error.responseBody) {
     return error.responseBody;
   }
 
-  return DEFAULT_REGISTRATION_FAILURE_MESSAGE;
+  return DEFAULT_LOGIN_FAILURE_MESSAGE;
 }
 
-export function RegisterModal(props: RegisterModalProps) {
-  const [formState, setFormState] = useState<RegisterFormState>(DEFAULT_FORM_STATE);
+export function LoginModal(props: LoginModalProps) {
+  const [formState, setFormState] = useState<LoginFormState>(DEFAULT_FORM_STATE);
   const [feedbackState, setFeedbackState] = useState<FeedbackState>(DEFAULT_FEEDBACK_STATE);
   const usernameInputReference = useRef<HTMLInputElement | null>(null);
 
@@ -101,14 +92,11 @@ export function RegisterModal(props: RegisterModalProps) {
 
   function closeFeedbackDialog(): void {
     setFeedbackState(DEFAULT_FEEDBACK_STATE);
-    window.setTimeout(() => {
-      props.successReturnFocusRef?.current?.focus();
-    }, 0);
   }
 
-  function updateField<K extends keyof RegisterFormState>(
+  function updateField<K extends keyof LoginFormState>(
     key: K,
-    value: RegisterFormState[K],
+    value: LoginFormState[K],
   ): void {
     setFormState((current) => ({
       ...current,
@@ -116,28 +104,22 @@ export function RegisterModal(props: RegisterModalProps) {
     }));
   }
 
-  async function submitRegistration(): Promise<void> {
+  async function submitLogin(): Promise<void> {
     try {
-      await props.onRegister(toRegisterPayload(formState));
+      await props.onLogin(toLoginPayload(formState));
       closeDialog();
-      setFeedbackState({
-        isOpen: true,
-        message: REGISTRATION_SUCCESS_MESSAGE,
-        title: REGISTRATION_SUCCESS_TITLE,
-      });
     } catch (error) {
       closeDialog();
       setFeedbackState({
         isOpen: true,
-        message: buildRegistrationFailureMessage(error),
-        title: REGISTRATION_FAILURE_TITLE,
+        message: buildLoginFailureMessage(error),
       });
     }
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    void submitRegistration();
+    void submitLogin();
   }
 
   return (
@@ -158,12 +140,6 @@ export function RegisterModal(props: RegisterModalProps) {
               value={formState.username}
             />
             <TextField
-              label="Email"
-              onChange={(event) => updateField("email", event.target.value)}
-              type="email"
-              value={formState.email}
-            />
-            <TextField
               label="Password"
               onChange={(event) => updateField("password", event.target.value)}
               type="password"
@@ -180,7 +156,7 @@ export function RegisterModal(props: RegisterModalProps) {
               Cancel
             </Button>
             <Button disabled={props.isBusy} type="submit" variant="contained">
-              {CREATE_ACCOUNT_LABEL}
+              {SUBMIT_BUTTON_LABEL}
             </Button>
           </DialogActions>
         </Box>
@@ -189,7 +165,7 @@ export function RegisterModal(props: RegisterModalProps) {
         isOpen={feedbackState.isOpen}
         message={feedbackState.message}
         onClose={closeFeedbackDialog}
-        title={feedbackState.title}
+        title={LOGIN_FAILURE_TITLE}
       />
     </>
   );

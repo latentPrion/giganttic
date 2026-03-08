@@ -7,7 +7,7 @@ import React, {
 } from "react";
 
 import { authApi } from "../api/auth-api.js";
-import { isApiError } from "../api/api-error.js";
+import { isApiError } from "../../api/api-error.js";
 import type {
   LoginRequest,
   RegisterRequest,

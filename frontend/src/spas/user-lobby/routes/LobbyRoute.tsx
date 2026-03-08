@@ -7,7 +7,7 @@ import {
 import { Navigate } from "react-router-dom";
 
 import { AppShell } from "../../../app/shell/AppShell.js";
-import { useSessionManager } from "../../../auth/hooks/useSessionManager.js";
+import { useSessionManager } from "../../../common/session/hooks/useSessionManager.js";
 import { UserLobbyPage } from "../../../lobby/components/UserLobbyPage.js";
 
 const LOBBY_LOADING_MESSAGE = "Loading your lobby...";

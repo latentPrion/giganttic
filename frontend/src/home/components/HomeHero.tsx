@@ -8,8 +8,8 @@ import {
   Typography,
 } from "@mui/material";
 
-import { useSessionManager } from "../../auth/hooks/useSessionManager.js";
-import { LoggedOutSessionManager } from "../../auth/components/LoggedOutSessionManager.js";
+import { useSessionManager } from "../../common/session/hooks/useSessionManager.js";
+import { LoggedOutSessionManager } from "../../common/session/components/LoggedOutSessionManager.js";
 
 const GITHUB_HREF = "https://github.com/latentprion";
 const GITHUB_LABEL = "Github";

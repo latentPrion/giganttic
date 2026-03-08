@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "../../auth/api/api-error.js";
+import { ApiError } from "../../common/api/api-error.js";
 import { lobbyApi } from "./lobby-api.js";
 
 const TEST_TOKEN = "test-token";

@@ -1,4 +1,4 @@
-import { requestJson } from "../../auth/api/http-client.js";
+import { requestJson } from "../../common/api/http-client.js";
 import {
   deleteProjectResponseSchema,
   getOrganizationResponseSchema,

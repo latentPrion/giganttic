@@ -1,8 +1,9 @@
 import React from "react";
 import { Box } from "@mui/material";
 
-import { HeaderNavbar } from "../../auth/components/HeaderNavbar.js";
-import { SessionManager } from "../../auth/components/SessionManager.js";
+import { HeaderNavbar } from "../../common/components/HeaderNavbar.js";
+import { SessionManager } from "../../common/session/components/SessionManager.js";
+import { SessionNavSlot } from "../../common/session/components/SessionNavSlot.js";
 
 interface AppShellProps {
   children?: React.ReactNode;
@@ -19,7 +20,7 @@ export function AppShell({ children, navigation }: AppShellProps) {
         width: "100%",
       }}
     >
-      <HeaderNavbar navigation={navigation} />
+      <HeaderNavbar navigation={navigation} sessionSlot={<SessionNavSlot />} />
       <SessionManager />
       {children}
     </Box>

@@ -2,29 +2,23 @@ import React from "react";
 import {
   AppBar,
   Box,
-  CircularProgress,
   Container,
   Stack,
   Toolbar,
   Typography,
 } from "@mui/material";
 
-import { useSessionManager } from "../hooks/useSessionManager.js";
 import { HomeLink } from "./HomeLink.js";
-import { LoggedInSessionManager } from "./LoggedInSessionManager.js";
-import { LoggedOutSessionManager } from "./LoggedOutSessionManager.js";
 
 const PRODUCT_NAME = "Giganttic";
 const PRODUCT_TAGLINE = "Structured project control";
-const LOADING_SIZE = 20;
 
 interface HeaderNavbarProps {
   navigation?: React.ReactNode;
+  sessionSlot?: React.ReactNode;
 }
 
-export function HeaderNavbar({ navigation }: HeaderNavbarProps) {
-  const { actions, authState, isBusy } = useSessionManager();
-
+export function HeaderNavbar({ navigation, sessionSlot }: HeaderNavbarProps) {
   return (
     <AppBar
       color="transparent"
@@ -69,24 +63,7 @@ export function HeaderNavbar({ navigation }: HeaderNavbarProps) {
               </Stack>
             ) : null}
           </Box>
-          {authState.status === "loading" ? (
-            <CircularProgress size={LOADING_SIZE} />
-          ) : null}
-          {authState.status === "authenticated" ? (
-            <LoggedInSessionManager
-              isBusy={isBusy}
-              onLogout={actions.logout}
-              roles={authState.auth.user.roles}
-              username={authState.auth.user.username}
-            />
-          ) : null}
-          {authState.status !== "authenticated" && authState.status !== "loading" ? (
-            <LoggedOutSessionManager
-              isBusy={isBusy}
-              onLogin={actions.login}
-              onRegister={actions.register}
-            />
-          ) : null}
+          {sessionSlot}
         </Toolbar>
       </Container>
     </AppBar>

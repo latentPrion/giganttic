@@ -13,7 +13,7 @@ import {
   type RegisterResponse,
   type RevokeSessionsResponse,
 } from "../contracts/auth.contracts.js";
-import { requestJson } from "./http-client.js";
+import { requestJson } from "../../api/http-client.js";
 
 const AUTH_REGISTER_PATH = "/auth/register";
 const AUTH_LOGIN_PATH = "/auth/login";

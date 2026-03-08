@@ -3,11 +3,11 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "../api/api-error.js";
+import { ApiError } from "../../api/api-error.js";
 import { authApi } from "../api/auth-api.js";
 import { authTokenStorage } from "../storage/auth-token-storage.js";
-import { App } from "../../App.js";
-import { renderWithTheme } from "../../test/render-with-theme.js";
+import { App } from "../../../App.js";
+import { renderWithTheme } from "../../../test/render-with-theme.js";
 
 vi.mock("../api/auth-api.js", () => ({
   authApi: {

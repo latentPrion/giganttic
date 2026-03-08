@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { isApiError } from "../../auth/api/api-error.js";
+import { isApiError } from "../../common/api/api-error.js";
 import { lobbyApi } from "../api/lobby-api.js";
 import {
   type LobbyOrganization,

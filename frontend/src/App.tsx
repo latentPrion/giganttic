@@ -1,7 +1,7 @@
 import React from "react";
 
 import { AppRoutes } from "./app/AppRoutes.js";
-import { AuthSessionProvider } from "./auth/context/AuthSessionContext.js";
+import { AuthSessionProvider } from "./common/session/context/AuthSessionContext.js";
 
 export function App() {
   return (

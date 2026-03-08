@@ -1,4 +1,4 @@
-import { frontendConfig } from "../../config/frontend-config.js";
+import { frontendConfig } from "../../../config/frontend-config.js";
 
 interface StorageLike {
   getItem(key: string): string | null;

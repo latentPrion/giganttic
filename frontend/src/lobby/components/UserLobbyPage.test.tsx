@@ -3,7 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError } from "../../auth/api/api-error.js";
+import { ApiError } from "../../common/api/api-error.js";
 import { renderWithTheme } from "../../test/render-with-theme.js";
 import { lobbyApi } from "../api/lobby-api.js";
 import { UserLobbyPage } from "./UserLobbyPage.js";
@@ -280,7 +280,7 @@ describe("UserLobbyPage", () => {
 
     await screen.findByText("Apollo");
     await user.click(screen.getByRole("button", { name: /^Organizations$/i }));
-    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root")!);
+    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root") as HTMLElement);
     expect(orgCard).toBeTruthy();
     await user.click(within(orgCard).getByRole("button", { name: "Leave" }));
 
@@ -305,7 +305,7 @@ describe("UserLobbyPage", () => {
 
     await screen.findByText("Apollo");
     await user.click(screen.getByRole("button", { name: /^Organizations$/i }));
-    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root")!);
+    const orgCard = await screen.findByText("Giganttic Org").then((el) => el.closest(".MuiPaper-root") as HTMLElement);
     const leaveOrganizationButton = within(orgCard).getByRole("button", { name: "Leave" });
     await user.click(leaveOrganizationButton);
 

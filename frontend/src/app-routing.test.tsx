@@ -3,13 +3,13 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { authApi } from "./auth/api/auth-api.js";
-import { authTokenStorage } from "./auth/storage/auth-token-storage.js";
+import { authApi } from "./common/session/api/auth-api.js";
+import { authTokenStorage } from "./common/session/storage/auth-token-storage.js";
 import { lobbyApi } from "./lobby/api/lobby-api.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
 
-vi.mock("./auth/api/auth-api.js", () => ({
+vi.mock("./common/session/api/auth-api.js", () => ({
   authApi: {
     getCurrentSession: vi.fn(),
     login: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("./auth/api/auth-api.js", () => ({
   },
 }));
 
-vi.mock("./auth/storage/auth-token-storage.js", () => ({
+vi.mock("./common/session/storage/auth-token-storage.js", () => ({
   authTokenStorage: {
     clear: vi.fn(),
     read: vi.fn(),
