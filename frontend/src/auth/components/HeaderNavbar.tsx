@@ -4,6 +4,7 @@ import {
   Box,
   CircularProgress,
   Container,
+  Stack,
   Toolbar,
   Typography,
 } from "@mui/material";
@@ -16,7 +17,11 @@ const PRODUCT_NAME = "Giganttic";
 const PRODUCT_TAGLINE = "Structured project control";
 const LOADING_SIZE = 20;
 
-export function HeaderNavbar() {
+interface HeaderNavbarProps {
+  navigation?: React.ReactNode;
+}
+
+export function HeaderNavbar({ navigation }: HeaderNavbarProps) {
   const { actions, authState, isBusy } = useSessionManager();
 
   return (
@@ -48,6 +53,18 @@ export function HeaderNavbar() {
             <Typography color="rgba(255, 255, 255, 0.72)" variant="body2">
               {PRODUCT_TAGLINE}
             </Typography>
+            {navigation ? (
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{
+                  flexWrap: "wrap",
+                  marginTop: 1,
+                }}
+              >
+                {navigation}
+              </Stack>
+            ) : null}
           </Box>
           {authState.status === "loading" ? (
             <CircularProgress size={LOADING_SIZE} />
