@@ -8,7 +8,7 @@ const AUTH_HEADER_PREFIX = "Bearer";
 
 interface JsonRequestOptions<TRequestSchema extends ZodType | undefined> {
   body?: TRequestSchema extends ZodType ? unknown : undefined;
-  method: "DELETE" | "GET" | "POST" | "PUT";
+  method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   path: string;
   requestSchema?: TRequestSchema;
   responseSchema: ZodType;

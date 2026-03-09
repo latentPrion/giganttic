@@ -1,0 +1,11 @@
+export const PROJECT_DIALOG_MAX_WIDTH = "sm";
+export const PROJECT_FORM_DIALOG_TITLE_CREATE = "Create Project";
+export const PROJECT_FORM_DIALOG_TITLE_EDIT = "Edit Project";
+export const PROJECT_SUMMARY_DIALOG_TITLE = "Project Summary";
+export const PROJECT_FORM_SUBMIT_LABEL_CREATE = "Create Project";
+export const PROJECT_FORM_SUBMIT_LABEL_EDIT = "Save Changes";
+export const PROJECT_FORM_GAP = 2;
+export const PROJECT_SUMMARY_MEMBER_PREVIEW_LIMIT = 5;
+export const PROJECT_LOAD_ERROR_MESSAGE = "Unable to load that project right now.";
+export const PROJECT_CREATE_ERROR_MESSAGE = "Unable to create that project.";
+export const PROJECT_UPDATE_ERROR_MESSAGE = "Unable to update that project.";

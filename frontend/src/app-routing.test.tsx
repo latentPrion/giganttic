@@ -28,14 +28,23 @@ vi.mock("./common/session/storage/auth-token-storage.js", () => ({
 
 vi.mock("./lobby/api/lobby-api.js", () => ({
   lobbyApi: {
+    createOrganization: vi.fn(),
+    createProject: vi.fn(),
+    createTeam: vi.fn(),
+    deleteOrganization: vi.fn(),
     deleteProject: vi.fn(),
+    deleteTeam: vi.fn(),
     getOrganization: vi.fn(),
+    getProject: vi.fn(),
     getTeam: vi.fn(),
     listOrganizations: vi.fn(),
     listProjects: vi.fn(),
     listTeams: vi.fn(),
     replaceOrganizationUsers: vi.fn(),
     replaceTeamMembers: vi.fn(),
+    updateOrganization: vi.fn(),
+    updateProject: vi.fn(),
+    updateTeam: vi.fn(),
   },
 }));
 
@@ -139,8 +148,8 @@ describe("app routing", () => {
     });
 
     expect(await screen.findByText("User Lobby")).toBeVisible();
-    expect(await screen.findByRole("button", { name: /Projects/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /Teams/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: /Organizations/i })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /^Projects$/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Teams$/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Organizations$/i })).toBeVisible();
   });
 });

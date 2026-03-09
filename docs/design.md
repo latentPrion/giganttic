@@ -214,6 +214,10 @@ Current responsibilities:
 - host session-aware login, registration, current-session lookup, and logout UI
 - host the normal user lobby SPA for the current user's associated projects,
   teams, and organizations
+- render reusable entity list items in the user lobby, with view-specific action
+  affordances controlled by parent-selected render modes
+- provide reusable project, team, and organization create, edit, and summary
+  modal workflows in the user lobby
 - validate auth REST payloads at the transport boundary with Zod before data
   enters frontend state
 
@@ -222,6 +226,20 @@ Planned future responsibilities:
 - add a separate admin SPA for broad administrative discovery and management of
   entities outside the current user's normal associations
 - host DHTMLX Gantt
+
+Current lobby interaction model:
+
+- entity rows are reusable JSX list-item components
+- parent views choose the row render mode, such as main listing vs narrower
+  future views
+- clicking a project, team, or organization row opens a summary modal by
+  default
+- project, team, and organization create/edit actions are reusable button +
+  modal flows
+- delete actions for project, team, and organization rows are reusable button
+  components in the main listing view
+- user list-item/button scaffolding exists, but modal-backed user CRUD is still
+  deferred until matching backend routes exist
 - render future project-management views
 - communicate with the backend REST API
 

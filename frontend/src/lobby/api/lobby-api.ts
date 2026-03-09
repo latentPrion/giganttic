@@ -1,7 +1,16 @@
 import { requestJson } from "../../common/api/http-client.js";
 import {
+  createOrganizationRequestSchema,
+  createOrganizationResponseSchema,
+  createProjectRequestSchema,
+  createProjectResponseSchema,
+  createTeamRequestSchema,
+  createTeamResponseSchema,
+  deleteOrganizationResponseSchema,
   deleteProjectResponseSchema,
+  deleteTeamResponseSchema,
   getOrganizationResponseSchema,
+  getProjectResponseSchema,
   getTeamResponseSchema,
   listOrganizationsResponseSchema,
   listProjectsResponseSchema,
@@ -10,8 +19,23 @@ import {
   replaceOrganizationUsersResponseSchema,
   replaceTeamMembersRequestSchema,
   replaceTeamMembersResponseSchema,
+  updateOrganizationRequestSchema,
+  updateOrganizationResponseSchema,
+  updateProjectRequestSchema,
+  updateProjectResponseSchema,
+  updateTeamRequestSchema,
+  updateTeamResponseSchema,
+  type CreateOrganizationRequest,
+  type CreateOrganizationResponse,
+  type CreateProjectRequest,
+  type CreateProjectResponse,
+  type CreateTeamRequest,
+  type CreateTeamResponse,
+  type DeleteOrganizationResponse,
   type DeleteProjectResponse,
+  type DeleteTeamResponse,
   type GetOrganizationResponse,
+  type GetProjectResponse,
   type GetTeamResponse,
   type ListOrganizationsResponse,
   type ListProjectsResponse,
@@ -20,6 +44,12 @@ import {
   type ReplaceOrganizationUsersResponse,
   type ReplaceTeamMembersRequest,
   type ReplaceTeamMembersResponse,
+  type UpdateOrganizationRequest,
+  type UpdateOrganizationResponse,
+  type UpdateProjectRequest,
+  type UpdateProjectResponse,
+  type UpdateTeamRequest,
+  type UpdateTeamResponse,
 } from "../contracts/lobby.contracts.js";
 
 function createProjectPath(projectId?: number): string {
@@ -37,6 +67,60 @@ function createOrganizationPath(organizationId?: number): string {
 }
 
 export const lobbyApi = {
+  async createOrganization(
+    token: string,
+    payload: CreateOrganizationRequest,
+  ): Promise<CreateOrganizationResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: createOrganizationPath(),
+      requestSchema: createOrganizationRequestSchema,
+      responseSchema: createOrganizationResponseSchema,
+      token,
+    });
+  },
+
+  async createProject(
+    token: string,
+    payload: CreateProjectRequest,
+  ): Promise<CreateProjectResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: createProjectPath(),
+      requestSchema: createProjectRequestSchema,
+      responseSchema: createProjectResponseSchema,
+      token,
+    });
+  },
+
+  async createTeam(
+    token: string,
+    payload: CreateTeamRequest,
+  ): Promise<CreateTeamResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: createTeamPath(),
+      requestSchema: createTeamRequestSchema,
+      responseSchema: createTeamResponseSchema,
+      token,
+    });
+  },
+
+  async deleteOrganization(
+    token: string,
+    organizationId: number,
+  ): Promise<DeleteOrganizationResponse> {
+    return await requestJson({
+      method: "DELETE",
+      path: createOrganizationPath(organizationId),
+      responseSchema: deleteOrganizationResponseSchema,
+      token,
+    });
+  },
+
   async deleteProject(
     token: string,
     projectId: number,
@@ -49,6 +133,15 @@ export const lobbyApi = {
     });
   },
 
+  async deleteTeam(token: string, teamId: number): Promise<DeleteTeamResponse> {
+    return await requestJson({
+      method: "DELETE",
+      path: createTeamPath(teamId),
+      responseSchema: deleteTeamResponseSchema,
+      token,
+    });
+  },
+
   async getOrganization(
     token: string,
     organizationId: number,
@@ -57,6 +150,15 @@ export const lobbyApi = {
       method: "GET",
       path: createOrganizationPath(organizationId),
       responseSchema: getOrganizationResponseSchema,
+      token,
+    });
+  },
+
+  async getProject(token: string, projectId: number): Promise<GetProjectResponse> {
+    return await requestJson({
+      method: "GET",
+      path: createProjectPath(projectId),
+      responseSchema: getProjectResponseSchema,
       token,
     });
   },
@@ -123,6 +225,51 @@ export const lobbyApi = {
       path: `${createTeamPath(teamId)}/members`,
       requestSchema: replaceTeamMembersRequestSchema,
       responseSchema: replaceTeamMembersResponseSchema,
+      token,
+    });
+  },
+
+  async updateProject(
+    token: string,
+    projectId: number,
+    payload: UpdateProjectRequest,
+  ): Promise<UpdateProjectResponse> {
+    return await requestJson({
+      body: payload,
+      method: "PATCH",
+      path: createProjectPath(projectId),
+      requestSchema: updateProjectRequestSchema,
+      responseSchema: updateProjectResponseSchema,
+      token,
+    });
+  },
+
+  async updateOrganization(
+    token: string,
+    organizationId: number,
+    payload: UpdateOrganizationRequest,
+  ): Promise<UpdateOrganizationResponse> {
+    return await requestJson({
+      body: payload,
+      method: "PATCH",
+      path: createOrganizationPath(organizationId),
+      requestSchema: updateOrganizationRequestSchema,
+      responseSchema: updateOrganizationResponseSchema,
+      token,
+    });
+  },
+
+  async updateTeam(
+    token: string,
+    teamId: number,
+    payload: UpdateTeamRequest,
+  ): Promise<UpdateTeamResponse> {
+    return await requestJson({
+      body: payload,
+      method: "PATCH",
+      path: createTeamPath(teamId),
+      requestSchema: updateTeamRequestSchema,
+      responseSchema: updateTeamResponseSchema,
       token,
     });
   },

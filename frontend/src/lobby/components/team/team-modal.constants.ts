@@ -1,0 +1,11 @@
+export const TEAM_DIALOG_MAX_WIDTH = "sm";
+export const TEAM_FORM_DIALOG_TITLE_CREATE = "Create Team";
+export const TEAM_FORM_DIALOG_TITLE_EDIT = "Edit Team";
+export const TEAM_SUMMARY_DIALOG_TITLE = "Team Summary";
+export const TEAM_FORM_SUBMIT_LABEL_CREATE = "Create Team";
+export const TEAM_FORM_SUBMIT_LABEL_EDIT = "Save Changes";
+export const TEAM_FORM_GAP = 2;
+export const TEAM_SUMMARY_MEMBER_PREVIEW_LIMIT = 5;
+export const TEAM_LOAD_ERROR_MESSAGE = "Unable to load that team right now.";
+export const TEAM_CREATE_ERROR_MESSAGE = "Unable to create that team.";
+export const TEAM_UPDATE_ERROR_MESSAGE = "Unable to update that team.";

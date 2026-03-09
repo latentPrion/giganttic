@@ -10,6 +10,11 @@ const projectSchema = z.object({
   name: z.string(),
   updatedAt: timestampSchema,
 });
+const projectMemberSchema = z.object({
+  roleCodes: roleCodesSchema,
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
 
 const teamSchema = z.object({
   createdAt: timestampSchema,
@@ -42,6 +47,27 @@ const organizationMemberSchema = z.object({
 export const listProjectsResponseSchema = z.object({
   projects: z.array(projectSchema),
 });
+export const createProjectRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1),
+});
+export const createProjectResponseSchema = z.object({
+  project: projectSchema,
+});
+export const getProjectResponseSchema = z.object({
+  members: z.array(projectMemberSchema),
+  project: projectSchema,
+});
+export const updateProjectRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1).optional(),
+}).refine(
+  (value) => value.description !== undefined || value.name !== undefined,
+  "At least one field must be provided",
+);
+export const updateProjectResponseSchema = z.object({
+  project: projectSchema,
+});
 
 export const deleteProjectResponseSchema = z.object({
   deletedProjectId: z.number().int().positive(),
@@ -50,10 +76,30 @@ export const deleteProjectResponseSchema = z.object({
 export const listTeamsResponseSchema = z.object({
   teams: z.array(teamSchema),
 });
+export const createTeamRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1),
+});
+export const createTeamResponseSchema = z.object({
+  team: teamSchema,
+});
 
 export const getTeamResponseSchema = z.object({
   members: z.array(teamMemberSchema),
   team: teamSchema,
+});
+export const updateTeamRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1).optional(),
+}).refine(
+  (value) => value.description !== undefined || value.name !== undefined,
+  "At least one field must be provided",
+);
+export const updateTeamResponseSchema = z.object({
+  team: teamSchema,
+});
+export const deleteTeamResponseSchema = z.object({
+  deletedTeamId: z.number().int().positive(),
 });
 
 export const replaceTeamMembersRequestSchema = z.object({
@@ -71,6 +117,13 @@ export const replaceTeamMembersResponseSchema = z.object({
 export const listOrganizationsResponseSchema = z.object({
   organizations: z.array(organizationSchema),
 });
+export const createOrganizationRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1),
+});
+export const createOrganizationResponseSchema = z.object({
+  organization: organizationSchema,
+});
 
 export const getOrganizationResponseSchema = z.object({
   members: z.array(organizationMemberSchema),
@@ -81,6 +134,19 @@ export const getOrganizationResponseSchema = z.object({
   teams: z.array(z.object({
     teamId: z.number().int().positive(),
   })),
+});
+export const updateOrganizationRequestSchema = z.object({
+  description: z.string().trim().min(1).nullable().optional(),
+  name: z.string().trim().min(1).optional(),
+}).refine(
+  (value) => value.description !== undefined || value.name !== undefined,
+  "At least one field must be provided",
+);
+export const updateOrganizationResponseSchema = z.object({
+  organization: organizationSchema,
+});
+export const deleteOrganizationResponseSchema = z.object({
+  deletedOrganizationId: z.number().int().positive(),
 });
 
 export const replaceOrganizationUsersRequestSchema = z.object({
@@ -94,8 +160,17 @@ export const replaceOrganizationUsersResponseSchema = z.object({
   organizationId: z.number().int().positive(),
 });
 
+export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
+export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
+export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
+export type CreateTeamResponse = z.infer<typeof createTeamResponseSchema>;
+export type CreateOrganizationRequest = z.infer<typeof createOrganizationRequestSchema>;
+export type CreateOrganizationResponse = z.infer<typeof createOrganizationResponseSchema>;
+export type DeleteOrganizationResponse = z.infer<typeof deleteOrganizationResponseSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
+export type DeleteTeamResponse = z.infer<typeof deleteTeamResponseSchema>;
 export type GetOrganizationResponse = z.infer<typeof getOrganizationResponseSchema>;
+export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
 export type GetTeamResponse = z.infer<typeof getTeamResponseSchema>;
 export type ListOrganizationsResponse = z.infer<typeof listOrganizationsResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
@@ -103,6 +178,7 @@ export type ListTeamsResponse = z.infer<typeof listTeamsResponseSchema>;
 export type LobbyOrganization = z.infer<typeof organizationSchema>;
 export type LobbyProject = z.infer<typeof projectSchema>;
 export type LobbyTeam = z.infer<typeof teamSchema>;
+export type ProjectMember = z.infer<typeof projectMemberSchema>;
 export type ReplaceOrganizationUsersRequest = z.infer<
   typeof replaceOrganizationUsersRequestSchema
 >;
@@ -115,3 +191,9 @@ export type ReplaceTeamMembersRequest = z.infer<
 export type ReplaceTeamMembersResponse = z.infer<
   typeof replaceTeamMembersResponseSchema
 >;
+export type UpdateOrganizationRequest = z.infer<typeof updateOrganizationRequestSchema>;
+export type UpdateOrganizationResponse = z.infer<typeof updateOrganizationResponseSchema>;
+export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+export type UpdateProjectResponse = z.infer<typeof updateProjectResponseSchema>;
+export type UpdateTeamRequest = z.infer<typeof updateTeamRequestSchema>;
+export type UpdateTeamResponse = z.infer<typeof updateTeamResponseSchema>;
