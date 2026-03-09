@@ -9,6 +9,7 @@
     "db:generate": "node db/generate-ddl.mjs",
     "db:generate:active": "node db/generate-ddl.mjs",
     "db:create": "node db/create-db.mjs",
+    "charts:development-planner": "node scripts/generate-development-planner-gantt.mjs",
     "dev": "node scripts/dev-launcher.mjs",
     "dev:lan": "node scripts/dev-launcher.mjs --lan",
     "frontend:build": "vite build --config frontend/vite.config.ts",

@@ -1,6 +1,6 @@
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 
-const DEFAULT_REPO_CHART_FILENAME = "welcome-chart.xml";
+const DEFAULT_REPO_CHART_FILENAME = "development-planner-chart.xml";
 
 const repoChartModules = import.meta.glob("../../../../../charts/*.xml", {
   eager: true,

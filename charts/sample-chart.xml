@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="1" parent="0" start_date="2026-03-09 00:00" duration="4" open="true" progress="0.6"><![CDATA[Sample Discovery]]></task>
+  <task id="2" parent="1" start_date="2026-03-13 00:00" duration="3" progress="0.3"><![CDATA[Initial Buildout]]></task>
+  <task id="3" parent="0" start_date="2026-03-17 00:00" duration="5" progress="0.15"><![CDATA[Stakeholder Review]]></task>
+  <coll_options for="links">
+    <item id="1" source="1" target="2" type="0" />
+    <item id="2" source="2" target="3" type="0" />
+  </coll_options>
+</data>
