@@ -25,12 +25,28 @@ export const organizationRoleCodes = {
   teamManager: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
 } as const;
 
+export const issueStatusCodes = {
+  blocked: "ISSUE_STATUS_BLOCKED",
+  closed: "ISSUE_STATUS_CLOSED",
+  open: "ISSUE_STATUS_OPEN",
+} as const;
+
+export const closedReasonCodes = {
+  cantFix: "ISSUE_CLOSED_REASON_CANTFIX",
+  resolved: "ISSUE_CLOSED_REASON_RESOLVED",
+  wontFix: "ISSUE_CLOSED_REASON_WONTFIX",
+} as const;
+
 export const teamRoleCodes = {
   projectManager: "GGTC_TEAMROLE_PROJECT_MANAGER",
   teamManager: "GGTC_TEAMROLE_TEAM_MANAGER",
 } as const;
 
 const nowTimestampExpression = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
+const issueProgressPercentageMaximum = 100;
+const issueProgressPercentageMaximumLiteral = sql.raw(
+  `${issueProgressPercentageMaximum}`,
+);
 const usernamePasswordCredentialTypeLiteral = sql.raw(
   `'${credentialTypeCodes.usernamePassword}'`,
 );
@@ -52,6 +68,17 @@ function createReferenceTimestampColumns() {
       .notNull()
       .default(nowTimestampExpression),
   };
+}
+
+function createCodeReferenceTable(tableName: string) {
+  return sqliteTable(tableName, {
+    code: text("code").primaryKey(),
+    displayName: text("displayName").notNull(),
+    description: text("description"),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowTimestampExpression),
+  });
 }
 
 export const users = sqliteTable(
@@ -92,21 +119,52 @@ export const organizations = sqliteTable("Organizations", {
   ...createTimestampColumns(),
 });
 
-function createRoleReferenceTable(tableName: string) {
-  return sqliteTable(tableName, {
-    code: text("code").primaryKey(),
-    displayName: text("displayName").notNull(),
+export const systemRoles = createCodeReferenceTable("SystemRoles");
+export const projectRoles = createCodeReferenceTable("ProjectRoles");
+export const teamRoles = createCodeReferenceTable("TeamRoles");
+export const organizationRoles = createCodeReferenceTable("OrganizationRoles");
+export const issueStatuses = createCodeReferenceTable("IssueStatuses");
+export const closedReasons = createCodeReferenceTable("ClosedReasons");
+
+export const issues = sqliteTable(
+  "Issues",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    projectId: integer("projectId")
+      .notNull()
+      .references(() => projects.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    name: text("name").notNull(),
     description: text("description"),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    journal: text("journal"),
+    status: text("status")
+      .notNull()
+      .references(() => issueStatuses.code, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      })
+      .default(issueStatusCodes.open),
+    closedReason: text("closedReason").references(() => closedReasons.code, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    progressPercentage: integer("progressPercentage").notNull().default(0),
+    openedAt: integer("openedAt", { mode: "timestamp_ms" })
       .notNull()
       .default(nowTimestampExpression),
-  });
-}
-
-export const systemRoles = createRoleReferenceTable("SystemRoles");
-export const projectRoles = createRoleReferenceTable("ProjectRoles");
-export const teamRoles = createRoleReferenceTable("TeamRoles");
-export const organizationRoles = createRoleReferenceTable("OrganizationRoles");
+    closedAt: integer("closedAt", { mode: "timestamp_ms" }),
+    closedReasonDescription: text("closedReasonDescription"),
+    ...createTimestampColumns(),
+  },
+  (table) => [
+    check(
+      "Issues_progressPercentage_range_check",
+      sql`${table.progressPercentage} >= 0 AND ${table.progressPercentage} <= ${issueProgressPercentageMaximumLiteral}`,
+    ),
+  ],
+);
 
 export const credentialTypes = sqliteTable("CredentialTypes", {
   code: text("code").primaryKey(),
@@ -487,6 +545,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const projectsRelations = relations(projects, ({ many }) => ({
+  issues: many(issues),
   organizationAccess: many(projectsOrganizations),
   teamAccess: many(projectsTeams),
   userAccess: many(projectsUsers),
@@ -525,6 +584,14 @@ export const organizationRolesRelations = relations(
     userRoleAssignments: many(usersOrganizationsOrganizationRoles),
   }),
 );
+
+export const issueStatusesRelations = relations(issueStatuses, ({ many }) => ({
+  issues: many(issues),
+}));
+
+export const closedReasonsRelations = relations(closedReasons, ({ many }) => ({
+  issues: many(issues),
+}));
 
 export const credentialTypesRelations = relations(
   credentialTypes,
@@ -708,6 +775,21 @@ export const usersSessionsRelations = relations(usersSessions, ({ one }) => ({
   }),
 }));
 
+export const issuesRelations = relations(issues, ({ one }) => ({
+  closedReasonReference: one(closedReasons, {
+    fields: [issues.closedReason],
+    references: [closedReasons.code],
+  }),
+  project: one(projects, {
+    fields: [issues.projectId],
+    references: [projects.id],
+  }),
+  statusReference: one(issueStatuses, {
+    fields: [issues.status],
+    references: [issueStatuses.code],
+  }),
+}));
+
 export const authSeedData = {
   credentialTypes: [
     {
@@ -741,6 +823,40 @@ export const authSeedData = {
       description:
         "Organization-scoped team management authority for teams assigned to the organization.",
       displayName: "Team Manager",
+    },
+  ],
+  issueStatuses: [
+    {
+      code: issueStatusCodes.open,
+      description: "Issue is open and actionable.",
+      displayName: "Open",
+    },
+    {
+      code: issueStatusCodes.closed,
+      description: "Issue has been closed.",
+      displayName: "Closed",
+    },
+    {
+      code: issueStatusCodes.blocked,
+      description: "Issue is blocked pending external resolution.",
+      displayName: "Blocked",
+    },
+  ],
+  closedReasons: [
+    {
+      code: closedReasonCodes.wontFix,
+      description: "Issue will not be fixed by product decision.",
+      displayName: "Won't Fix",
+    },
+    {
+      code: closedReasonCodes.cantFix,
+      description: "Issue cannot be fixed within the current system constraints.",
+      displayName: "Can't Fix",
+    },
+    {
+      code: closedReasonCodes.resolved,
+      description: "Issue has been resolved.",
+      displayName: "Resolved",
     },
   ],
   systemRoles: [

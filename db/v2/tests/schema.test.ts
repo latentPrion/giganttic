@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  closedReasonCodes,
   credentialTypeCodes,
+  issueStatusCodes,
   organizationRoleCodes,
   projectRoleCodes,
   systemRoleCodes,
   teamRoleCodes,
 } from "../schema.js";
 import {
+  closedReasonsInsertSchema,
   organizationsInsertSchema,
   organizationsTeamsInsertSchema,
+  issuesInsertSchema,
+  issueStatusesInsertSchema,
   projectsOrganizationsInsertSchema,
   projectsInsertSchema,
   projectsTeamsInsertSchema,
@@ -116,5 +121,30 @@ describe("auth and access v2 zod schemas", () => {
     expect(credentialTypeCodes.usernamePassword).toBe(
       "GGTC_CREDTYPE_USERNAME_PASSWORD",
     );
+  });
+
+  it("accepts issue status and closed reason inserts", () => {
+    const issueStatus = issueStatusesInsertSchema.parse({
+      code: issueStatusCodes.open,
+      displayName: "Open",
+    });
+    const closedReason = closedReasonsInsertSchema.parse({
+      code: closedReasonCodes.resolved,
+      displayName: "Resolved",
+    });
+
+    expect(issueStatus.code).toBe(issueStatusCodes.open);
+    expect(closedReason.code).toBe(closedReasonCodes.resolved);
+  });
+
+  it("accepts an issue insert payload", () => {
+    const issue = issuesInsertSchema.parse({
+      name: "Broken upload flow",
+      projectId: 7,
+      status: issueStatusCodes.open,
+    });
+
+    expect(issue.projectId).toBe(7);
+    expect(issue.status).toBe(issueStatusCodes.open);
   });
 });

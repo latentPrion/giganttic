@@ -5,6 +5,8 @@ import path from "node:path";
 import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  issues,
+  issuesInsertSchema,
   organizationsTeams,
   organizationsTeamsInsertSchema,
 } from "../db/index.js";
@@ -70,6 +72,21 @@ describe("db version selection pipeline", () => {
     ).toMatchObject({
       organizationId: 1,
       teamId: 2,
+    });
+  });
+
+  it("exports issues artifacts from the active db facade", () => {
+    expect(issues).toBeDefined();
+    expect(
+      issuesInsertSchema.parse({
+        name: "Sample issue",
+        projectId: 1,
+        status: "ISSUE_STATUS_OPEN",
+      }),
+    ).toMatchObject({
+      name: "Sample issue",
+      projectId: 1,
+      status: "ISSUE_STATUS_OPEN",
     });
   });
 });

@@ -1,9 +1,43 @@
+CREATE TABLE `ClosedReasons` (
+	`code` text PRIMARY KEY NOT NULL,
+	`displayName` text NOT NULL,
+	`description` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `CredentialTypes` (
 	`code` text PRIMARY KEY NOT NULL,
 	`displayName` text NOT NULL,
 	`description` text,
 	`allowsMultiplePerUser` integer DEFAULT false NOT NULL,
 	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `IssueStatuses` (
+	`code` text PRIMARY KEY NOT NULL,
+	`displayName` text NOT NULL,
+	`description` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `Issues` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`projectId` integer NOT NULL,
+	`name` text NOT NULL,
+	`description` text,
+	`journal` text,
+	`status` text DEFAULT 'ISSUE_STATUS_OPEN' NOT NULL,
+	`closedReason` text,
+	`progressPercentage` integer DEFAULT 0 NOT NULL,
+	`openedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	`closedAt` integer,
+	`closedReasonDescription` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	`updatedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	FOREIGN KEY (`projectId`) REFERENCES `Projects`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`status`) REFERENCES `IssueStatuses`(`code`) ON UPDATE cascade ON DELETE restrict,
+	FOREIGN KEY (`closedReason`) REFERENCES `ClosedReasons`(`code`) ON UPDATE cascade ON DELETE restrict,
+	CONSTRAINT "Issues_progressPercentage_range_check" CHECK("Issues"."progressPercentage" >= 0 AND "Issues"."progressPercentage" <= 100)
 );
 --> statement-breakpoint
 CREATE TABLE `OrganizationRoles` (

@@ -8,6 +8,7 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  issues,
   projects,
   projectsTeams,
   projectsUsers,
@@ -293,6 +294,9 @@ export class ProjectsService {
     this.assertCanDeleteProject(authContext, projectId);
 
     this.databaseService.db.transaction((tx) => {
+      tx.delete(issues)
+        .where(eq(issues.projectId, projectId))
+        .run();
       tx.delete(usersProjectsProjectRoles)
         .where(eq(usersProjectsProjectRoles.projectId, projectId))
         .run();

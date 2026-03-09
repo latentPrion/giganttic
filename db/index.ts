@@ -18,12 +18,26 @@ const activeDbModule = schemaModules[
 export { activeSchemaVersion, availableSchemaVersions };
 
 export const {
+  closedReasonCodes,
+  closedReasons,
+  closedReasonsInsertSchema,
+  closedReasonsRelations,
+  closedReasonsSelectSchema,
   authSeedData,
   credentialTypeCodes,
   credentialTypes,
   credentialTypesInsertSchema,
   credentialTypesRelations,
   credentialTypesSelectSchema,
+  issueStatusCodes,
+  issueStatuses,
+  issueStatusesInsertSchema,
+  issueStatusesRelations,
+  issueStatusesSelectSchema,
+  issues,
+  issuesInsertSchema,
+  issuesRelations,
+  issuesSelectSchema,
   organizationRoleCodes,
   organizationRoles,
   organizationRolesInsertSchema,
@@ -122,6 +136,8 @@ export type Team = typeof teams.$inferSelect;
 export type NewTeam = typeof teams.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
+export type Issue = typeof issues.$inferSelect;
+export type NewIssue = typeof issues.$inferInsert;
 export type SystemRole = typeof systemRoles.$inferSelect;
 export type NewSystemRole = typeof systemRoles.$inferInsert;
 export type ProjectRole = typeof projectRoles.$inferSelect;
@@ -130,6 +146,10 @@ export type TeamRole = typeof teamRoles.$inferSelect;
 export type NewTeamRole = typeof teamRoles.$inferInsert;
 export type OrganizationRole = typeof organizationRoles.$inferSelect;
 export type NewOrganizationRole = typeof organizationRoles.$inferInsert;
+export type IssueStatus = typeof issueStatuses.$inferSelect;
+export type NewIssueStatus = typeof issueStatuses.$inferInsert;
+export type ClosedReason = typeof closedReasons.$inferSelect;
+export type NewClosedReason = typeof closedReasons.$inferInsert;
 export type CredentialType = typeof credentialTypes.$inferSelect;
 export type NewCredentialType = typeof credentialTypes.$inferInsert;
 export type ProjectUserAccess = typeof projectsUsers.$inferSelect;
@@ -170,6 +190,8 @@ export type TeamInsertInput = z.infer<typeof teamsInsertSchema>;
 export type TeamRecord = z.infer<typeof teamsSelectSchema>;
 export type OrganizationInsertInput = z.infer<typeof organizationsInsertSchema>;
 export type OrganizationRecord = z.infer<typeof organizationsSelectSchema>;
+export type IssueInsertInput = z.infer<typeof issuesInsertSchema>;
+export type IssueRecord = z.infer<typeof issuesSelectSchema>;
 export type SystemRoleInsertInput = z.infer<typeof systemRolesInsertSchema>;
 export type SystemRoleRecord = z.infer<typeof systemRolesSelectSchema>;
 export type ProjectRoleInsertInput = z.infer<typeof projectRolesInsertSchema>;
@@ -182,6 +204,10 @@ export type OrganizationRoleInsertInput = z.infer<
 export type OrganizationRoleRecord = z.infer<
   typeof organizationRolesSelectSchema
 >;
+export type IssueStatusInsertInput = z.infer<typeof issueStatusesInsertSchema>;
+export type IssueStatusRecord = z.infer<typeof issueStatusesSelectSchema>;
+export type ClosedReasonInsertInput = z.infer<typeof closedReasonsInsertSchema>;
+export type ClosedReasonRecord = z.infer<typeof closedReasonsSelectSchema>;
 export type CredentialTypeInsertInput = z.infer<
   typeof credentialTypesInsertSchema
 >;

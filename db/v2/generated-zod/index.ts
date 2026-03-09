@@ -1,7 +1,10 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
 import {
+  closedReasons,
   credentialTypes,
+  issueStatuses,
+  issues,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -37,6 +40,9 @@ export const teamsSelectSchema = createSelectSchema(teams);
 export const organizationsInsertSchema = createInsertSchema(organizations);
 export const organizationsSelectSchema = createSelectSchema(organizations);
 
+export const issuesInsertSchema = createInsertSchema(issues);
+export const issuesSelectSchema = createSelectSchema(issues);
+
 export const systemRolesInsertSchema = createInsertSchema(systemRoles);
 export const systemRolesSelectSchema = createSelectSchema(systemRoles);
 
@@ -50,6 +56,12 @@ export const organizationRolesInsertSchema =
   createInsertSchema(organizationRoles);
 export const organizationRolesSelectSchema =
   createSelectSchema(organizationRoles);
+
+export const issueStatusesInsertSchema = createInsertSchema(issueStatuses);
+export const issueStatusesSelectSchema = createSelectSchema(issueStatuses);
+
+export const closedReasonsInsertSchema = createInsertSchema(closedReasons);
+export const closedReasonsSelectSchema = createSelectSchema(closedReasons);
 
 export const credentialTypesInsertSchema = createInsertSchema(credentialTypes);
 export const credentialTypesSelectSchema = createSelectSchema(credentialTypes);

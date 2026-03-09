@@ -4,6 +4,7 @@ import { type BackendConfig } from "./config/backend-config.js";
 import { BackendConfigModule } from "./config/backend-config.module.js";
 import { AuthModule } from "./modules/auth/auth.module.js";
 import { DatabaseModule } from "./modules/database/database.module.js";
+import { IssuesModule } from "./modules/issues/issues.module.js";
 import { OrganizationsModule } from "./modules/organizations/organizations.module.js";
 import { ProjectsModule } from "./modules/projects/projects.module.js";
 import { TeamsModule } from "./modules/teams/teams.module.js";
@@ -20,6 +21,7 @@ export class AppModule {
         AuthModule,
         TeamsModule,
         ProjectsModule,
+        IssuesModule,
         OrganizationsModule,
         UsersModule,
       ],

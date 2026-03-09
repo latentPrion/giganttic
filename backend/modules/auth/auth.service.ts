@@ -19,8 +19,10 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
   authSeedData,
+  closedReasons,
   credentialTypes,
   credentialTypeCodes,
+  issueStatuses,
   organizationRoleCodes,
   organizationRoles,
   organizations,
@@ -103,6 +105,16 @@ export class AuthService {
       tx
         .insert(organizationRoles)
         .values([...authSeedData.organizationRoles])
+        .onConflictDoNothing()
+        .run();
+      tx
+        .insert(issueStatuses)
+        .values([...authSeedData.issueStatuses])
+        .onConflictDoNothing()
+        .run();
+      tx
+        .insert(closedReasons)
+        .values([...authSeedData.closedReasons])
         .onConflictDoNothing()
         .run();
       tx

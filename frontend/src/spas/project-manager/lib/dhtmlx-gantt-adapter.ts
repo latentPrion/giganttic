@@ -1,5 +1,5 @@
-import { gantt } from "@dhtmlx-gantt/dhtmlxgantt.es.js";
-import "@dhtmlx-gantt/dhtmlxgantt.css";
+import { gantt } from "../../../../../dhtmlx-gantt/codebase/dhtmlxgantt.es.js";
+import "../../../../../dhtmlx-gantt/codebase/dhtmlxgantt.css";
 
 export function getDhtmlxGantt() {
   return gantt;

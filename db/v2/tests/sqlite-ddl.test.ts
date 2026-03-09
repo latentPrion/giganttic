@@ -81,17 +81,20 @@ describe("generated sqlite ddl for v2", () => {
 
     const presentTableCount = querySingleValue(
       db,
-      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         "Users",
         "CredentialTypes",
         "Projects",
         "Teams",
         "Organizations",
+        "Issues",
         "SystemRoles",
         "ProjectRoles",
         "TeamRoles",
         "OrganizationRoles",
+        "IssueStatuses",
+        "ClosedReasons",
         "Projects_Users",
         "Teams_Users",
         "Projects_Teams",
@@ -110,7 +113,7 @@ describe("generated sqlite ddl for v2", () => {
       ["Roles", "Users_Roles"],
     );
 
-    expect(presentTableCount).toBe(19);
+    expect(presentTableCount).toBe(22);
     expect(removedTableCount).toBe(0);
     db.close();
   });
@@ -150,10 +153,19 @@ describe("generated sqlite ddl for v2", () => {
     db.exec(
       "INSERT INTO OrganizationRoles (code, displayName) VALUES ('GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER', 'Organization Manager');",
     );
+    db.exec(
+      "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_OPEN', 'Open');",
+    );
+    db.exec(
+      "INSERT INTO ClosedReasons (code, displayName) VALUES ('ISSUE_CLOSED_REASON_RESOLVED', 'Resolved');",
+    );
 
     db.exec("INSERT INTO Projects_Users (userId, projectId) VALUES (1, 1);");
     db.exec("INSERT INTO Users_SystemRoles (userId, roleCode) VALUES (1, 'GGTC_SYSTEMROLE_ADMIN');");
     db.exec("INSERT INTO Organizations_Teams (organizationId, teamId) VALUES (1, 1);");
+    db.exec(
+      "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Bug', 'ISSUE_STATUS_OPEN', 25);",
+    );
 
     expect(() =>
       db.exec("INSERT INTO Projects_Users (userId, projectId) VALUES (1, 1);"),
@@ -169,6 +181,33 @@ describe("generated sqlite ddl for v2", () => {
         "INSERT INTO Users_Teams_TeamRoles (userId, teamId, roleCode) VALUES (1, 999, 'GGTC_TEAMROLE_PROJECT_MANAGER');",
       ),
     ).toThrow(/foreign key/i);
+    expect(() =>
+      db.exec(
+        "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (999, 'Ghost Bug', 'ISSUE_STATUS_OPEN', 25);",
+      ),
+    ).toThrow(/foreign key/i);
+    expect(() =>
+      db.exec(
+        "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Bad Progress', 'ISSUE_STATUS_OPEN', 101);",
+      ),
+    ).toThrow(/check/i);
+    db.close();
+  });
+
+  it("cascades project deletion to issues", async () => {
+    const db = await createV2Database();
+
+    db.exec(
+      "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_OPEN', 'Open');",
+    );
+    db.exec("INSERT INTO Projects (id, name) VALUES (1, 'Apollo');");
+    db.exec(
+      "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Linked issue', 'ISSUE_STATUS_OPEN', 0);",
+    );
+
+    db.exec("DELETE FROM Projects WHERE id = 1;");
+
+    expect(querySingleValue(db, "SELECT COUNT(*) FROM Issues")).toBe(0);
     db.close();
   });
 });
