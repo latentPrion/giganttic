@@ -1,12 +1,12 @@
 import React from "react";
 import { EntityActionButton } from "./EntityActionButton.js";
 
-interface IssueViewButtonProps {
+interface TeamViewButtonProps {
   disabled?: boolean;
   onClick(): void;
 }
 
-export function IssueViewButton(props: IssueViewButtonProps) {
+export function TeamViewButton(props: TeamViewButtonProps) {
   return (
     <EntityActionButton
       disabled={props.disabled}

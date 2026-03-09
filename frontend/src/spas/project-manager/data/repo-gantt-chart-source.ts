@@ -1,7 +1,5 @@
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 
-const DEFAULT_REPO_CHART_FILENAME = "development-planner-chart.xml";
-
 const repoChartModules = import.meta.glob("../../../../../charts/*.xml", {
   eager: true,
   import: "default",
@@ -29,15 +27,16 @@ function createValidatedRepoCharts(
   return validatedCharts;
 }
 
-function createFallbackChartSource(): GanttChartSource {
-  return {
-    content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data></data>",
-    type: "xml",
-  };
-}
-
 const validatedRepoCharts = createValidatedRepoCharts(repoChartModules);
 
-export function getRepoGanttChartSource(_projectId: number | null): GanttChartSource {
-  return validatedRepoCharts.get(DEFAULT_REPO_CHART_FILENAME) ?? createFallbackChartSource();
+function createChartFilename(projectId: number): string {
+  return `${projectId}.xml`;
+}
+
+export function getRepoGanttChartSource(projectId: number | null): GanttChartSource | null {
+  if (projectId === null) {
+    return null;
+  }
+
+  return validatedRepoCharts.get(createChartFilename(projectId)) ?? null;
 }

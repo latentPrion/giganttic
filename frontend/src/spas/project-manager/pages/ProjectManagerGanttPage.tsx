@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Alert,
   Box,
   Stack,
   Typography,
@@ -15,12 +16,47 @@ interface ProjectManagerGanttPageProps {
 }
 
 const DEFAULT_DISPLAY_MODE: GanttDisplayMode = "both";
+const MISSING_CHART_MESSAGE = "No gantt chart file exists for this project yet.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Manager Gantt";
 const SAMPLE_PROJECT_LABEL = "Sample chart";
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? SAMPLE_PROJECT_LABEL : `${projectId}`;
+}
+
+function renderGanttContainer(
+  chartSource: ReturnType<typeof getRepoGanttChartSource>,
+  displayMode: GanttDisplayMode,
+  isControlPanelExpanded: boolean,
+  onDisplayModeChange: (nextValue: GanttDisplayMode) => void,
+  onToggleExpanded: () => void,
+) {
+  if (chartSource === null) {
+    return <Alert severity="info">{MISSING_CHART_MESSAGE}</Alert>;
+  }
+
+  return (
+    <Box
+      sx={{
+        border: "1px solid rgba(255, 255, 255, 0.12)",
+        borderRadius: 3,
+        display: "flex",
+        flex: 1,
+        flexDirection: "column",
+        minHeight: "70dvh",
+        overflow: "hidden",
+      }}
+    >
+      <GanttChart chartSource={chartSource} displayMode={displayMode} />
+      <GanttChartControlPanel
+        displayMode={displayMode}
+        isExpanded={isControlPanelExpanded}
+        onDisplayModeChange={onDisplayModeChange}
+        onToggleExpanded={onToggleExpanded}
+      />
+    </Box>
+  );
 }
 
 export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
@@ -54,25 +90,13 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             Selected project: {createSelectedProjectLabel(props.projectId)}
           </Typography>
         </Stack>
-        <Box
-          sx={{
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: 3,
-            display: "flex",
-            flex: 1,
-            flexDirection: "column",
-            minHeight: "70dvh",
-            overflow: "hidden",
-          }}
-        >
-          <GanttChart chartSource={chartSource} displayMode={displayMode} />
-          <GanttChartControlPanel
-            displayMode={displayMode}
-            isExpanded={isControlPanelExpanded}
-            onDisplayModeChange={setDisplayMode}
-            onToggleExpanded={toggleControlPanelExpanded}
-          />
-        </Box>
+        {renderGanttContainer(
+          chartSource,
+          displayMode,
+          isControlPanelExpanded,
+          setDisplayMode,
+          toggleControlPanelExpanded,
+        )}
       </Stack>
     </Box>
   );

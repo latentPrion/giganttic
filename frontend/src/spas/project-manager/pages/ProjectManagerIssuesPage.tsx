@@ -224,7 +224,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
               <>
                 <IssueViewButton
                   disabled={busyKey === `issue:${issue.id}`}
-                  onClick={() => openDetailRoute(issue.id)}
+                  onClick={() => openSummaryModal(issue.id)}
                 />
                 <IssueEditButton
                   disabled={busyKey === `issue:${issue.id}`}
@@ -238,7 +238,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
             )}
             issue={issue}
             key={issue.id}
-            onOpenSummary={() => openSummaryModal(issue.id)}
+            onNavigate={() => openDetailRoute(issue.id)}
             viewMode={VIEW_MODE}
           />
         ))}

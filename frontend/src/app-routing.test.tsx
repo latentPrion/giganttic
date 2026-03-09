@@ -123,6 +123,7 @@ describe("app routing", () => {
         journal: "Issue journal",
         name: "Issue 7",
         openedAt: "2026-03-08T00:00:00.000Z",
+        priority: 2,
         progressPercentage: 15,
         projectId: 42,
         status: "ISSUE_STATUS_OPEN",
@@ -140,11 +141,26 @@ describe("app routing", () => {
         journal: "Issue journal",
         name: "Issue 7",
         openedAt: "2026-03-08T00:00:00.000Z",
+        priority: 2,
         progressPercentage: 15,
         projectId: 42,
         status: "ISSUE_STATUS_OPEN",
         updatedAt: "2026-03-08T00:00:00.000Z",
       }],
+    });
+    lobbyApiMock.getProject.mockResolvedValue({
+      members: [{
+        roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+        userId: 101,
+        username: "demo-user",
+      }],
+      project: {
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Project description",
+        id: 1,
+        name: "Project 1",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      },
     });
   });
 
@@ -220,9 +236,9 @@ describe("app routing", () => {
     expect(screen.getByRole("button", { name: /^Organizations$/i })).toBeVisible();
   });
 
-  it("redirects unauthenticated PM gantt requests to the public home route", async () => {
+  it("redirects unauthenticated PM project requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/gantt?projectId=42"],
+      initialEntries: ["/pm/project?projectId=1&view=gantt"],
     });
 
     expect(
@@ -230,41 +246,54 @@ describe("app routing", () => {
     ).toBeVisible();
   });
 
-  it("renders the PM gantt SPA for authenticated users", async () => {
+  it("renders the PM project detail SPA for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/gantt?projectId=42"],
+      initialEntries: ["/pm/project?projectId=1&view=detail"],
     });
 
-    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
-    expect(screen.getByText("Selected project: 42")).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+    expect(await screen.findByText("Project")).toBeVisible();
+    expect(screen.getByText("Selected project: 1")).toBeVisible();
+    expect(await screen.findByText("Detailed Project View")).toBeVisible();
   });
 
-  it("renders the PM gantt SPA with sample fallback when the project query param is invalid", async () => {
+  it("renders the PM project gantt SPA for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/gantt?projectId=invalid"],
+      initialEntries: ["/pm/project?projectId=1&view=gantt"],
     });
 
-    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
-    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
+    expect(await screen.findByText("Project")).toBeVisible();
+    expect(screen.getByText("Selected project: 1")).toBeVisible();
+    expect(await screen.findByRole("tab", { name: "Both" })).toBeVisible();
   });
 
-  it("renders the PM gantt SPA with sample fallback when the project query param is missing", async () => {
+  it("renders the PM project route with a safe fallback when the project query param is invalid", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/gantt"],
+      initialEntries: ["/pm/project?projectId=invalid&view=gantt"],
     });
 
-    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
-    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
+    expect(await screen.findByText("Project")).toBeVisible();
+    expect(screen.getByText("Provide a valid projectId to view a project.")).toBeVisible();
+  });
+
+  it("renders the PM project route with a safe fallback when the project query param is missing", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project"],
+    });
+
+    expect(await screen.findByText("Project")).toBeVisible();
+    expect(screen.getByText("Provide a valid projectId to view a project.")).toBeVisible();
   });
 
   it("redirects unauthenticated PM issues requests to the public home route", async () => {

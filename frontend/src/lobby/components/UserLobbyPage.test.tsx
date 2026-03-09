@@ -8,6 +8,16 @@ import { renderWithTheme } from "../../test/render-with-theme.js";
 import { lobbyApi } from "../api/lobby-api.js";
 import { UserLobbyPage } from "./UserLobbyPage.js";
 
+const navigateMock = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 vi.mock("../api/lobby-api.js", () => ({
   lobbyApi: {
     createOrganization: vi.fn(),
@@ -222,6 +232,7 @@ async function findOrganizationCard(): Promise<HTMLElement> {
 }
 
 beforeEach(() => {
+  navigateMock.mockReset();
   lobbyApiMock.createOrganization.mockReset();
   lobbyApiMock.createProject.mockReset();
   lobbyApiMock.createTeam.mockReset();
@@ -342,12 +353,22 @@ describe("UserLobbyPage", () => {
     expect(screen.getByText("Apollo")).toBeVisible();
   });
 
-  it("opens a project summary modal when the project row is clicked", async () => {
+  it("navigates to the PM project route when the project row is clicked", async () => {
     const user = userEvent.setup();
 
     renderLobbyPage();
 
     await user.click(await screen.findByRole("button", { name: /Apollo/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=1&view=detail");
+  });
+
+  it("opens a project summary modal from the view button", async () => {
+    const user = userEvent.setup();
+
+    renderLobbyPage();
+
+    await user.click((await screen.findAllByRole("button", { name: "View" }))[0]!);
 
     expect(await screen.findByRole("heading", { name: "Project Summary" })).toBeVisible();
     expect(await screen.findByText("Members: 2")).toBeVisible();
@@ -448,7 +469,7 @@ describe("UserLobbyPage", () => {
     renderLobbyPage();
 
     await openProjectsSection();
-    await user.click(screen.getByRole("button", { name: /Apollo/i }));
+    await user.click((await screen.findAllByRole("button", { name: "View" }))[0]!);
     expect(await screen.findByText("demo-user (GGTC_PROJECTROLE_PROJECT_MANAGER)")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -468,7 +489,7 @@ describe("UserLobbyPage", () => {
     nameInput.focus();
     await user.keyboard("{Enter}");
 
-    await user.click(await screen.findByRole("button", { name: /Apollo Prime/i }));
+    await user.click((await screen.findAllByRole("button", { name: "View" }))[0]!);
 
     expect(await screen.findByText("updated-manager (GGTC_PROJECTROLE_PROJECT_MANAGER)")).toBeVisible();
     expect(lobbyApiMock.getProject).toHaveBeenCalledTimes(2);
@@ -546,26 +567,26 @@ describe("UserLobbyPage", () => {
     expect((await screen.findAllByText("Project update failed.")).length).toBeGreaterThan(0);
   });
 
-  it("opens a team summary modal when the team row is clicked", async () => {
+  it("opens a team summary modal from the view button", async () => {
     const user = userEvent.setup();
 
     renderLobbyPage();
 
     await openTeamsSection(user);
-    await user.click(screen.getByRole("button", { name: /Operators/i }));
+    await user.click(screen.getAllByRole("button", { name: "View" })[1]!);
     expect(await screen.findByRole("heading", { name: "Team Summary" })).toBeVisible();
     expect(await screen.findByText("Members: 2")).toBeVisible();
     expect(await screen.findByText("demo-user (GGTC_TEAMROLE_TEAM_MANAGER)")).toBeVisible();
     expect(lobbyApiMock.getTeam).toHaveBeenCalledWith(TOKEN, 11);
   });
 
-  it("opens an organization summary modal when the organization row is clicked", async () => {
+  it("opens an organization summary modal from the view button", async () => {
     const user = userEvent.setup();
 
     renderLobbyPage();
 
     await openOrganizationsSection(user);
-    await user.click(screen.getByRole("button", { name: /Giganttic Org/i }));
+    await user.click(screen.getAllByRole("button", { name: "View" })[1]!);
     expect(await screen.findByRole("heading", { name: "Organization Summary" })).toBeVisible();
     expect(await screen.findByText("Members: 2")).toBeVisible();
     expect(await screen.findByText("Projects: 1")).toBeVisible();

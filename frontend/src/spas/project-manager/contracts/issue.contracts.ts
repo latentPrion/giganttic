@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const ISSUE_PROGRESS_MAXIMUM = 100;
+const ISSUE_PRIORITY_MINIMUM = 0;
 
 export const issueStatusSchema = z.enum([
   "ISSUE_STATUS_OPEN",
@@ -26,6 +27,10 @@ function createProgressPercentageSchema() {
   return z.number().int().min(0).max(ISSUE_PROGRESS_MAXIMUM);
 }
 
+function createIssuePrioritySchema() {
+  return z.number().int().min(ISSUE_PRIORITY_MINIMUM);
+}
+
 export const issueSchema = z.object({
   closedAt: z.string().nullable(),
   closedReason: closedReasonSchema.nullable(),
@@ -36,6 +41,7 @@ export const issueSchema = z.object({
   journal: z.string().nullable(),
   name: z.string(),
   openedAt: z.string(),
+  priority: createIssuePrioritySchema(),
   progressPercentage: createProgressPercentageSchema(),
   projectId: z.number().int().positive(),
   status: issueStatusSchema,
@@ -56,6 +62,7 @@ export const createIssueRequestSchema = z.object({
   description: createOptionalNullableTextSchema(),
   journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema(),
+  priority: createIssuePrioritySchema().optional(),
   progressPercentage: createProgressPercentageSchema().optional(),
   status: issueStatusSchema.optional(),
 });
@@ -70,6 +77,7 @@ export const updateIssueRequestSchema = z.object({
   description: createOptionalNullableTextSchema(),
   journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema().optional(),
+  priority: createIssuePrioritySchema().optional(),
   progressPercentage: createProgressPercentageSchema().optional(),
   status: issueStatusSchema.optional(),
 }).refine(
@@ -79,6 +87,7 @@ export const updateIssueRequestSchema = z.object({
     || value.description !== undefined
     || value.journal !== undefined
     || value.name !== undefined
+    || value.priority !== undefined
     || value.progressPercentage !== undefined
     || value.status !== undefined,
   "At least one field must be provided",

@@ -5,7 +5,7 @@ import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
 interface OrganizationListItemProps {
   actionContent?: React.ReactNode;
-  onOpenSummary(): void;
+  onNavigate?(): void;
   organization: LobbyOrganization;
   viewMode: EntityListItemViewMode;
 }
@@ -15,7 +15,7 @@ export function OrganizationListItem(props: OrganizationListItemProps) {
     <EntityListItemCard
       actionContent={props.actionContent}
       description={props.organization.description}
-      onOpenSummary={props.onOpenSummary}
+      onNavigate={props.onNavigate}
       title={props.organization.name}
       viewMode={props.viewMode}
     />

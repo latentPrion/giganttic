@@ -42,6 +42,7 @@ function createIssue(overrides: Partial<Issue> = {}): Issue {
     journal: "Investigate the payload mismatch",
     name: "Issue 7",
     openedAt: DEFAULT_TIMESTAMP,
+    priority: 2,
     progressPercentage: 35,
     projectId: 42,
     status: "ISSUE_STATUS_OPEN" as const,
@@ -70,14 +71,14 @@ describe("ProjectManagerIssuePage", () => {
     expect(issuesApiMock.getIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
   });
 
-  it("opens the summary modal from the issue list item", async () => {
+  it("opens the summary modal from the view button", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
       <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
     );
 
-    await user.click(await screen.findByText("Issue 7"));
+    await user.click(await screen.findByRole("button", { name: "View" }));
 
     expect(await screen.findByRole("dialog", { name: "Issue Summary" })).toBeVisible();
   });

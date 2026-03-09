@@ -20,6 +20,7 @@ function createIssue() {
     journal: "Working notes",
     name: "Fix upload summary mismatch",
     openedAt: DEFAULT_TIMESTAMP,
+    priority: 2,
     progressPercentage: 35,
     projectId: 42,
     status: "ISSUE_STATUS_OPEN" as const,
@@ -28,9 +29,9 @@ function createIssue() {
 }
 
 describe("IssueListItem", () => {
-  it("renders action buttons in main-listing-view and opens summary on row click", async () => {
+  it("renders action buttons in main-listing-view and triggers navigation on row click", async () => {
     const user = userEvent.setup();
-    const onOpenSummary = vi.fn();
+    const onNavigate = vi.fn();
 
     renderWithTheme(
       <IssueListItem
@@ -41,7 +42,7 @@ describe("IssueListItem", () => {
           </>
         )}
         issue={createIssue()}
-        onOpenSummary={onOpenSummary}
+        onNavigate={onNavigate}
         viewMode="main-listing-view"
       />,
     );
@@ -52,7 +53,7 @@ describe("IssueListItem", () => {
 
     await user.click(screen.getByRole("button", { name: /Fix upload summary mismatch/i }));
 
-    expect(onOpenSummary).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
   });
 
   it("hides action buttons in side-nav-narrow-view", () => {
@@ -60,7 +61,7 @@ describe("IssueListItem", () => {
       <IssueListItem
         actionContent={<IssueEditButton onClick={vi.fn()} />}
         issue={createIssue()}
-        onOpenSummary={vi.fn()}
+        onNavigate={vi.fn()}
         viewMode="side-nav-narrow-view"
       />,
     );
@@ -70,14 +71,14 @@ describe("IssueListItem", () => {
 
   it("does not trigger the summary handler when action buttons are clicked", async () => {
     const user = userEvent.setup();
-    const onOpenSummary = vi.fn();
+    const onNavigate = vi.fn();
     const onEdit = vi.fn();
 
     renderWithTheme(
       <IssueListItem
         actionContent={<IssueEditButton onClick={onEdit} />}
         issue={createIssue()}
-        onOpenSummary={onOpenSummary}
+        onNavigate={onNavigate}
         viewMode="main-listing-view"
       />,
     );
@@ -85,6 +86,6 @@ describe("IssueListItem", () => {
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onOpenSummary).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 });

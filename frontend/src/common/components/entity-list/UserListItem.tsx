@@ -10,7 +10,7 @@ interface UserListItemUser {
 
 interface UserListItemProps {
   actionContent?: React.ReactNode;
-  onOpenSummary(): void;
+  onNavigate?(): void;
   user: UserListItemUser;
   viewMode: EntityListItemViewMode;
 }
@@ -20,7 +20,7 @@ export function UserListItem(props: UserListItemProps) {
     <EntityListItemCard
       actionContent={props.actionContent}
       description={props.user.description ?? null}
-      onOpenSummary={props.onOpenSummary}
+      onNavigate={props.onNavigate}
       title={props.user.username}
       viewMode={props.viewMode}
     />

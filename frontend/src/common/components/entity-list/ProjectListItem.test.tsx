@@ -21,9 +21,9 @@ function createProject() {
 }
 
 describe("ProjectListItem", () => {
-  it("renders action buttons in main-listing-view and opens summary on row click", async () => {
+  it("renders action buttons in main-listing-view and triggers navigation on row click", async () => {
     const user = userEvent.setup();
-    const onOpenSummary = vi.fn();
+    const onNavigate = vi.fn();
 
     renderWithTheme(
       <ProjectListItem
@@ -33,7 +33,7 @@ describe("ProjectListItem", () => {
             <ProjectDeleteButton onClick={vi.fn()} />
           </>
         )}
-        onOpenSummary={onOpenSummary}
+        onNavigate={onNavigate}
         project={createProject()}
         viewMode="main-listing-view"
       />,
@@ -44,7 +44,7 @@ describe("ProjectListItem", () => {
 
     await user.click(screen.getByRole("button", { name: /Apollo/i }));
 
-    expect(onOpenSummary).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
   });
 
   it("hides action buttons in side-nav-narrow-view", () => {
@@ -56,7 +56,7 @@ describe("ProjectListItem", () => {
             <ProjectDeleteButton onClick={vi.fn()} />
           </>
         )}
-        onOpenSummary={vi.fn()}
+        onNavigate={vi.fn()}
         project={createProject()}
         viewMode="side-nav-narrow-view"
       />,
@@ -68,13 +68,13 @@ describe("ProjectListItem", () => {
 
   it("does not trigger the summary handler when action buttons are clicked", async () => {
     const user = userEvent.setup();
-    const onOpenSummary = vi.fn();
+    const onNavigate = vi.fn();
     const onEdit = vi.fn();
 
     renderWithTheme(
       <ProjectListItem
         actionContent={<ProjectEditButton onClick={onEdit} />}
-        onOpenSummary={onOpenSummary}
+        onNavigate={onNavigate}
         project={createProject()}
         viewMode="main-listing-view"
       />,
@@ -83,6 +83,6 @@ describe("ProjectListItem", () => {
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onOpenSummary).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 });

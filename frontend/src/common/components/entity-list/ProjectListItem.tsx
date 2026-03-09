@@ -5,7 +5,7 @@ import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
 interface ProjectListItemProps {
   actionContent?: React.ReactNode;
-  onOpenSummary(): void;
+  onNavigate?(): void;
   project: LobbyProject;
   viewMode: EntityListItemViewMode;
 }
@@ -15,7 +15,7 @@ export function ProjectListItem(props: ProjectListItemProps) {
     <EntityListItemCard
       actionContent={props.actionContent}
       description={props.project.description}
-      onOpenSummary={props.onOpenSummary}
+      onNavigate={props.onNavigate}
       title={props.project.name}
       viewMode={props.viewMode}
     />

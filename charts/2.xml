@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="201" open="1" parent="0" progress="0.55" start_date="2026-03-02 10:00" duration="5"><![CDATA[Org project planning]]></task>
+  <task id="202" open="1" parent="201" progress="0.40" start_date="2026-03-03 11:00" duration="3"><![CDATA[Org-scoped access audit]]></task>
+  <task id="203" open="1" parent="201" progress="0.20" start_date="2026-03-06 10:30" duration="4"><![CDATA[Cross-role regression run]]></task>
+  <coll_options for="links">
+    <item id="2001" source="201" target="202" type="0" />
+    <item id="2002" source="202" target="203" type="0" />
+  </coll_options>
+</data>

@@ -7,16 +7,20 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 import { OrganizationDeleteButton } from "../../common/components/entity-actions/OrganizationDeleteButton.js";
 import { OrganizationCreateButton } from "../../common/components/entity-actions/OrganizationCreateButton.js";
 import { OrganizationEditButton } from "../../common/components/entity-actions/OrganizationEditButton.js";
+import { OrganizationViewButton } from "../../common/components/entity-actions/OrganizationViewButton.js";
 import { ProjectCreateButton } from "../../common/components/entity-actions/ProjectCreateButton.js";
 import { ProjectDeleteButton } from "../../common/components/entity-actions/ProjectDeleteButton.js";
 import { ProjectEditButton } from "../../common/components/entity-actions/ProjectEditButton.js";
+import { ProjectViewButton } from "../../common/components/entity-actions/ProjectViewButton.js";
 import { TeamCreateButton } from "../../common/components/entity-actions/TeamCreateButton.js";
 import { TeamDeleteButton } from "../../common/components/entity-actions/TeamDeleteButton.js";
 import { TeamEditButton } from "../../common/components/entity-actions/TeamEditButton.js";
+import { TeamViewButton } from "../../common/components/entity-actions/TeamViewButton.js";
 import { OrganizationListItem } from "../../common/components/entity-list/OrganizationListItem.js";
 import { EntityItemList } from "../../common/components/entity-list/EntityItemList.js";
 import { ProjectListItem } from "../../common/components/entity-list/ProjectListItem.js";
@@ -90,6 +94,7 @@ interface ProjectSectionContentProps {
   onDeleteProject(projectId: number): void;
   onEditProject(projectId: number): void;
   onOpenSummary(projectId: number): void;
+  onProjectNavigate(projectId: number): void;
   projects: LobbyProject[];
   viewMode: EntityListItemViewMode;
 }
@@ -109,6 +114,10 @@ function ProjectSectionContent(props: ProjectSectionContentProps) {
         <ProjectListItem
           actionContent={(
             <>
+              <ProjectViewButton
+                disabled={props.busyKey === `project:${project.id}`}
+                onClick={() => props.onOpenSummary(project.id)}
+              />
               <ProjectEditButton
                 disabled={props.busyKey === `project:${project.id}`}
                 onClick={() => props.onEditProject(project.id)}
@@ -120,7 +129,7 @@ function ProjectSectionContent(props: ProjectSectionContentProps) {
             </>
           )}
           key={project.id}
-          onOpenSummary={() => props.onOpenSummary(project.id)}
+          onNavigate={() => props.onProjectNavigate(project.id)}
           project={project}
           viewMode={props.viewMode}
         />
@@ -153,6 +162,10 @@ function TeamSectionContent(props: TeamSectionContentProps) {
         <TeamListItem
           actionContent={(
             <>
+              <TeamViewButton
+                disabled={props.busyKey === `team:${team.id}`}
+                onClick={() => props.onOpenSummary(team.id)}
+              />
               <TeamEditButton
                 disabled={props.busyKey === `team:${team.id}`}
                 onClick={() => props.onEditTeam(team.id)}
@@ -164,7 +177,6 @@ function TeamSectionContent(props: TeamSectionContentProps) {
             </>
           )}
           key={team.id}
-          onOpenSummary={() => props.onOpenSummary(team.id)}
           team={team}
           viewMode={props.viewMode}
         />
@@ -197,6 +209,10 @@ function OrganizationSectionContent(props: OrganizationSectionContentProps) {
         <OrganizationListItem
           actionContent={(
             <>
+              <OrganizationViewButton
+                disabled={props.busyKey === `organization:${organization.id}`}
+                onClick={() => props.onOpenSummary(organization.id)}
+              />
               <OrganizationEditButton
                 disabled={props.busyKey === `organization:${organization.id}`}
                 onClick={() => props.onEditOrganization(organization.id)}
@@ -208,7 +224,6 @@ function OrganizationSectionContent(props: OrganizationSectionContentProps) {
             </>
           )}
           key={organization.id}
-          onOpenSummary={() => props.onOpenSummary(organization.id)}
           organization={organization}
           viewMode={props.viewMode}
         />
@@ -218,6 +233,7 @@ function OrganizationSectionContent(props: OrganizationSectionContentProps) {
 }
 
 export function UserLobbyPage({ token }: UserLobbyPageProps) {
+  const navigate = useNavigate();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreateOrganizationModalOpen, setIsCreateOrganizationModalOpen] = useState(false);
@@ -357,6 +373,10 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
 
   function openProjectSummaryModal(projectId: number): void {
     setProjectSummaryTargetId(projectId);
+  }
+
+  function navigateToProject(projectId: number): void {
+    navigate(`/pm/project?projectId=${projectId}&view=detail`);
   }
 
   function openTeamSummaryModal(teamId: number): void {
@@ -593,6 +613,7 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
                 onDeleteProject={(projectId) => void deleteProject(projectId)}
                 onEditProject={openProjectEditModal}
                 onOpenSummary={openProjectSummaryModal}
+                onProjectNavigate={navigateToProject}
                 projects={lobbyData.projects}
                 viewMode={LIST_ITEM_VIEW_MODE}
               />

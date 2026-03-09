@@ -11,7 +11,7 @@ import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 interface IssueListItemProps {
   actionContent?: React.ReactNode;
   issue: Issue;
-  onOpenSummary(): void;
+  onNavigate?(): void;
   viewMode: EntityListItemViewMode;
 }
 
@@ -35,7 +35,7 @@ export function IssueListItem(props: IssueListItemProps) {
     <EntityListItemCard
       actionContent={props.actionContent}
       description={props.issue.description}
-      onOpenSummary={props.onOpenSummary}
+      onNavigate={props.onNavigate}
       title={props.issue.name}
       viewMode={props.viewMode}
     >

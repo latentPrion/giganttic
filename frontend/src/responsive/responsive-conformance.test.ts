@@ -134,11 +134,11 @@ describe("responsive layout contracts", () => {
     const appSource = readFrontendFile("App.tsx");
     const publicLayoutSource = readPublicHomeLayoutFile("PublicHomeLayout.tsx");
     const lobbyRouteSource = readUserLobbyRouteFile("LobbyRoute.tsx");
-    const ganttRouteSource = readProjectManagerRouteFile("GanttRoute.tsx");
+    const projectRouteSource = readProjectManagerRouteFile("ProjectRoute.tsx");
 
     expect(appSource).toContain("<AppRoutes />");
     expect(publicLayoutSource).toContain("<AppShell");
     expect(lobbyRouteSource).toContain("<UserLobbyPage");
-    expect(ganttRouteSource).toContain("<ProjectManagerGanttPage");
+    expect(projectRouteSource).toContain("<ProjectManagerProjectPage");
   });
 });

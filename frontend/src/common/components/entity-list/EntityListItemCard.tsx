@@ -12,7 +12,7 @@ interface EntityListItemCardProps {
   actionContent?: React.ReactNode;
   children?: React.ReactNode;
   description: string | null;
-  onOpenSummary(): void;
+  onNavigate?(): void;
   title: string;
   viewMode: EntityListItemViewMode;
 }
@@ -31,6 +31,7 @@ function stopActionPropagation(event: React.MouseEvent<HTMLElement>): void {
 
 export function EntityListItemCard(props: EntityListItemCardProps) {
   const showActions = shouldRenderActions(props.viewMode) && props.actionContent;
+  const isNavigable = props.onNavigate !== undefined;
 
   return (
     <Paper elevation={0} sx={{ padding: CARD_PADDING }}>
@@ -41,13 +42,15 @@ export function EntityListItemCard(props: EntityListItemCardProps) {
         spacing={CONTENT_GAP}
       >
         <ButtonBase
-          onClick={props.onOpenSummary}
+          disabled={!isNavigable}
+          onClick={props.onNavigate}
           sx={{
             alignItems: "stretch",
             borderRadius: 2,
             display: "flex",
             flex: 1,
             justifyContent: "flex-start",
+            opacity: isNavigable ? 1 : 0.84,
             textAlign: "left",
             width: "100%",
           }}

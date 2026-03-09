@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="101" open="1" parent="0" progress="0.65" start_date="2026-03-03 09:00" duration="4"><![CDATA[Direct PM kickoff]]></task>
+  <task id="102" open="1" parent="101" progress="0.35" start_date="2026-03-04 09:00" duration="3"><![CDATA[Issue workflow polish]]></task>
+  <task id="103" open="1" parent="101" progress="0.10" start_date="2026-03-06 09:00" duration="2"><![CDATA[Acceptance review]]></task>
+  <coll_options for="links">
+    <item id="1001" source="101" target="102" type="0" />
+    <item id="1002" source="102" target="103" type="0" />
+  </coll_options>
+</data>

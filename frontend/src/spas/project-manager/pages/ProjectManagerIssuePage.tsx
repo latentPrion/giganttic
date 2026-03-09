@@ -10,6 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { IssueDeleteButton } from "../../../common/components/entity-actions/IssueDeleteButton.js";
 import { IssueEditButton } from "../../../common/components/entity-actions/IssueEditButton.js";
+import { IssueViewButton } from "../../../common/components/entity-actions/IssueViewButton.js";
 import { IssueListItem } from "../../../common/components/entity-list/IssueListItem.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { isApiError } from "../../../common/api/api-error.js";
@@ -158,6 +159,10 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
         <IssueListItem
           actionContent={(
             <>
+              <IssueViewButton
+                disabled={busyKey === `issue:${issue.id}`}
+                onClick={() => setIsSummaryModalOpen(true)}
+              />
               <IssueEditButton
                 disabled={busyKey === `issue:${issue.id}`}
                 onClick={() => setIsEditModalOpen(true)}
@@ -169,7 +174,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             </>
           )}
           issue={issue}
-          onOpenSummary={() => setIsSummaryModalOpen(true)}
+          onNavigate={() => navigate(`/pm/issue?id=${issue.id}&projectId=${issue.projectId}`)}
           viewMode={VIEW_MODE}
         />
         <IssueDetailsCard issue={issue} />
