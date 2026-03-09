@@ -9,16 +9,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
-const mockRepoChartData = {
-  data: [
-    {
-      duration: 3,
-      id: 1001,
-      start_date: "2026-03-09 00:00",
-      text: "Repo chart task",
-    },
-  ],
-  links: [],
+const mockRepoChartSource = {
+  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Repo chart task]]></task></data>",
+  type: "xml" as const,
 };
 
 const mockGantt = {
@@ -44,8 +37,8 @@ vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
   getDhtmlxGantt: () => mockGantt,
 }));
 
-vi.mock("../data/repo-gantt-chart-data.js", () => ({
-  getRepoGanttChartData: () => mockRepoChartData,
+vi.mock("../data/repo-gantt-chart-source.js", () => ({
+  getRepoGanttChartSource: () => mockRepoChartSource,
 }));
 
 describe("ProjectManagerGanttPage", () => {
@@ -79,7 +72,7 @@ describe("ProjectManagerGanttPage", () => {
     });
   });
 
-  it("loads gantt data from the repo charts loader on first render", async () => {
+  it("loads gantt XML from the repo charts loader on first render", async () => {
     renderWithTheme(<ProjectManagerGanttPage projectId={null} />);
 
     await waitFor(() => {
@@ -87,7 +80,10 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
-    expect(mockGantt.parse.mock.calls[0]?.[0]).toEqual(mockRepoChartData);
+    expect(mockGantt.parse.mock.calls[0]).toEqual([
+      mockRepoChartSource.content,
+      mockRepoChartSource.type,
+    ]);
   });
 
   it("cleans up the gantt instance on unmount", async () => {
