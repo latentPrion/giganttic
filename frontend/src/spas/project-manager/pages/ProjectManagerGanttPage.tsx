@@ -7,6 +7,7 @@ import {
 
 import { GanttChart } from "../components/GanttChart.js";
 import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js";
+import { getRepoGanttChartData } from "../data/repo-gantt-chart-data.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
 interface ProjectManagerGanttPageProps {
@@ -25,6 +26,7 @@ function createSelectedProjectLabel(projectId: number | null): string {
 export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   const [displayMode, setDisplayMode] = useState<GanttDisplayMode>(DEFAULT_DISPLAY_MODE);
   const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true);
+  const chartData = getRepoGanttChartData(props.projectId);
 
   function toggleControlPanelExpanded(): void {
     setIsControlPanelExpanded((current) => !current);
@@ -63,7 +65,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             overflow: "hidden",
           }}
         >
-          <GanttChart displayMode={displayMode} />
+          <GanttChart chartData={chartData} displayMode={displayMode} />
           <GanttChartControlPanel
             displayMode={displayMode}
             isExpanded={isControlPanelExpanded}

@@ -9,6 +9,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
+const mockRepoChartData = {
+  data: [
+    {
+      duration: 3,
+      id: 1001,
+      start_date: "2026-03-09 00:00",
+      text: "Repo chart task",
+    },
+  ],
+  links: [],
+};
+
 const mockGantt = {
   clearAll: vi.fn(),
   config: {
@@ -30,6 +42,10 @@ const mockGantt = {
 
 vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
   getDhtmlxGantt: () => mockGantt,
+}));
+
+vi.mock("../data/repo-gantt-chart-data.js", () => ({
+  getRepoGanttChartData: () => mockRepoChartData,
 }));
 
 describe("ProjectManagerGanttPage", () => {
@@ -63,7 +79,7 @@ describe("ProjectManagerGanttPage", () => {
     });
   });
 
-  it("loads sample gantt data on first render", async () => {
+  it("loads gantt data from the repo charts loader on first render", async () => {
     renderWithTheme(<ProjectManagerGanttPage projectId={null} />);
 
     await waitFor(() => {
@@ -71,10 +87,7 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
-    expect(mockGantt.parse.mock.calls[0]?.[0]).toMatchObject({
-      data: expect.any(Array),
-      links: expect.any(Array),
-    });
+    expect(mockGantt.parse.mock.calls[0]?.[0]).toEqual(mockRepoChartData);
   });
 
   it("cleans up the gantt instance on unmount", async () => {

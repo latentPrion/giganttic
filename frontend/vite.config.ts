@@ -7,6 +7,7 @@ const DEFAULT_BACKEND_TARGET = "http://127.0.0.1:3000";
 const API_PREFIX = "/stc-proj-mgmt/api";
 const CURRENT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT_DIRECTORY = path.resolve(CURRENT_DIRECTORY, "..");
+const CHARTS_DIRECTORY = path.resolve(PROJECT_ROOT_DIRECTORY, "charts");
 const FRONTEND_ROOT_DIRECTORY = CURRENT_DIRECTORY;
 const DHTMLX_GANTT_CODEBASE_DIRECTORY = path.resolve(
   PROJECT_ROOT_DIRECTORY,
@@ -25,6 +26,7 @@ export default defineConfig({
     fs: {
       allow: [
         FRONTEND_ROOT_DIRECTORY,
+        CHARTS_DIRECTORY,
         DHTMLX_GANTT_CODEBASE_DIRECTORY,
       ],
     },

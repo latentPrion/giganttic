@@ -1,11 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import { Box } from "@mui/material";
 
-import { createSampleGanttData } from "../data/sample-gantt-data.js";
+import type { GanttChartFile } from "../contracts/gantt-chart-file.contracts.js";
 import { getDhtmlxGantt } from "../lib/dhtmlx-gantt-adapter.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
 interface GanttChartProps {
+  chartData: GanttChartFile;
   displayMode: GanttDisplayMode;
 }
 
@@ -166,6 +167,7 @@ function createLayoutForDisplayMode(displayMode: GanttDisplayMode): GanttLayoutC
 
 function initializeMountedGantt(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  chartData: GanttChartFile,
   containerElement: HTMLDivElement,
   displayMode: GanttDisplayMode,
 ) {
@@ -174,7 +176,7 @@ function initializeMountedGantt(
   ganttInstance.config.show_grid = displayMode !== "chart";
   ganttInstance.config.show_chart = displayMode !== "grid";
   ganttInstance.init(containerElement);
-  ganttInstance.parse(createSampleGanttData());
+  ganttInstance.parse(chartData);
   ganttInstance.render();
   ganttInstance.setSizes();
 }
@@ -200,13 +202,13 @@ export function GanttChart(props: GanttChartProps) {
     const ganttInstance = getDhtmlxGantt();
     ganttReference.current = ganttInstance;
 
-    initializeMountedGantt(ganttInstance, containerElement, props.displayMode);
+    initializeMountedGantt(ganttInstance, props.chartData, containerElement, props.displayMode);
 
     return () => {
       cleanupMountedGantt(ganttInstance, containerElement);
       ganttReference.current = null;
     };
-  }, [props.displayMode]);
+  }, [props.chartData, props.displayMode]);
 
   return (
     <Box
