@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared Fireflies API helpers for CLI scripts in pm/."""
+"""Shared Fireflies API helpers for CLI scripts in fireflies-ai/."""
 
 from __future__ import annotations
 

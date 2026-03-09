@@ -8,3 +8,5 @@ run/*.db
 run/*.sqlite
 run/*.sqlite3
 /docs/3rdParty
+*.pyc
+

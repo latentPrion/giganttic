@@ -21,15 +21,15 @@ Or pass it directly with `--token`.
 ## List transcripts
 
 ```bash
-python3 pm/fireflies_transcripts_cli.py list
+python3 fireflies-ai/fireflies_transcripts_cli.py list
 ```
 
 Optional filters:
 
 ```bash
-python3 pm/fireflies_transcripts_cli.py --limit 50 --skip 0 --keyword demo list
-python3 pm/fireflies_transcripts_cli.py --from-date 2026-01-01T00:00:00.000Z list
-python3 pm/fireflies_transcripts_cli.py --last-n-days 14 list
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 50 --skip 0 --keyword demo list
+python3 fireflies-ai/fireflies_transcripts_cli.py --from-date 2026-01-01T00:00:00.000Z list
+python3 fireflies-ai/fireflies_transcripts_cli.py --last-n-days 14 list
 ```
 
 `--last-n-days N` computes a UTC `fromDate` for the preceding `N` days and cannot
@@ -38,7 +38,7 @@ be combined with `--from-date`.
 ## Interactive download flow
 
 ```bash
-python3 pm/fireflies_transcripts_cli.py -o pm/downloads interactive
+python3 fireflies-ai/fireflies_transcripts_cli.py -o fireflies-ai/downloads interactive
 ```
 
 The interactive flow will:
@@ -58,13 +58,13 @@ You can enter a comma-separated selection such as:
 - `transcript,audio`
 - `all`
 
-Downloaded files go into `pm/downloads/` by default.
+Downloaded files go into `fireflies-ai/downloads/` by default.
 
 ## Direct indexed download
 
 ```bash
-python3 pm/fireflies_transcripts_cli.py -o pm/downloads download 1,3-5 --assets audio
-python3 pm/fireflies_transcripts_cli.py -o pm/downloads download 1,3-5 --assets transcript,audio
+python3 fireflies-ai/fireflies_transcripts_cli.py -o fireflies-ai/downloads download 1,3-5 --assets audio
+python3 fireflies-ai/fireflies_transcripts_cli.py -o fireflies-ai/downloads download 1,3-5 --assets transcript,audio
 ```
 
 ## Transcript downloads
@@ -82,13 +82,13 @@ assumed PDFs. The CLI fetches transcript payloads through the Fireflies
 Audio and video downloads still use the `audio_url` and `video_url` fields from
 the transcript listing.
 
-## Convert a saved transcript JSON file into named text
+## Convert a saved transcript JSON file into SRT or PDF
 
 ```bash
-python3 pm/fireflies_transcript_to_text.py \
+python3 fireflies-ai/fireflies_transcript_to_text.py \
   --token 'your-token-here' \
-  -o pm/my-transcript.txt \
-  pm/2026-03-03T20-00-42.942Z-030326---Autobroker-x-Cardog-Meeting-transcript.json
+  -o fireflies-ai/my-transcript.srt \
+  fireflies-ai/2026-03-03T20-00-42.942Z-030326---Autobroker-x-Cardog-Meeting-transcript.json
 ```
 
 This script:
@@ -96,15 +96,35 @@ This script:
 1. Reads the local transcript JSON file.
 2. Extracts its transcript `id`.
 3. Queries Fireflies for transcript detail, including speaker metadata.
-4. Writes a timestamped text file with speaker names where available.
+4. Writes SRT by default, or PDF if requested, with speaker names where available.
 
 If a speaker cannot be resolved, the script falls back to `Speaker<speaker_id>`.
 
-You can override the output path:
+SRT is the default format:
 
 ```bash
-python3 pm/fireflies_transcript_to_text.py \
+python3 fireflies-ai/fireflies_transcript_to_text.py \
   --token 'your-token-here' \
-  -o pm/my-transcript.txt \
-  pm/your-transcript.json
+  fireflies-ai/your-transcript.json
+```
+
+Explicit SRT output:
+
+```bash
+python3 fireflies-ai/fireflies_transcript_to_text.py \
+  --token 'your-token-here' \
+  -f srt \
+  -o fireflies-ai/my-transcript.srt \
+  fireflies-ai/your-transcript.json
+```
+
+PDF output uses `enscript` and `ghostscript`:
+
+```bash
+sudo apt install enscript ghostscript
+python3 fireflies-ai/fireflies_transcript_to_text.py \
+  --token 'your-token-here' \
+  -f pdf \
+  -o fireflies-ai/my-transcript.pdf \
+  fireflies-ai/your-transcript.json
 ```
