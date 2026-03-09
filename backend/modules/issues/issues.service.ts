@@ -62,6 +62,7 @@ function toIssueResponse(issue: IssueRecord): IssueResponse {
     journal: issue.journal ?? null,
     name: issue.name,
     openedAt: issue.openedAt.toISOString(),
+    priority: issue.priority,
     progressPercentage: issue.progressPercentage,
     projectId: issue.projectId,
     status: issue.status as IssueResponse["status"],
@@ -83,6 +84,7 @@ function createIssueInsertValues(
     journal: normalizeNullableText(payload.journal) ?? null,
     name: payload.name.trim(),
     openedAt: now,
+    priority: payload.priority ?? 0,
     progressPercentage: payload.progressPercentage ?? 0,
     projectId,
     status: normalizedState.status,
@@ -115,6 +117,7 @@ function createIssueUpdateValues(payload: UpdateIssueRequest, currentIssue: Issu
       ? undefined
       : normalizeNullableText(payload.journal) ?? null,
     name: payload.name?.trim(),
+    priority: payload.priority,
     progressPercentage: payload.progressPercentage,
     status: normalizedState.status,
     updatedAt: now,

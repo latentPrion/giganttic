@@ -22,6 +22,7 @@ import {
   closedReasons,
   credentialTypes,
   credentialTypeCodes,
+  issues,
   issueStatuses,
   organizationRoleCodes,
   organizationRoles,
@@ -75,6 +76,19 @@ type SeededUserIds = Record<SeededAccountKey, number>;
 interface NamedSeedEntity {
   description: string;
   name: string;
+}
+
+interface SeededIssueEntity {
+  closedAt: string | null;
+  closedReason: string | null;
+  closedReasonDescription: string | null;
+  description: string | null;
+  journal: string | null;
+  name: string;
+  openedAt: string;
+  priority: number;
+  progressPercentage: number;
+  status: string;
 }
 
 @Injectable()
@@ -600,6 +614,22 @@ export class AuthService {
       seededUserIds.projectProjectManager,
       projectRoleCodes.projectManager,
     );
+
+    this.ensureProjectIssues(
+      tx,
+      organizationProjectManagerProjectId,
+      seededScopedFixtures.issues.orgProjectManager,
+    );
+    this.ensureProjectIssues(
+      tx,
+      directProjectManagerProjectId,
+      seededScopedFixtures.issues.projectProjectManager,
+    );
+    this.ensureProjectIssues(
+      tx,
+      teamProjectManagerProjectId,
+      seededScopedFixtures.issues.teamProjectManager,
+    );
   }
 
   private ensureOrganization(
@@ -768,6 +798,74 @@ export class AuthService {
       })
       .onConflictDoNothing()
       .run();
+  }
+
+  private ensureProjectIssues(
+    tx: SeedDatabase,
+    projectId: number,
+    seededIssues: readonly SeededIssueEntity[],
+  ): void {
+    for (const seededIssue of seededIssues) {
+      this.ensureIssue(tx, projectId, seededIssue);
+    }
+  }
+
+  private ensureIssue(
+    tx: SeedDatabase,
+    projectId: number,
+    seed: SeededIssueEntity,
+  ): void {
+    const existingIssue = tx
+      .select({ id: issues.id })
+      .from(issues)
+      .where(and(eq(issues.projectId, projectId), eq(issues.name, seed.name)))
+      .get();
+    const nextValues = this.createSeededIssueValues(projectId, seed);
+
+    if (existingIssue) {
+      tx.update(issues)
+        .set({
+          ...nextValues,
+          updatedAt: new Date(),
+        })
+        .where(eq(issues.id, existingIssue.id))
+        .run();
+      return;
+    }
+
+    tx.insert(issues)
+      .values(nextValues)
+      .run();
+  }
+
+  private createSeededIssueValues(
+    projectId: number,
+    seed: SeededIssueEntity,
+  ) {
+    return {
+      closedAt: this.parseOptionalSeededTimestamp(seed.closedAt),
+      closedReason: seed.closedReason,
+      closedReasonDescription: seed.closedReasonDescription,
+      description: seed.description,
+      journal: seed.journal,
+      name: seed.name,
+      openedAt: this.parseRequiredSeededTimestamp(seed.openedAt),
+      priority: seed.priority,
+      progressPercentage: seed.progressPercentage,
+      projectId,
+      status: seed.status,
+    };
+  }
+
+  private parseOptionalSeededTimestamp(value: string | null): Date | null {
+    if (value === null) {
+      return null;
+    }
+    return new Date(value);
+  }
+
+  private parseRequiredSeededTimestamp(value: string): Date {
+    return new Date(value);
   }
 
   private ensureTeam(

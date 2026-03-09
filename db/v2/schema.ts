@@ -43,6 +43,8 @@ export const teamRoleCodes = {
 } as const;
 
 const nowTimestampExpression = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
+const issuePriorityMinimum = 0;
+const issuePriorityMinimumLiteral = sql.raw(`${issuePriorityMinimum}`);
 const issueProgressPercentageMaximum = 100;
 const issueProgressPercentageMaximumLiteral = sql.raw(
   `${issueProgressPercentageMaximum}`,
@@ -139,6 +141,7 @@ export const issues = sqliteTable(
     name: text("name").notNull(),
     description: text("description"),
     journal: text("journal"),
+    priority: integer("priority").notNull().default(issuePriorityMinimum),
     status: text("status")
       .notNull()
       .references(() => issueStatuses.code, {
@@ -159,6 +162,10 @@ export const issues = sqliteTable(
     ...createTimestampColumns(),
   },
   (table) => [
+    check(
+      "Issues_priority_non_negative_check",
+      sql`${table.priority} >= ${issuePriorityMinimumLiteral}`,
+    ),
     check(
       "Issues_progressPercentage_range_check",
       sql`${table.progressPercentage} >= 0 AND ${table.progressPercentage} <= ${issueProgressPercentageMaximumLiteral}`,

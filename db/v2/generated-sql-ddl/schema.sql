@@ -26,6 +26,7 @@ CREATE TABLE `Issues` (
 	`name` text NOT NULL,
 	`description` text,
 	`journal` text,
+	`priority` integer DEFAULT 0 NOT NULL,
 	`status` text DEFAULT 'ISSUE_STATUS_OPEN' NOT NULL,
 	`closedReason` text,
 	`progressPercentage` integer DEFAULT 0 NOT NULL,
@@ -37,6 +38,7 @@ CREATE TABLE `Issues` (
 	FOREIGN KEY (`projectId`) REFERENCES `Projects`(`id`) ON UPDATE cascade ON DELETE cascade,
 	FOREIGN KEY (`status`) REFERENCES `IssueStatuses`(`code`) ON UPDATE cascade ON DELETE restrict,
 	FOREIGN KEY (`closedReason`) REFERENCES `ClosedReasons`(`code`) ON UPDATE cascade ON DELETE restrict,
+	CONSTRAINT "Issues_priority_non_negative_check" CHECK("Issues"."priority" >= 0),
 	CONSTRAINT "Issues_progressPercentage_range_check" CHECK("Issues"."progressPercentage" >= 0 AND "Issues"."progressPercentage" <= 100)
 );
 --> statement-breakpoint

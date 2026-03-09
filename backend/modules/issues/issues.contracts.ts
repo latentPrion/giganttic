@@ -14,6 +14,7 @@ const closedReasonCodes = [
 const issueStatusEnum = z.enum(issueStatusCodes);
 const closedReasonEnum = z.enum(closedReasonCodes);
 const issueUpdateRequiredMessage = "At least one field must be provided";
+const priorityMinimum = 0;
 const progressPercentageMaximum = 100;
 
 function createIssueIdSchema() {
@@ -32,6 +33,10 @@ function createIssueProgressSchema() {
   return z.number().int().min(0).max(progressPercentageMaximum);
 }
 
+function createIssuePrioritySchema() {
+  return z.number().int().min(priorityMinimum);
+}
+
 export const issueRouteParamsSchema = z.object({
   issueId: createIssueIdSchema(),
   projectId: createIssueIdSchema(),
@@ -47,6 +52,7 @@ export const createIssueRequestSchema = z.object({
   description: createOptionalNullableTextSchema(),
   journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema(),
+  priority: createIssuePrioritySchema().optional(),
   progressPercentage: createIssueProgressSchema().optional(),
   status: issueStatusEnum.optional(),
 });
@@ -57,6 +63,7 @@ export const updateIssueRequestSchema = z.object({
   description: createOptionalNullableTextSchema(),
   journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema().optional(),
+  priority: createIssuePrioritySchema().optional(),
   progressPercentage: createIssueProgressSchema().optional(),
   status: issueStatusEnum.optional(),
 }).refine(
@@ -66,6 +73,7 @@ export const updateIssueRequestSchema = z.object({
     || value.description !== undefined
     || value.journal !== undefined
     || value.name !== undefined
+    || value.priority !== undefined
     || value.progressPercentage !== undefined
     || value.status !== undefined,
   issueUpdateRequiredMessage,
@@ -81,6 +89,7 @@ export const issueSchema = z.object({
   journal: z.string().nullable(),
   name: z.string(),
   openedAt: z.string(),
+  priority: createIssuePrioritySchema(),
   progressPercentage: z.number().int().min(0).max(progressPercentageMaximum),
   projectId: z.number().int().positive(),
   status: issueStatusEnum,

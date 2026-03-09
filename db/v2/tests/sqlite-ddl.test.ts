@@ -164,7 +164,7 @@ describe("generated sqlite ddl for v2", () => {
     db.exec("INSERT INTO Users_SystemRoles (userId, roleCode) VALUES (1, 'GGTC_SYSTEMROLE_ADMIN');");
     db.exec("INSERT INTO Organizations_Teams (organizationId, teamId) VALUES (1, 1);");
     db.exec(
-      "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Bug', 'ISSUE_STATUS_OPEN', 25);",
+      "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Bug', 3, 'ISSUE_STATUS_OPEN', 25);",
     );
 
     expect(() =>
@@ -183,12 +183,17 @@ describe("generated sqlite ddl for v2", () => {
     ).toThrow(/foreign key/i);
     expect(() =>
       db.exec(
-        "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (999, 'Ghost Bug', 'ISSUE_STATUS_OPEN', 25);",
+        "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (999, 'Ghost Bug', 1, 'ISSUE_STATUS_OPEN', 25);",
       ),
     ).toThrow(/foreign key/i);
     expect(() =>
       db.exec(
-        "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Bad Progress', 'ISSUE_STATUS_OPEN', 101);",
+        "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Bad Progress', 1, 'ISSUE_STATUS_OPEN', 101);",
+      ),
+    ).toThrow(/check/i);
+    expect(() =>
+      db.exec(
+        "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Negative Priority', -1, 'ISSUE_STATUS_OPEN', 0);",
       ),
     ).toThrow(/check/i);
     db.close();
@@ -202,7 +207,7 @@ describe("generated sqlite ddl for v2", () => {
     );
     db.exec("INSERT INTO Projects (id, name) VALUES (1, 'Apollo');");
     db.exec(
-      "INSERT INTO Issues (projectId, name, status, progressPercentage) VALUES (1, 'Linked issue', 'ISSUE_STATUS_OPEN', 0);",
+      "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Linked issue', 0, 'ISSUE_STATUS_OPEN', 0);",
     );
 
     db.exec("DELETE FROM Projects WHERE id = 1;");

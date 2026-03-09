@@ -14,6 +14,7 @@ const ISSUE_STATUS_CLOSED = "ISSUE_STATUS_CLOSED";
 const ISSUE_STATUS_BLOCKED = "ISSUE_STATUS_BLOCKED";
 const ISSUE_CLOSED_REASON_RESOLVED = "ISSUE_CLOSED_REASON_RESOLVED";
 const ISSUE_CLOSED_REASON_WONTFIX = "ISSUE_CLOSED_REASON_WONTFIX";
+const DEFAULT_ISSUE_PRIORITY = 0;
 
 describe("issues crud api", () => {
   function createProject(
@@ -159,6 +160,7 @@ describe("issues crud api", () => {
     const createResponse = await createIssue(creator.accessToken, projectId, {
       description: "Fix upload blocking error",
       name: "Upload bug",
+      priority: 4,
       progressPercentage: 10,
     });
     const listResponse = await harness.app.inject({
@@ -170,10 +172,11 @@ describe("issues crud api", () => {
     expect(createResponse.statusCode).toBe(201);
     expect(listResponse.statusCode).toBe(200);
 
-    const createBody = harness.parseJson<{ issue: { id: number; projectId: number; status: string } }>(createResponse.payload);
+    const createBody = harness.parseJson<{ issue: { id: number; priority: number; projectId: number; status: string } }>(createResponse.payload);
     const listBody = harness.parseJson<{ issues: Array<{ id: number }> }>(listResponse.payload);
 
     expect(createBody.issue.projectId).toBe(projectId);
+    expect(createBody.issue.priority).toBe(4);
     expect(createBody.issue.status).toBe("ISSUE_STATUS_OPEN");
     expect(listBody.issues.map((issue) => issue.id)).toContain(createBody.issue.id);
   });
@@ -495,7 +498,7 @@ describe("issues crud api", () => {
     expect(validBody.issue.status).toBe(ISSUE_STATUS_CLOSED);
   });
 
-  it("defaults new issues to open with zero progress and null closed fields", async () => {
+  it("defaults new issues to open with zero progress priority and null closed fields", async () => {
     const creator = await harness.registerUser("issue-defaults");
     const projectId = harness.parseJson<{ project: { id: number } }>(
       (await createProject(creator.accessToken, { name: "Defaults Project" })).payload,
@@ -512,6 +515,7 @@ describe("issues crud api", () => {
         closedReason: string | null;
         createdAt: string;
         openedAt: string;
+        priority: number;
         progressPercentage: number;
         projectId: number;
         status: string;
@@ -521,6 +525,7 @@ describe("issues crud api", () => {
 
     expect(body.issue.projectId).toBe(projectId);
     expect(body.issue.status).toBe(ISSUE_STATUS_OPEN);
+    expect(body.issue.priority).toBe(DEFAULT_ISSUE_PRIORITY);
     expect(body.issue.progressPercentage).toBe(0);
     expect(body.issue.closedAt).toBeNull();
     expect(body.issue.closedReason).toBeNull();
@@ -595,7 +600,9 @@ describe("issues crud api", () => {
       createIssue(creator.accessToken, projectId, { name: "   " }),
       createIssue(creator.accessToken, projectId, { name: "Bad status", status: "BAD_STATUS" }),
       createIssue(creator.accessToken, projectId, { name: "Bad reason", closedReason: "BAD_REASON" }),
+      createIssue(creator.accessToken, projectId, { name: "Bad priority", priority: -1 }),
       updateIssue(creator.accessToken, projectId, issueId, { progressPercentage: -1 }),
+      updateIssue(creator.accessToken, projectId, issueId, { priority: -2 }),
       updateIssue(creator.accessToken, projectId, issueId, { closedReasonDescription: "No closed state" }),
     ]);
 

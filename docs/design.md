@@ -33,7 +33,6 @@ The repository currently contains:
 
 The repository does not yet contain:
 
-- DHTMLX Gantt integration
 - chart storage and chart-management APIs
 - Temporal workers or workflows
 - external ingestion integrations
@@ -216,6 +215,8 @@ Current responsibilities:
   teams, and organizations
 - host an authenticated project-manager SPA route at `/pm/gantt` that mounts
   a DHTMLX Gantt chart
+- host authenticated project-manager issue routes at `/pm/issues` and
+  `/pm/issue`
 - render reusable entity list items in the user lobby, with view-specific action
   affordances controlled by parent-selected render modes
 - provide reusable project, team, and organization create, edit, and summary
@@ -251,6 +252,15 @@ Current project-manager SPA interaction model:
 - the selected project is read from the `projectId` query parameter
 - the initial slice always renders sample Gantt data, even when a project id is
   present
+- `/pm/issues` is authenticated-only and lists all issues for the selected
+  project using the `projectId` query parameter
+- `/pm/issue` is authenticated-only and shows a single issue detail view using
+  `id` together with `projectId`
+- PM issue routes use reusable `IssueListItem` rows together with reusable
+  create, edit, delete, and open-detail issue buttons
+- clicking an issue row opens an issue summary modal by default
+- the issue detail page renders a summary-preview row above a detailed issue
+  card so edits can be previewed against the row presentation
 - DHTMLX Gantt is loaded from the `dhtmlx-gantt/` git submodule rather than an
   npm package
 - a hideable bottom `GanttChartControlPanel` hosts a tabset for `Both`, `Grid`,

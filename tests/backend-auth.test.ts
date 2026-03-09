@@ -16,6 +16,7 @@ import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
 import {
+  issues,
   organizations,
   organizationsTeams,
   projects,
@@ -248,6 +249,11 @@ describe("backend auth api", () => {
       .from(projects)
       .where(eq(projects.name, "Seed Fixture Team Project Managed Project"))
       .get();
+    const directProjectManagerProject = databaseService.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.name, "Seed Fixture Direct Project Managed Project"))
+      .get();
 
     expect(
       databaseService.db
@@ -333,6 +339,27 @@ describe("backend auth api", () => {
         .where(eq(projectsTeams.projectId, teamProjectManagerProject!.id))
         .all(),
     ).toHaveLength(1);
+    expect(
+      databaseService.db
+        .select()
+        .from(issues)
+        .where(eq(issues.projectId, organizationProjectManagerProject!.id))
+        .all(),
+    ).not.toHaveLength(0);
+    expect(
+      databaseService.db
+        .select()
+        .from(issues)
+        .where(eq(issues.projectId, directProjectManagerProject!.id))
+        .all(),
+    ).not.toHaveLength(0);
+    expect(
+      databaseService.db
+        .select()
+        .from(issues)
+        .where(eq(issues.projectId, teamProjectManagerProject!.id))
+        .all(),
+    ).not.toHaveLength(0);
     expect(
       databaseService.db
         .select()

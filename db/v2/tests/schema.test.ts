@@ -140,10 +140,12 @@ describe("auth and access v2 zod schemas", () => {
   it("accepts an issue insert payload", () => {
     const issue = issuesInsertSchema.parse({
       name: "Broken upload flow",
+      priority: 2,
       projectId: 7,
       status: issueStatusCodes.open,
     });
 
+    expect(issue.priority).toBe(2);
     expect(issue.projectId).toBe(7);
     expect(issue.status).toBe(issueStatusCodes.open);
   });

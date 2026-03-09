@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authApi } from "./common/session/api/auth-api.js";
 import { authTokenStorage } from "./common/session/storage/auth-token-storage.js";
 import { lobbyApi } from "./lobby/api/lobby-api.js";
+import { issuesApi } from "./spas/project-manager/api/issues-api.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
 
@@ -69,9 +70,20 @@ vi.mock("./lobby/api/lobby-api.js", () => ({
   },
 }));
 
+vi.mock("./spas/project-manager/api/issues-api.js", () => ({
+  issuesApi: {
+    createIssue: vi.fn(),
+    deleteIssue: vi.fn(),
+    getIssue: vi.fn(),
+    listIssues: vi.fn(),
+    updateIssue: vi.fn(),
+  },
+}));
+
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
 const lobbyApiMock = vi.mocked(lobbyApi);
+const issuesApiMock = vi.mocked(issuesApi);
 
 function createAuthenticatedResponse() {
   return {
@@ -100,6 +112,40 @@ describe("app routing", () => {
     lobbyApiMock.listOrganizations.mockResolvedValue({ organizations: [] });
     lobbyApiMock.listProjects.mockResolvedValue({ projects: [] });
     lobbyApiMock.listTeams.mockResolvedValue({ teams: [] });
+    issuesApiMock.getIssue.mockResolvedValue({
+      issue: {
+        closedAt: null,
+        closedReason: null,
+        closedReasonDescription: null,
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Issue description",
+        id: 7,
+        journal: "Issue journal",
+        name: "Issue 7",
+        openedAt: "2026-03-08T00:00:00.000Z",
+        progressPercentage: 15,
+        projectId: 42,
+        status: "ISSUE_STATUS_OPEN",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      },
+    });
+    issuesApiMock.listIssues.mockResolvedValue({
+      issues: [{
+        closedAt: null,
+        closedReason: null,
+        closedReasonDescription: null,
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Issue description",
+        id: 7,
+        journal: "Issue journal",
+        name: "Issue 7",
+        openedAt: "2026-03-08T00:00:00.000Z",
+        progressPercentage: 15,
+        projectId: 42,
+        status: "ISSUE_STATUS_OPEN",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      }],
+    });
   });
 
   afterEach(() => {
@@ -219,5 +265,41 @@ describe("app routing", () => {
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
     expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
+  });
+
+  it("redirects unauthenticated PM issues requests to the public home route", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/issues?projectId=42"],
+    });
+
+    expect(
+      await screen.findByText("Giganttic, built by LatentPrion"),
+    ).toBeVisible();
+  });
+
+  it("renders the PM issues SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/issues?projectId=42"],
+    });
+
+    expect(await screen.findByText("Project Issues")).toBeVisible();
+    expect(screen.getByText("Selected project: 42")).toBeVisible();
+    expect(await screen.findByText("Issue 7")).toBeVisible();
+  });
+
+  it("renders the PM issue detail SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/issue?id=7&projectId=42"],
+    });
+
+    expect(await screen.findByText("Issue Detail")).toBeVisible();
+    expect(screen.getByText("Selected issue: 7")).toBeVisible();
+    expect(await screen.findByText("Detailed Issue View")).toBeVisible();
   });
 });
