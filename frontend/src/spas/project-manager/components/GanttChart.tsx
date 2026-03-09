@@ -11,8 +11,31 @@ interface GanttChartProps {
 
 const GANTT_CONTAINER_MIN_HEIGHT = 520;
 const GANTT_DATE_FORMAT = "%Y-%m-%d %H:%i";
+const GANTT_DURATION_COLUMN_WIDTH = 100;
 const GANTT_NAME_COLUMN_WIDTH = 220;
+const GANTT_START_COLUMN_WIDTH = 120;
 const GANTT_SURFACE_BACKGROUND = "#ffffff";
+const GANTT_GRID_PADDING_WIDTH = 32;
+const GANTT_HORIZONTAL_SCROLLBAR_HEIGHT = 20;
+const GANTT_LAYOUT_CSS_CLASS = "gantt_container";
+const GANTT_TIMELINE_GRAVITY = 2;
+const GANTT_GRID_WIDTH =
+  GANTT_NAME_COLUMN_WIDTH + GANTT_START_COLUMN_WIDTH + GANTT_DURATION_COLUMN_WIDTH
+  + GANTT_GRID_PADDING_WIDTH;
+
+interface GanttLayoutCell {
+  cols?: GanttLayoutCell[];
+  css?: string;
+  gravity?: number;
+  height?: number;
+  id?: string;
+  resizer?: boolean;
+  rows?: GanttLayoutCell[];
+  scrollX?: string;
+  scrollY?: string;
+  view?: string;
+  width?: number;
+}
 
 function configureBaseGantt(ganttInstance: ReturnType<typeof getDhtmlxGantt>) {
   ganttInstance.config.columns = [
@@ -26,14 +49,119 @@ function configureBaseGantt(ganttInstance: ReturnType<typeof getDhtmlxGantt>) {
       align: "center",
       label: "Start",
       name: "start_date",
+      width: GANTT_START_COLUMN_WIDTH,
     },
     {
       align: "center",
       label: "Duration",
       name: "duration",
+      width: GANTT_DURATION_COLUMN_WIDTH,
     },
   ];
   ganttInstance.config.date_format = GANTT_DATE_FORMAT;
+  ganttInstance.config.grid_width = GANTT_GRID_WIDTH;
+  ganttInstance.config.keep_grid_width = true;
+}
+
+function createBothModeLayout(): GanttLayoutCell {
+  return {
+    css: GANTT_LAYOUT_CSS_CLASS,
+    rows: [
+      {
+        cols: [
+          {
+            view: "grid",
+            width: GANTT_GRID_WIDTH,
+            scrollX: "scrollHor",
+            scrollY: "scrollVer",
+          },
+          {
+            resizer: true,
+            width: 1,
+          },
+          {
+            gravity: GANTT_TIMELINE_GRAVITY,
+            view: "timeline",
+            scrollX: "scrollHor",
+            scrollY: "scrollVer",
+          },
+          {
+            id: "scrollVer",
+            view: "scrollbar",
+          },
+        ],
+      },
+      {
+        id: "scrollHor",
+        view: "scrollbar",
+        height: GANTT_HORIZONTAL_SCROLLBAR_HEIGHT,
+      },
+    ],
+  };
+}
+
+function createGridOnlyLayout(): GanttLayoutCell {
+  return {
+    css: GANTT_LAYOUT_CSS_CLASS,
+    rows: [
+      {
+        cols: [
+          {
+            view: "grid",
+            scrollX: "scrollHor",
+            scrollY: "scrollVer",
+          },
+          {
+            id: "scrollVer",
+            view: "scrollbar",
+          },
+        ],
+      },
+      {
+        id: "scrollHor",
+        view: "scrollbar",
+        height: GANTT_HORIZONTAL_SCROLLBAR_HEIGHT,
+      },
+    ],
+  };
+}
+
+function createChartOnlyLayout(): GanttLayoutCell {
+  return {
+    css: GANTT_LAYOUT_CSS_CLASS,
+    rows: [
+      {
+        cols: [
+          {
+            view: "timeline",
+            scrollX: "scrollHor",
+            scrollY: "scrollVer",
+          },
+          {
+            id: "scrollVer",
+            view: "scrollbar",
+          },
+        ],
+      },
+      {
+        id: "scrollHor",
+        view: "scrollbar",
+        height: GANTT_HORIZONTAL_SCROLLBAR_HEIGHT,
+      },
+    ],
+  };
+}
+
+function createLayoutForDisplayMode(displayMode: GanttDisplayMode): GanttLayoutCell {
+  if (displayMode === "grid") {
+    return createGridOnlyLayout();
+  }
+
+  if (displayMode === "chart") {
+    return createChartOnlyLayout();
+  }
+
+  return createBothModeLayout();
 }
 
 function initializeMountedGantt(
@@ -42,9 +170,13 @@ function initializeMountedGantt(
   displayMode: GanttDisplayMode,
 ) {
   configureBaseGantt(ganttInstance);
+  ganttInstance.config.layout = createLayoutForDisplayMode(displayMode);
+  ganttInstance.config.show_grid = displayMode !== "chart";
+  ganttInstance.config.show_chart = displayMode !== "grid";
   ganttInstance.init(containerElement);
   ganttInstance.parse(createSampleGanttData());
-  applyDisplayMode(ganttInstance, displayMode);
+  ganttInstance.render();
+  ganttInstance.setSizes();
 }
 
 function cleanupMountedGantt(
@@ -53,16 +185,6 @@ function cleanupMountedGantt(
 ) {
   ganttInstance.clearAll();
   containerElement.replaceChildren();
-}
-
-function applyDisplayMode(
-  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
-  displayMode: GanttDisplayMode,
-) {
-  ganttInstance.config.show_grid = displayMode !== "chart";
-  ganttInstance.config.show_chart = displayMode !== "grid";
-  ganttInstance.resetLayout();
-  ganttInstance.setSizes();
 }
 
 export function GanttChart(props: GanttChartProps) {
@@ -84,14 +206,6 @@ export function GanttChart(props: GanttChartProps) {
       cleanupMountedGantt(ganttInstance, containerElement);
       ganttReference.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!ganttReference.current) {
-      return;
-    }
-
-    applyDisplayMode(ganttReference.current, props.displayMode);
   }, [props.displayMode]);
 
   return (

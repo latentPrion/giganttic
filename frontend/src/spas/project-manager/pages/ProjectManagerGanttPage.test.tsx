@@ -14,12 +14,16 @@ const mockGantt = {
   config: {
     columns: [] as unknown[],
     date_format: "",
+    grid_width: 0,
+    keep_grid_width: false,
+    layout: null as unknown,
     show_chart: true,
     show_grid: true,
   },
   destructor: vi.fn(),
   init: vi.fn(),
   parse: vi.fn(),
+  render: vi.fn(),
   resetLayout: vi.fn(),
   setSizes: vi.fn(),
 };
@@ -33,11 +37,15 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.clearAll.mockReset();
     mockGantt.config.columns = [];
     mockGantt.config.date_format = "";
+    mockGantt.config.grid_width = 0;
+    mockGantt.config.keep_grid_width = false;
+    mockGantt.config.layout = null;
     mockGantt.config.show_chart = true;
     mockGantt.config.show_grid = true;
     mockGantt.destructor.mockReset();
     mockGantt.init.mockReset();
     mockGantt.parse.mockReset();
+    mockGantt.render.mockReset();
     mockGantt.resetLayout.mockReset();
     mockGantt.setSizes.mockReset();
   });
@@ -62,6 +70,7 @@ describe("ProjectManagerGanttPage", () => {
       expect(mockGantt.parse).toHaveBeenCalledTimes(1);
     });
 
+    expect(mockGantt.config.keep_grid_width).toBe(true);
     expect(mockGantt.parse.mock.calls[0]?.[0]).toMatchObject({
       data: expect.any(Array),
       links: expect.any(Array),
@@ -101,21 +110,72 @@ describe("ProjectManagerGanttPage", () => {
 
     renderWithTheme(<ProjectManagerGanttPage projectId={42} />);
 
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
     await user.click(screen.getByRole("tab", { name: "Grid" }));
 
+    expect(mockGantt.config.layout).toMatchObject({
+      rows: [
+        {
+          cols: [
+            { scrollX: "scrollHor", scrollY: "scrollVer", view: "grid" },
+            { id: "scrollVer", view: "scrollbar" },
+          ],
+        },
+        { height: 20, id: "scrollHor", view: "scrollbar" },
+      ],
+    });
     expect(mockGantt.config.show_grid).toBe(true);
     expect(mockGantt.config.show_chart).toBe(false);
+    expect(mockGantt.init).toHaveBeenCalledTimes(2);
+    expect(mockGantt.parse).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByRole("tab", { name: "Chart" }));
 
+    expect(mockGantt.config.layout).toMatchObject({
+      rows: [
+        {
+          cols: [
+            { scrollX: "scrollHor", scrollY: "scrollVer", view: "timeline" },
+            { id: "scrollVer", view: "scrollbar" },
+          ],
+        },
+        { height: 20, id: "scrollHor", view: "scrollbar" },
+      ],
+    });
     expect(mockGantt.config.show_grid).toBe(false);
     expect(mockGantt.config.show_chart).toBe(true);
+    expect(mockGantt.init).toHaveBeenCalledTimes(3);
+    expect(mockGantt.parse).toHaveBeenCalledTimes(3);
 
     await user.click(screen.getByRole("tab", { name: "Both" }));
 
+    expect(mockGantt.config.layout).toMatchObject({
+      rows: [
+        {
+          cols: [
+            { view: "grid", width: expect.any(Number) },
+            { resizer: true, width: 1 },
+            {
+              gravity: expect.any(Number),
+              scrollX: "scrollHor",
+              scrollY: "scrollVer",
+              view: "timeline",
+            },
+            { id: "scrollVer", view: "scrollbar" },
+          ],
+        },
+        { height: 20, id: "scrollHor", view: "scrollbar" },
+      ],
+    });
+    expect(mockGantt.config.grid_width).toBeGreaterThan(0);
     expect(mockGantt.config.show_grid).toBe(true);
     expect(mockGantt.config.show_chart).toBe(true);
-    expect(mockGantt.resetLayout).toHaveBeenCalled();
+    expect(mockGantt.init).toHaveBeenCalledTimes(4);
+    expect(mockGantt.parse).toHaveBeenCalledTimes(4);
+    expect(mockGantt.render).toHaveBeenCalled();
     expect(mockGantt.setSizes).toHaveBeenCalled();
   });
 
