@@ -9,6 +9,23 @@ import { lobbyApi } from "./lobby/api/lobby-api.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
 
+vi.mock("./spas/project-manager/lib/dhtmlx-gantt-adapter.js", () => ({
+  getDhtmlxGantt: () => ({
+    clearAll: vi.fn(),
+    config: {
+      columns: [],
+      date_format: "",
+      show_chart: true,
+      show_grid: true,
+    },
+    destructor: vi.fn(),
+    init: vi.fn(),
+    parse: vi.fn(),
+    resetLayout: vi.fn(),
+    setSizes: vi.fn(),
+  }),
+}));
+
 vi.mock("./common/session/api/auth-api.js", () => ({
   authApi: {
     getCurrentSession: vi.fn(),
@@ -151,5 +168,52 @@ describe("app routing", () => {
     expect(await screen.findByRole("button", { name: /^Projects$/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Teams$/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Organizations$/i })).toBeVisible();
+  });
+
+  it("redirects unauthenticated PM gantt requests to the public home route", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/gantt?projectId=42"],
+    });
+
+    expect(
+      await screen.findByText("Giganttic, built by LatentPrion"),
+    ).toBeVisible();
+  });
+
+  it("renders the PM gantt SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/gantt?projectId=42"],
+    });
+
+    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
+    expect(screen.getByText("Selected project: 42")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+  });
+
+  it("renders the PM gantt SPA with sample fallback when the project query param is invalid", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/gantt?projectId=invalid"],
+    });
+
+    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
+    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
+  });
+
+  it("renders the PM gantt SPA with sample fallback when the project query param is missing", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/gantt"],
+    });
+
+    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
+    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
   });
 });

@@ -214,6 +214,8 @@ Current responsibilities:
 - host session-aware login, registration, current-session lookup, and logout UI
 - host the normal user lobby SPA for the current user's associated projects,
   teams, and organizations
+- host an authenticated project-manager SPA route at `/pm/gantt` that mounts
+  a DHTMLX Gantt chart
 - render reusable entity list items in the user lobby, with view-specific action
   affordances controlled by parent-selected render modes
 - provide reusable project, team, and organization create, edit, and summary
@@ -225,7 +227,7 @@ Planned future responsibilities:
 
 - add a separate admin SPA for broad administrative discovery and management of
   entities outside the current user's normal associations
-- host DHTMLX Gantt
+- expand the project-manager SPA beyond the initial gantt route
 
 Current lobby interaction model:
 
@@ -242,6 +244,17 @@ Current lobby interaction model:
   deferred until matching backend routes exist
 - render future project-management views
 - communicate with the backend REST API
+
+Current project-manager SPA interaction model:
+
+- `/pm/gantt` is authenticated-only and reuses the shared app shell/header
+- the selected project is read from the `projectId` query parameter
+- the initial slice always renders sample Gantt data, even when a project id is
+  present
+- DHTMLX Gantt is loaded from the `dhtmlx-gantt/` git submodule rather than an
+  npm package
+- a hideable bottom `GanttChartControlPanel` hosts a tabset for `Both`, `Grid`,
+  and `Chart` display modes
 
 ### Temporal
 

@@ -25,6 +25,10 @@ const USER_LOBBY_ROUTES_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
   "spas/user-lobby/routes",
 );
+const PROJECT_MANAGER_ROUTES_DIRECTORY = path.resolve(
+  FRONTEND_SOURCE_DIRECTORY,
+  "spas/project-manager/routes",
+);
 const THEME_DIRECTORY = path.resolve(FRONTEND_SOURCE_DIRECTORY, "theme");
 
 function readFrontendFile(...relativeSegments: string[]) {
@@ -65,6 +69,13 @@ function readPublicHomeLayoutFile(filename: string) {
 function readUserLobbyRouteFile(filename: string) {
   return fs.readFileSync(
     path.resolve(USER_LOBBY_ROUTES_DIRECTORY, filename),
+    "utf8",
+  );
+}
+
+function readProjectManagerRouteFile(filename: string) {
+  return fs.readFileSync(
+    path.resolve(PROJECT_MANAGER_ROUTES_DIRECTORY, filename),
     "utf8",
   );
 }
@@ -123,9 +134,11 @@ describe("responsive layout contracts", () => {
     const appSource = readFrontendFile("App.tsx");
     const publicLayoutSource = readPublicHomeLayoutFile("PublicHomeLayout.tsx");
     const lobbyRouteSource = readUserLobbyRouteFile("LobbyRoute.tsx");
+    const ganttRouteSource = readProjectManagerRouteFile("GanttRoute.tsx");
 
     expect(appSource).toContain("<AppRoutes />");
     expect(publicLayoutSource).toContain("<AppShell");
     expect(lobbyRouteSource).toContain("<UserLobbyPage");
+    expect(ganttRouteSource).toContain("<ProjectManagerGanttPage");
   });
 });

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -13,6 +14,11 @@
     "noEmit": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@dhtmlx-gantt/*": [
+        "dhtmlx-gantt/codebase/*"
+      ]
+    },
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "types": [
