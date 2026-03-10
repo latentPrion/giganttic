@@ -56,12 +56,14 @@ function createProjectManagerSources(
 function createProject(overrides: Partial<{
   description: string | null;
   id: number;
+  journal: string | null;
   name: string;
 }> = {}) {
   return {
     createdAt: DEFAULT_TIMESTAMP,
     description: "Delivery pipeline",
     id: 1,
+    journal: "Project kickoff notes",
     name: "Apollo",
     updatedAt: DEFAULT_TIMESTAMP,
     ...overrides,
@@ -416,6 +418,7 @@ describe("UserLobbyPage", () => {
     await waitFor(() => {
       expect(lobbyApiMock.createProject).toHaveBeenCalledWith(TOKEN, {
         description: "Fresh project",
+        journal: null,
         name: "Zeus",
       });
     });
@@ -448,12 +451,16 @@ describe("UserLobbyPage", () => {
     const descriptionInput = screen.getByLabelText("Description");
     await user.clear(descriptionInput);
     await user.type(descriptionInput, "Updated description");
+    const journalInput = screen.getByLabelText("Journal");
+    await user.clear(journalInput);
+    await user.type(journalInput, "Updated journal");
     nameInput.focus();
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(lobbyApiMock.updateProject).toHaveBeenCalledWith(TOKEN, 1, {
         description: "Updated description",
+        journal: "Updated journal",
         name: "Apollo Prime",
       });
     });

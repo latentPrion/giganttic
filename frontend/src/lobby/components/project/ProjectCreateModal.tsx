@@ -31,17 +31,20 @@ interface ProjectCreateModalProps {
 
 interface ProjectFormState {
   description: string;
+  journal: string;
   name: string;
 }
 
 const DEFAULT_FORM_STATE: ProjectFormState = {
   description: "",
+  journal: "",
   name: "",
 };
 
 function normalizeCreatePayload(formState: ProjectFormState): CreateProjectRequest {
   return {
     description: formState.description.trim() === "" ? null : formState.description,
+    journal: formState.journal.trim() === "" ? null : formState.journal,
     name: formState.name,
   };
 }

@@ -39,6 +39,7 @@ describe("projects crud api", () => {
     accessToken: string,
     payload: {
       description?: string | null;
+      journal?: string | null;
       name: string;
     },
   ) {
@@ -93,6 +94,46 @@ describe("projects crud api", () => {
     expect(membershipRow?.userId).toBe(creator.user.id);
     expect(roleRow?.userId).toBe(creator.user.id);
     expect(roleRow?.roleCode).toBe("GGTC_PROJECTROLE_PROJECT_MANAGER");
+  });
+
+  it("persists project journal through create, get, and update", async () => {
+    const creator = await harness.registerUser("project-journal");
+    const createResponse = await createProject(creator.accessToken, {
+      description: "Delivery project",
+      journal: "Initial planning journal",
+      name: "Journal Project",
+    });
+    const { project } = harness.parseJson<{
+      project: {
+        id: number;
+        journal: string | null;
+      };
+    }>(createResponse.payload);
+
+    const getResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+    const updateResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: {
+        journal: "Updated execution journal",
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+    expect(project.journal).toBe("Initial planning journal");
+    expect(getResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ project: { journal: string | null } }>(getResponse.payload).project.journal,
+    ).toBe("Initial planning journal");
+    expect(updateResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ project: { journal: string | null } }>(updateResponse.payload).project.journal,
+    ).toBe("Updated execution journal");
   });
 
   it("rejects unauthenticated access to all project routes", async () => {

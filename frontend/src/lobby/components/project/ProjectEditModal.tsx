@@ -32,12 +32,14 @@ interface ProjectEditModalProps {
 
 interface ProjectFormState {
   description: string;
+  journal: string;
   name: string;
 }
 
 function createFormState(project: LobbyProject | null): ProjectFormState {
   return {
     description: project?.description ?? "",
+    journal: project?.journal ?? "",
     name: project?.name ?? "",
   };
 }
@@ -45,6 +47,7 @@ function createFormState(project: LobbyProject | null): ProjectFormState {
 function normalizeUpdatePayload(formState: ProjectFormState): UpdateProjectRequest {
   return {
     description: formState.description.trim() === "" ? null : formState.description,
+    journal: formState.journal.trim() === "" ? null : formState.journal,
     name: formState.name,
   };
 }

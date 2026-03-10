@@ -18,6 +18,10 @@ function createRoleLabel(roleCodes: string[]): string {
   return roleCodes.length === 0 ? "member" : roleCodes.join(", ");
 }
 
+function createJournalText(journal: string | null | undefined): string {
+  return journal ?? "No journal entries yet.";
+}
+
 export function ProjectDetailsCard(props: ProjectDetailsCardProps) {
   return (
     <Paper elevation={0} sx={{ padding: 3 }}>
@@ -28,6 +32,12 @@ export function ProjectDetailsCard(props: ProjectDetailsCardProps) {
         <Typography color="text.secondary" variant="body2">
           {props.projectResponse.project.description ?? "No description provided."}
         </Typography>
+        <Stack spacing={0.5}>
+          <Typography variant="subtitle2">Journal</Typography>
+          <Typography color="text.secondary" variant="body2">
+            {createJournalText(props.projectResponse.project.journal)}
+          </Typography>
+        </Stack>
         <Typography variant="body2">
           Project ID: {props.projectResponse.project.id}
         </Typography>

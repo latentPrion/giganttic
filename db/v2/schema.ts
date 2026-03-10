@@ -105,6 +105,7 @@ export const projects = sqliteTable("Projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description"),
+  journal: text("journal"),
   ...createTimestampColumns(),
 });
 

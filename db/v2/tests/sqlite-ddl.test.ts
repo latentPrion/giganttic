@@ -137,6 +137,16 @@ describe("generated sqlite ddl for v2", () => {
     db.close();
   });
 
+  it("creates the Projects journal column", async () => {
+    const db = await createV2Database();
+
+    const result = db.exec("PRAGMA table_info('Projects');");
+    const columnNames = result[0]?.values.map((row) => row[1]);
+
+    expect(columnNames).toContain("journal");
+    db.close();
+  });
+
   it("enforces mapping uniqueness and foreign keys", async () => {
     const db = await createV2Database();
 

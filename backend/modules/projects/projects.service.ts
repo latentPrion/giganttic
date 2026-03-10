@@ -73,11 +73,22 @@ function normalizeDescription(
   return description.trim();
 }
 
+function normalizeJournal(
+  journal: string | null | undefined,
+): string | null {
+  if (journal === undefined || journal === null) {
+    return journal ?? null;
+  }
+
+  return journal.trim();
+}
+
 function toProjectResponse(project: typeof projects.$inferSelect): ProjectResponse {
   return {
     createdAt: project.createdAt.toISOString(),
     description: project.description ?? null,
     id: project.id,
+    journal: project.journal ?? null,
     name: project.name,
     updatedAt: project.updatedAt.toISOString(),
   };
@@ -150,6 +161,7 @@ export class ProjectsService {
       const [createdProject] = tx.insert(projects)
         .values({
           description: normalizeDescription(payload.description),
+          journal: normalizeJournal(payload.journal),
           name: payload.name.trim(),
         })
         .returning({ id: projects.id })
@@ -220,6 +232,9 @@ export class ProjectsService {
           description: payload.description === undefined
             ? undefined
             : normalizeDescription(payload.description),
+          journal: payload.journal === undefined
+            ? undefined
+            : normalizeJournal(payload.journal),
           name: payload.name?.trim(),
           updatedAt: new Date(),
         })

@@ -52,6 +52,7 @@ function createProjectResponse() {
       createdAt: DEFAULT_TIMESTAMP,
       description: "Project description",
       id: 42,
+      journal: "Project execution journal",
       name: "Project 42",
       updatedAt: DEFAULT_TIMESTAMP,
     },
@@ -96,6 +97,8 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByText("Project")).toBeVisible();
     expect(await screen.findByText("Project 42")).toBeVisible();
     expect(screen.getByText("Detailed Project View")).toBeVisible();
+    expect(screen.getByText("Journal")).toBeVisible();
+    expect(screen.getByText("Project execution journal")).toBeVisible();
     expect(screen.getByText("Project Managers")).toBeVisible();
     expect(screen.getByText("Direct")).toBeVisible();
     expect(screen.getByText("Team")).toBeVisible();
@@ -115,6 +118,35 @@ describe("ProjectManagerProjectPage", () => {
     await user.click(await screen.findByRole("button", { name: "View" }));
 
     expect(await screen.findByRole("dialog", { name: "Project Summary" })).toBeVisible();
+  });
+
+  it("opens the edit modal with the journal field and submits journal updates", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+
+    const journalInput = await screen.findByLabelText("Journal");
+    expect(journalInput).toHaveValue("Project execution journal");
+    await user.clear(journalInput);
+    await user.type(journalInput, "Updated PM journal");
+    const nameInput = screen.getByLabelText("Name");
+    nameInput.focus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => {
+      expect(lobbyApiMock.updateProject).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, {
+        description: "Project description",
+        journal: "Updated PM journal",
+        name: "Project 42",
+      });
+    });
   });
 
   it("navigates between details and gantt views while preserving project id", async () => {
