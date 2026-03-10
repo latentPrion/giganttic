@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1773171095959,
+      "tag": "0000_tidy_shadow_king",
+      "breakpoints": true
+    }
+  ]
+}

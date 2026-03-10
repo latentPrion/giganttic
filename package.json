@@ -8,6 +8,8 @@
     "backend:start": "node dist/backend/main.js",
     "db:generate": "node db/generate-ddl.mjs",
     "db:generate:active": "node db/generate-ddl.mjs",
+    "db:generate:migration": "node db/generate-migration.mjs",
+    "db:generate:snapshot": "node db/generate-schema-snapshot.mjs",
     "db:create": "node db/create-db.mjs",
     "charts:development-planner": "node scripts/generate-development-planner-gantt.mjs",
     "dev": "node scripts/dev-launcher.mjs",

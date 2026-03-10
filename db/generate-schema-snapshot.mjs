@@ -1,8 +1,6 @@
-import { readFile } from "node:fs/promises";
-
 import { generateSchemaSnapshot } from "./drizzle-tooling.mjs";
 
-function parseSchemaNameFromArgs(argv) {
+function parseRequiredSchemaName(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--schema") {
       return argv[index + 1] ?? null;
@@ -12,11 +10,11 @@ function parseSchemaNameFromArgs(argv) {
   return null;
 }
 
-const config = JSON.parse(
-  await readFile(new URL("./config.json", import.meta.url), "utf8"),
-);
-const schemaName = parseSchemaNameFromArgs(process.argv.slice(2))
-  ?? config.activeSchemaVersion;
+const schemaName = parseRequiredSchemaName(process.argv.slice(2));
+
+if (!schemaName) {
+  throw new Error("Usage: node db/generate-schema-snapshot.mjs --schema <schema-name>");
+}
 
 await generateSchemaSnapshot({
   schemaName,

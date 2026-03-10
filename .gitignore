@@ -2,6 +2,7 @@ node_modules/
 coverage/
 dist/
 .vite/
+.tmp/
 *.log
 .DS_Store
 run/*.db
@@ -9,4 +10,3 @@ run/*.sqlite
 run/*.sqlite3
 /docs/3rdParty
 *.pyc
-

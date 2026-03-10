@@ -1,11 +1,26 @@
 # Database Migrations
 
-`db/v1/schema.ts` is the canonical source of truth for the current persisted model.
-Version-specific schema DDL should be generated into that schema version's
-`generated-sql-ddl/` directory rather than hand-written here.
+Each direct `db/<schema-name>/` subdirectory containing `schema.ts` is treated as a
+canonical schema snapshot, regardless of folder naming format.
 
-Migration directories follow the `<from-schema>--<to-schema>` naming rule. The repository includes:
+Each schema snapshot directory should contain:
 
-- `v1--v2/` as the placeholder for the next schema transition
+- `schema.ts`
+- `generated-sql-ddl/schema.sql`
+- `generated-drizzle-metadata/`
 
-Future migration directories should contain all SQL and helper assets required to move between those two named schema versions.
+Migration directories follow the `<from-schema>--<to-schema>` naming rule and contain
+the deliverables needed to move between those two named schema snapshots:
+
+- `pre-structural-data-migration.sql`
+- `drizzle-migrations.sql`
+- `post-structural-data-migration.sql`
+- `generated-drizzle-metadata/`
+
+Use the explicit tooling commands to refresh these artifacts:
+
+- `npm run db:generate:snapshot -- --schema <schema-name>`
+- `npm run db:generate:migration -- --from <schema-name> --to <schema-name>`
+
+The runtime DB facade only tracks the active schema version. Migration pair selection
+is always explicit via `--from` and `--to`.
