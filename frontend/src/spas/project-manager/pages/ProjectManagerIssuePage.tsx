@@ -22,6 +22,11 @@ import type {
 import { IssueDetailsCard } from "../components/issues/IssueDetailsCard.js";
 import { IssueEditModal } from "../components/issues/IssueEditModal.js";
 import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
+import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
+import {
+  createProjectIssueRoute,
+  createProjectIssuesRoute,
+} from "../routes/project-route-paths.js";
 
 interface ProjectManagerIssuePageProps {
   issueId: number | null;
@@ -92,11 +97,11 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
 
   function goBackToIssues(): void {
     if (props.projectId === null) {
-      navigate("/pm/issues");
+      navigate("/pm/project/issues");
       return;
     }
 
-    navigate(`/pm/issues?projectId=${props.projectId}`);
+    navigate(createProjectIssuesRoute(props.projectId));
   }
 
   async function handleUpdateIssue(
@@ -174,9 +179,9 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             </>
           )}
           issue={issue}
-          onNavigate={() => navigate(`/pm/issue?id=${issue.id}&projectId=${issue.projectId}`)}
-          viewMode={VIEW_MODE}
-        />
+            onNavigate={() => navigate(createProjectIssueRoute(issue.projectId, issue.id))}
+            viewMode={VIEW_MODE}
+          />
         <IssueDetailsCard issue={issue} />
       </Stack>
     );
@@ -207,6 +212,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             Selected issue: {props.issueId ?? "None"}
           </Typography>
         </Stack>
+        <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
         <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
           <Typography variant="h6">Issue detail with summary preview</Typography>
           <Button onClick={goBackToIssues} type="button" variant="outlined">

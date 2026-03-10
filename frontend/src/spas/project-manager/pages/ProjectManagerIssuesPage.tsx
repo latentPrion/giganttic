@@ -24,6 +24,8 @@ import type {
 import { IssueCreateModal } from "../components/issues/IssueCreateModal.js";
 import { IssueEditModal } from "../components/issues/IssueEditModal.js";
 import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
+import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
+import { createProjectIssueRoute } from "../routes/project-route-paths.js";
 
 interface ProjectManagerIssuesPageProps {
   projectId: number | null;
@@ -131,7 +133,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
       return;
     }
 
-    navigate(`/pm/issue?id=${issueId}&projectId=${props.projectId}`);
+    navigate(createProjectIssueRoute(props.projectId, issueId));
   }
 
   async function handleCreateIssue(payload: CreateIssueRequest): Promise<Issue> {
@@ -268,6 +270,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
             Selected project: {props.projectId ?? "None"}
           </Typography>
         </Stack>
+        <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
         <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
           <Typography variant="h6">All issues for the current project</Typography>
           <IssueCreateButton

@@ -7,6 +7,16 @@ import { ProjectManagerIssuesPage } from "./ProjectManagerIssuesPage.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
 
+const navigateMock = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 vi.mock("../api/issues-api.js", () => ({
   issuesApi: {
     createIssue: vi.fn(),
@@ -43,6 +53,7 @@ function createIssue(id = 7, overrides: Partial<Issue> = {}): Issue {
 
 describe("ProjectManagerIssuesPage", () => {
   beforeEach(() => {
+    navigateMock.mockReset();
     issuesApiMock.createIssue.mockReset();
     issuesApiMock.deleteIssue.mockReset();
     issuesApiMock.getIssue.mockReset();
@@ -97,6 +108,42 @@ describe("ProjectManagerIssuesPage", () => {
 
     expect(await screen.findByRole("dialog", { name: "Issue Summary" })).toBeVisible();
     expect(issuesApiMock.getIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the nested issue-detail route when the issue row is clicked", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /Issue 7/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issue?projectId=42&id=7");
+  });
+
+  it("uses the shared project-scoped navigation tabs", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Detail" }));
+    await user.click(screen.getByRole("tab", { name: "Gantt" }));
+
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
+  });
+
+  it("renders the missing-project fallback and disables create when no project is selected", async () => {
+    renderWithTheme(
+      <ProjectManagerIssuesPage projectId={null} token={DEFAULT_TOKEN} />,
+    );
+
+    expect(await screen.findByText("Select a valid project to view its issues.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create Issue" })).toBeDisabled();
   });
 
   it("updates an issue through the edit modal", async () => {

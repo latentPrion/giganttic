@@ -7,6 +7,7 @@ import {
 import { AboutPage } from "../home/components/AboutPage.js";
 import { ContactPage } from "../home/components/ContactPage.js";
 import { HomeHero } from "../home/components/HomeHero.js";
+import { GanttRoute } from "../spas/project-manager/routes/GanttRoute.js";
 import { IssueRoute } from "../spas/project-manager/routes/IssueRoute.js";
 import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
 import { ProjectRoute } from "../spas/project-manager/routes/ProjectRoute.js";
@@ -23,8 +24,9 @@ export function AppRoutes() {
       </Route>
       <Route element={<LobbyRoute />} path="/lobby" />
       <Route element={<ProjectRoute />} path="/pm/project" />
-      <Route element={<IssuesRoute />} path="/pm/issues" />
-      <Route element={<IssueRoute />} path="/pm/issue" />
+      <Route element={<GanttRoute />} path="/pm/project/gantt" />
+      <Route element={<IssuesRoute />} path="/pm/project/issues" />
+      <Route element={<IssueRoute />} path="/pm/project/issue" />
     </Routes>
   );
 }

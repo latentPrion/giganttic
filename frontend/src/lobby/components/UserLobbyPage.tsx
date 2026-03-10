@@ -376,7 +376,7 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
   }
 
   function navigateToProject(projectId: number): void {
-    navigate(`/pm/project?projectId=${projectId}&view=detail`);
+    navigate(`/pm/project?projectId=${projectId}`);
   }
 
   function openTeamSummaryModal(teamId: number): void {

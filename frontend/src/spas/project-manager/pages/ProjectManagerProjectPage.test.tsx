@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
@@ -10,29 +7,6 @@ import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { ProjectManagerProjectPage } from "./ProjectManagerProjectPage.js";
 
 const navigateMock = vi.fn();
-const mockRepoChartSource = {
-  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Repo chart task]]></task></data>",
-  type: "xml" as const,
-};
-const mockGantt = {
-  clearAll: vi.fn(),
-  config: {
-    columns: [] as unknown[],
-    date_format: "",
-    grid_width: 0,
-    keep_grid_width: false,
-    layout: null as unknown,
-    show_chart: true,
-    show_grid: true,
-  },
-  destructor: vi.fn(),
-  init: vi.fn(),
-  parse: vi.fn(),
-  render: vi.fn(),
-  resetLayout: vi.fn(),
-  setSizes: vi.fn(),
-};
-
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
@@ -47,14 +21,6 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
     getProject: vi.fn(),
     updateProject: vi.fn(),
   },
-}));
-
-vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
-  getDhtmlxGantt: () => mockGantt,
-}));
-
-vi.mock("../data/repo-gantt-chart-source.js", () => ({
-  getRepoGanttChartSource: vi.fn(),
 }));
 
 const lobbyApiMock = vi.mocked(lobbyApi);
@@ -84,14 +50,6 @@ describe("ProjectManagerProjectPage", () => {
     lobbyApiMock.deleteProject.mockReset();
     lobbyApiMock.getProject.mockReset();
     lobbyApiMock.updateProject.mockReset();
-    mockGantt.clearAll.mockReset();
-    mockGantt.init.mockReset();
-    mockGantt.parse.mockReset();
-    mockGantt.render.mockReset();
-    mockGantt.setSizes.mockReset();
-    const ganttData = await import("../data/repo-gantt-chart-source.js");
-    vi.mocked(ganttData.getRepoGanttChartSource).mockReset();
-    vi.mocked(ganttData.getRepoGanttChartSource).mockReturnValue(mockRepoChartSource);
     lobbyApiMock.getProject.mockResolvedValue(createProjectResponse());
     lobbyApiMock.updateProject.mockResolvedValue({
       project: {
@@ -106,7 +64,6 @@ describe("ProjectManagerProjectPage", () => {
       <ProjectManagerProjectPage
         projectId={42}
         token={DEFAULT_TOKEN}
-        viewMode="detail"
       />,
     );
 
@@ -123,30 +80,12 @@ describe("ProjectManagerProjectPage", () => {
       <ProjectManagerProjectPage
         projectId={42}
         token={DEFAULT_TOKEN}
-        viewMode="detail"
       />,
     );
 
     await user.click(await screen.findByRole("button", { name: "View" }));
 
     expect(await screen.findByRole("dialog", { name: "Project Summary" })).toBeVisible();
-  });
-
-  it("renders the gantt view for the selected project", async () => {
-    renderWithTheme(
-      <ProjectManagerProjectPage
-        projectId={42}
-        token={DEFAULT_TOKEN}
-        viewMode="gantt"
-      />,
-    );
-
-    expect(await screen.findByText("Project")).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
-
-    await waitFor(() => {
-      expect(mockGantt.init).toHaveBeenCalledTimes(1);
-    });
   });
 
   it("navigates between detail and gantt views while preserving project id", async () => {
@@ -156,27 +95,26 @@ describe("ProjectManagerProjectPage", () => {
       <ProjectManagerProjectPage
         projectId={42}
         token={DEFAULT_TOKEN}
-        viewMode="detail"
       />,
     );
 
     await user.click(await screen.findByRole("tab", { name: "Gantt" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=42&view=gantt");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
   });
 
-  it("shows a clear message when the project chart file is missing", async () => {
-    const ganttData = await import("../data/repo-gantt-chart-source.js");
-    vi.mocked(ganttData.getRepoGanttChartSource).mockReturnValue(null);
+  it("navigates to the issues route while preserving project id", async () => {
+    const user = userEvent.setup();
 
     renderWithTheme(
       <ProjectManagerProjectPage
         projectId={42}
         token={DEFAULT_TOKEN}
-        viewMode="gantt"
       />,
     );
 
-    expect(await screen.findByText("No gantt chart file exists for this project yet.")).toBeVisible();
+    await user.click(await screen.findByRole("tab", { name: "Issues" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
   });
 });

@@ -8,6 +8,7 @@ import {
 
 import { GanttChart } from "../components/GanttChart.js";
 import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js";
+import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { getRepoGanttChartSource } from "../data/repo-gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
@@ -90,6 +91,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             Selected project: {createSelectedProjectLabel(props.projectId)}
           </Typography>
         </Stack>
+        <ProjectManagerProjectNavigation currentSection="gantt" projectId={props.projectId} />
         {renderGanttContainer(
           chartSource,
           displayMode,

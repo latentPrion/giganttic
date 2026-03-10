@@ -238,7 +238,7 @@ describe("app routing", () => {
 
   it("redirects unauthenticated PM project requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=1&view=gantt"],
+      initialEntries: ["/pm/project?projectId=1"],
     });
 
     expect(
@@ -251,7 +251,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=1&view=detail"],
+      initialEntries: ["/pm/project?projectId=1"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -264,10 +264,10 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=1&view=gantt"],
+      initialEntries: ["/pm/project/gantt?projectId=1"],
     });
 
-    expect(await screen.findByText("Project")).toBeVisible();
+    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
     expect(screen.getByText("Selected project: 1")).toBeVisible();
     expect(await screen.findByRole("tab", { name: "Both" })).toBeVisible();
   });
@@ -277,7 +277,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=invalid&view=gantt"],
+      initialEntries: ["/pm/project?projectId=invalid"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -298,7 +298,7 @@ describe("app routing", () => {
 
   it("redirects unauthenticated PM issues requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/issues?projectId=42"],
+      initialEntries: ["/pm/project/issues?projectId=42"],
     });
 
     expect(
@@ -311,7 +311,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/issues?projectId=42"],
+      initialEntries: ["/pm/project/issues?projectId=42"],
     });
 
     expect(await screen.findByText("Project Issues")).toBeVisible();
@@ -319,16 +319,62 @@ describe("app routing", () => {
     expect(await screen.findByText("Issue 7")).toBeVisible();
   });
 
+  it("redirects unauthenticated PM issue-detail requests to the public home route", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/issue?id=7&projectId=42"],
+    });
+
+    expect(
+      await screen.findByText("Giganttic, built by LatentPrion"),
+    ).toBeVisible();
+  });
+
   it("renders the PM issue detail SPA for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/issue?id=7&projectId=42"],
+      initialEntries: ["/pm/project/issue?id=7&projectId=42"],
     });
 
     expect(await screen.findByText("Issue Detail")).toBeVisible();
     expect(screen.getByText("Selected issue: 7")).toBeVisible();
     expect(await screen.findByText("Detailed Issue View")).toBeVisible();
+  });
+
+  it("renders a safe fallback when the PM gantt route is missing projectId", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/gantt"],
+    });
+
+    expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
+    expect(screen.getByText("No gantt chart file exists for this project yet.")).toBeVisible();
+  });
+
+  it("renders a safe fallback when the PM issues route is missing projectId", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/issues"],
+    });
+
+    expect(await screen.findByText("Project Issues")).toBeVisible();
+    expect(screen.getByText("Select a valid project to view its issues.")).toBeVisible();
+  });
+
+  it("renders a safe fallback when the PM issue-detail route is missing issue id", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/issue?projectId=42"],
+    });
+
+    expect(await screen.findByText("Issue Detail")).toBeVisible();
+    expect(screen.getByText("Provide both a valid issue id and projectId to view an issue.")).toBeVisible();
   });
 });

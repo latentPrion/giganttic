@@ -213,10 +213,8 @@ Current responsibilities:
 - host session-aware login, registration, current-session lookup, and logout UI
 - host the normal user lobby SPA for the current user's associated projects,
   teams, and organizations
-- host an authenticated project-manager SPA route at `/pm/project` with
-  project-specific `detail` and `gantt` views
-- host authenticated project-manager issue routes at `/pm/issues` and
-  `/pm/issue`
+- host authenticated project-manager routes at `/pm/project`,
+  `/pm/project/gantt`, `/pm/project/issues`, and `/pm/project/issue`
 - render reusable entity list items in the user lobby, with view-specific action
   affordances controlled by parent-selected render modes
 - provide reusable project, team, and organization create, edit, and summary
@@ -251,17 +249,19 @@ Current project-manager SPA interaction model:
 
 - `/pm/project` is authenticated-only and reuses the shared app shell/header
 - the selected project is read from the `projectId` query parameter
-- `/pm/project?view=detail` shows the selected project entity in detail
-- `/pm/project?view=gantt` shows the selected project's gantt chart
+- `/pm/project?projectId=...` shows the selected project entity in detail
+- `/pm/project/gantt?projectId=...` shows the selected project's gantt chart
 - the gantt view loads XML from `charts/<projectId>.xml`
-- `/pm/issues` is authenticated-only and lists all issues for the selected
-  project using the `projectId` query parameter
-- `/pm/issue` is authenticated-only and shows a single issue detail view using
-  `id` together with `projectId`
+- `/pm/project/issues?projectId=...` is authenticated-only and lists all
+  issues for the selected project
+- `/pm/project/issue?projectId=...&id=...` is authenticated-only and shows a
+  single issue detail view
 - PM issue routes use reusable `IssueListItem` rows together with reusable
   create, edit, delete, and open-detail issue buttons
 - clicking an issue row navigates to the issue detail route
 - issue summary modals are opened from the reusable `View` button
+- all project-scoped PM pages show shared route-based navigation among detail,
+  gantt, and issues
 - the issue detail page renders a summary-preview row above a detailed issue
   card so edits can be previewed against the row presentation
 - DHTMLX Gantt is loaded from the `dhtmlx-gantt/` git submodule rather than an

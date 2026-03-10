@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { issues, projectsTeams } from "../db/index.js";
+import { issues, projects, projectsTeams } from "../db/index.js";
 import {
   MISSING_ENTITY_ID,
   createCrudTestHarness,
@@ -119,6 +119,21 @@ describe("issues crud api", () => {
 
   afterAll(async () => {
     await harness.cleanup();
+  });
+
+  it("seeds sample issues with priority for every initially seeded project", () => {
+    const seededProjects = harness.databaseService.db.select().from(projects).all();
+    const seededIssues = harness.databaseService.db.select().from(issues).all();
+    const issueProjectIds = new Set(seededIssues.map((issue) => issue.projectId));
+
+    expect(seededProjects.length).toBeGreaterThan(0);
+    expect(seededIssues.length).toBeGreaterThan(0);
+
+    for (const project of seededProjects) {
+      expect(issueProjectIds.has(project.id)).toBe(true);
+    }
+
+    expect(seededIssues.some((issue) => issue.priority > 0)).toBe(true);
   });
 
   it("rejects unauthenticated access to all issue routes", async () => {
@@ -532,6 +547,48 @@ describe("issues crud api", () => {
     expect(Number.isNaN(Date.parse(body.issue.createdAt))).toBe(false);
     expect(Number.isNaN(Date.parse(body.issue.openedAt))).toBe(false);
     expect(Number.isNaN(Date.parse(body.issue.updatedAt))).toBe(false);
+  });
+
+  it("persists priority changes through update and subsequent get and list calls", async () => {
+    const creator = await harness.registerUser("issue-priority-persist");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Priority Persist Project" })).payload,
+    ).project.id;
+    const issueId = harness.parseJson<{ issue: { id: number } }>(
+      (await createIssue(creator.accessToken, projectId, {
+        name: "Priority issue",
+        priority: 1,
+      })).payload,
+    ).issue.id;
+
+    const updateResponse = await updateIssue(creator.accessToken, projectId, issueId, {
+      priority: 9,
+      progressPercentage: 55,
+    });
+    const getResponse = await getIssue(creator.accessToken, projectId, issueId);
+    const listResponse = await listIssues(creator.accessToken, projectId);
+
+    expect(updateResponse.statusCode).toBe(200);
+    expect(getResponse.statusCode).toBe(200);
+    expect(listResponse.statusCode).toBe(200);
+
+    const updateBody = harness.parseJson<{
+      issue: { priority: number; progressPercentage: number };
+    }>(updateResponse.payload);
+    const getBody = harness.parseJson<{
+      issue: { priority: number; progressPercentage: number };
+    }>(getResponse.payload);
+    const listBody = harness.parseJson<{
+      issues: Array<{ id: number; priority: number; progressPercentage: number }>;
+    }>(listResponse.payload);
+    const listedIssue = listBody.issues.find((issue) => issue.id === issueId);
+
+    expect(updateBody.issue.priority).toBe(9);
+    expect(updateBody.issue.progressPercentage).toBe(55);
+    expect(getBody.issue.priority).toBe(9);
+    expect(getBody.issue.progressPercentage).toBe(55);
+    expect(listedIssue?.priority).toBe(9);
+    expect(listedIssue?.progressPercentage).toBe(55);
   });
 
   it("clears closed-only fields when updating a closed issue back to open or blocked", async () => {

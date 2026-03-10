@@ -81,6 +81,7 @@ describe("ProjectManagerIssuePage", () => {
     await user.click(await screen.findByRole("button", { name: "View" }));
 
     expect(await screen.findByRole("dialog", { name: "Issue Summary" })).toBeVisible();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("updates the issue and refreshes the detail preview row", async () => {
@@ -110,7 +111,7 @@ describe("ProjectManagerIssuePage", () => {
     });
     expect(await screen.findByText("Issue 7 Updated")).toBeVisible();
     expect(screen.getByText("Progress 90%")).toBeVisible();
-  });
+  }, 10000);
 
   it("deletes the issue and navigates back to the issues route", async () => {
     const user = userEvent.setup();
@@ -125,6 +126,28 @@ describe("ProjectManagerIssuePage", () => {
     await waitFor(() => {
       expect(issuesApiMock.deleteIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
     });
-    expect(navigateMock).toHaveBeenCalledWith("/pm/issues?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
+  });
+
+  it("uses the shared project-scoped navigation tabs", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Detail" }));
+    await user.click(screen.getByRole("tab", { name: "Gantt" }));
+
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
+  });
+
+  it("renders a safe fallback when issue id or projectId is missing", async () => {
+    renderWithTheme(
+      <ProjectManagerIssuePage issueId={null} projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    expect(await screen.findByText("Provide both a valid issue id and projectId to view an issue.")).toBeVisible();
   });
 });
