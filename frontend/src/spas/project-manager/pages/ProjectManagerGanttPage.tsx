@@ -84,6 +84,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
+          <ProjectManagerProjectNavigation currentSection="gantt" projectId={props.projectId} />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>
@@ -91,7 +92,6 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             Selected project: {createSelectedProjectLabel(props.projectId)}
           </Typography>
         </Stack>
-        <ProjectManagerProjectNavigation currentSection="gantt" projectId={props.projectId} />
         {renderGanttContainer(
           chartSource,
           displayMode,

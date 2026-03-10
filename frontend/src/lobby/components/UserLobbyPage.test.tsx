@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../common/api/api-error.js";
 import { renderWithTheme } from "../../test/render-with-theme.js";
 import { lobbyApi } from "../api/lobby-api.js";
+import type { ProjectManagerSource } from "../contracts/lobby.contracts.js";
 import { UserLobbyPage } from "./UserLobbyPage.js";
 
 const navigateMock = vi.fn();
@@ -45,6 +46,13 @@ const CURRENT_USER_ID = 101;
 const TOKEN = "demo-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 const LOBBY_ERROR_MESSAGE = "Unable to load your lobby right now.";
+
+function createProjectManagerSources(
+  ...sourceKinds: ProjectManagerSource[]
+): ProjectManagerSource[] {
+  return [...sourceKinds];
+}
+
 function createProject(overrides: Partial<{
   description: string | null;
   id: number;
@@ -79,7 +87,14 @@ function createProjectDetailResponse(overrides: Partial<{
     userId: number;
     username: string;
   }>;
+  organizations: ReturnType<typeof createOrganization>[];
   project: ReturnType<typeof createProject>;
+  projectManagers: Array<{
+    sourceKinds: Array<"direct" | "org" | "team">;
+    userId: number;
+    username: string;
+  }>;
+  teams: ReturnType<typeof createTeam>[];
 }> = {}) {
   return {
     members: [
@@ -90,7 +105,14 @@ function createProjectDetailResponse(overrides: Partial<{
         username: "reviewer",
       }),
     ],
+    organizations: [createOrganization()],
     project: createProject(),
+    projectManagers: [{
+      sourceKinds: createProjectManagerSources("direct"),
+      userId: CURRENT_USER_ID,
+      username: "demo-user",
+    }],
+    teams: [createTeam()],
     ...overrides,
   };
 }

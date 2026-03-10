@@ -9,9 +9,11 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
   issues,
+  organizations,
   projects,
   projectsTeams,
   projectsUsers,
+  teams,
   teamsUsers,
   users,
   usersProjectsProjectRoles,
@@ -27,7 +29,9 @@ import {
   listDirectProjectManagerUserIds,
   listEffectiveProjectManagerUserIds,
   listIndirectProjectManagerUserIds,
+  listOrganizationIdsForProject,
   listOrganizationProjectManagerUserIdsForProject,
+  listTeamIdsForProject,
   PROJECT_MANAGER_ROLE_CODE,
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
@@ -38,8 +42,12 @@ import type {
   GetProjectResponse,
   ListProjectsResponse,
   ProjectMember,
+  ProjectManager,
+  ProjectManagerSource,
+  ProjectOrganization,
   ProjectResponse,
   ProjectRoleAssignmentRequest,
+  ProjectTeam,
   UpdateProjectMembershipRequest,
   UpdateProjectMembershipResponse,
   UpdateProjectRequest,
@@ -72,6 +80,28 @@ function toProjectResponse(project: typeof projects.$inferSelect): ProjectRespon
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt.toISOString(),
+  };
+}
+
+function toProjectTeamResponse(team: typeof teams.$inferSelect): ProjectTeam {
+  return {
+    createdAt: team.createdAt.toISOString(),
+    description: team.description ?? null,
+    id: team.id,
+    name: team.name,
+    updatedAt: team.updatedAt.toISOString(),
+  };
+}
+
+function toProjectOrganizationResponse(
+  organization: typeof organizations.$inferSelect,
+): ProjectOrganization {
+  return {
+    createdAt: organization.createdAt.toISOString(),
+    description: organization.description ?? null,
+    id: organization.id,
+    name: organization.name,
+    updatedAt: organization.updatedAt.toISOString(),
   };
 }
 
@@ -169,7 +199,10 @@ export class ProjectsService {
 
     return {
       members: this.listProjectMembers(projectId),
+      organizations: this.listProjectOrganizations(projectId),
       project: this.getProjectRecordByIdOrThrow(projectId),
+      projectManagers: this.listProjectManagers(projectId),
+      teams: this.listProjectTeams(projectId),
     };
   }
 
@@ -644,5 +677,103 @@ export class ProjectsService {
       userId: member.userId,
       username: member.username,
     }));
+  }
+
+  private listProjectManagers(projectId: number): ProjectManager[] {
+    const directManagerIds = new Set(
+      listDirectProjectManagerUserIds(this.databaseService.db, projectId),
+    );
+    const teamManagerIds = new Set(
+      listIndirectProjectManagerUserIds(this.databaseService.db, projectId),
+    );
+    const organizationManagerIds = new Set(
+      listOrganizationProjectManagerUserIdsForProject(
+        this.databaseService.db,
+        projectId,
+      ),
+    );
+    const effectiveManagerIds = listEffectiveProjectManagerUserIds(
+      this.databaseService.db,
+      projectId,
+    );
+
+    if (effectiveManagerIds.length === 0) {
+      return [];
+    }
+
+    const userRows = this.databaseService.db
+      .select({
+        userId: users.id,
+        username: users.username,
+      })
+      .from(users)
+      .where(inArray(users.id, effectiveManagerIds))
+      .orderBy(asc(users.id))
+      .all();
+
+    return userRows.map((userRow) => ({
+      sourceKinds: this.createProjectManagerSourceKinds(
+        userRow.userId,
+        directManagerIds,
+        teamManagerIds,
+        organizationManagerIds,
+      ),
+      userId: userRow.userId,
+      username: userRow.username,
+    }));
+  }
+
+  private createProjectManagerSourceKinds(
+    userId: number,
+    directManagerIds: ReadonlySet<number>,
+    teamManagerIds: ReadonlySet<number>,
+    organizationManagerIds: ReadonlySet<number>,
+  ): ProjectManagerSource[] {
+    const sourceKinds: ProjectManagerSource[] = [];
+
+    if (directManagerIds.has(userId)) {
+      sourceKinds.push("direct");
+    }
+    if (teamManagerIds.has(userId)) {
+      sourceKinds.push("team");
+    }
+    if (organizationManagerIds.has(userId)) {
+      sourceKinds.push("org");
+    }
+
+    return sourceKinds;
+  }
+
+  private listProjectTeams(projectId: number): ProjectTeam[] {
+    const teamIds = listTeamIdsForProject(this.databaseService.db, projectId);
+    if (teamIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select()
+      .from(teams)
+      .where(inArray(teams.id, teamIds))
+      .orderBy(asc(teams.id))
+      .all()
+      .map(toProjectTeamResponse);
+  }
+
+  private listProjectOrganizations(projectId: number): ProjectOrganization[] {
+    const organizationIds = listOrganizationIdsForProject(
+      this.databaseService.db,
+      projectId,
+    );
+    if (organizationIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select()
+      .from(organizations)
+      .where(inArray(organizations.id, organizationIds))
+      .orderBy(asc(organizations.id))
+      .all()
+      .map(toProjectOrganizationResponse);
   }
 }

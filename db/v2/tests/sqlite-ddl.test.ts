@@ -157,6 +157,9 @@ describe("generated sqlite ddl for v2", () => {
       "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_OPEN', 'Open');",
     );
     db.exec(
+      "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_IN_PROGRESS', 'In Progress');",
+    );
+    db.exec(
       "INSERT INTO ClosedReasons (code, displayName) VALUES ('ISSUE_CLOSED_REASON_RESOLVED', 'Resolved');",
     );
 
@@ -204,6 +207,9 @@ describe("generated sqlite ddl for v2", () => {
 
     db.exec(
       "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_OPEN', 'Open');",
+    );
+    db.exec(
+      "INSERT INTO IssueStatuses (code, displayName) VALUES ('ISSUE_STATUS_IN_PROGRESS', 'In Progress');",
     );
     db.exec("INSERT INTO Projects (id, name) VALUES (1, 'Apollo');");
     db.exec(

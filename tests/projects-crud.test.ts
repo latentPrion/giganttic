@@ -7,6 +7,8 @@ import {
   projectsOrganizations,
   projectsTeams,
   projectsUsers,
+  usersOrganizations,
+  usersOrganizationsOrganizationRoles,
   usersProjectsProjectRoles,
   usersSessions,
 } from "../db/index.js";
@@ -45,6 +47,14 @@ describe("projects crud api", () => {
       method: "POST",
       payload,
       url: "/stc-proj-mgmt/api/projects",
+    });
+  }
+
+  function getProject(accessToken: string, projectId: number) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}`,
     });
   }
 
@@ -245,6 +255,271 @@ describe("projects crud api", () => {
     expect(teamMemberGet.statusCode).toBe(200);
     expect(outsiderGet.statusCode).toBe(403);
     expect(adminGet.statusCode).toBe(200);
+  });
+
+  it("returns effective project managers plus linked teams and direct or indirect organizations", async () => {
+    const creator = await harness.registerUser("project-detail-creator");
+    const teamManager = await harness.registerUser("project-detail-team-manager");
+    const organizationManager = await harness.registerUser("project-detail-org-manager");
+
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Project Detail Payload" })).payload,
+    ).project.id;
+    const teamId = harness.parseJson<{ team: { id: number } }>(
+      (await createTeam(creator.accessToken, { name: "Project Detail Team" })).payload,
+    ).team.id;
+
+    const directOrganizationId = harness.parseJson<{ organization: { id: number } }>(
+      (
+        await harness.app.inject({
+          headers: harness.createAuthHeaders(creator.accessToken),
+          method: "POST",
+          payload: { name: "Project Detail Direct Org" },
+          url: "/stc-proj-mgmt/api/organizations",
+        })
+      ).payload,
+    ).organization.id;
+    const indirectOrganizationId = harness.parseJson<{ organization: { id: number } }>(
+      (
+        await harness.app.inject({
+          headers: harness.createAuthHeaders(creator.accessToken),
+          method: "POST",
+          payload: { name: "Project Detail Indirect Org" },
+          url: "/stc-proj-mgmt/api/organizations",
+        })
+      ).payload,
+    ).organization.id;
+
+    const teamMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"],
+            userId: teamManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${teamId}/members`,
+    });
+
+    expect(teamMembershipResponse.statusCode).toBe(200);
+
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId,
+      teamId,
+    }).run();
+    harness.databaseService.db.insert(projectsOrganizations).values({
+      organizationId: directOrganizationId,
+      projectId,
+    }).run();
+    harness.databaseService.db.insert(organizationsTeams).values({
+      organizationId: indirectOrganizationId,
+      teamId,
+    }).run();
+    harness.databaseService.db.insert(usersOrganizations).values({
+      organizationId: directOrganizationId,
+      userId: organizationManager.user.id,
+    }).run();
+    harness.databaseService.db.insert(usersOrganizationsOrganizationRoles).values({
+      organizationId: directOrganizationId,
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: organizationManager.user.id,
+    }).run();
+    await harness.databaseService.persist();
+
+    const response = await getProject(creator.accessToken, projectId);
+    const body = harness.parseJson<{
+      organizations: Array<{ id: number }>;
+      projectManagers: Array<{ sourceKinds: string[]; userId: number; username: string }>;
+      teams: Array<{ id: number }>;
+    }>(response.payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.projectManagers).toEqual([
+      {
+        sourceKinds: ["direct"],
+        userId: creator.user.id,
+        username: creator.user.username,
+      },
+      {
+        sourceKinds: ["team"],
+        userId: teamManager.user.id,
+        username: teamManager.user.username,
+      },
+      {
+        sourceKinds: ["org"],
+        userId: organizationManager.user.id,
+        username: organizationManager.user.username,
+      },
+    ]);
+    expect(body.teams.map((team) => team.id)).toEqual([teamId]);
+    expect(body.organizations.map((organization) => organization.id)).toEqual([
+      directOrganizationId,
+      indirectOrganizationId,
+    ]);
+  });
+
+  it("deduplicates project managers and organizations while combining mixed source kinds in stable order", async () => {
+    const creator = await harness.registerUser("project-mixed-source-creator");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Mixed Source Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+    const sharedManager = await harness.registerUser("project-mixed-source-shared-manager");
+    const secondManager = await harness.registerUser("project-mixed-source-second-manager");
+
+    const lowIdTeamResponse = await createTeam(creator.accessToken, {
+      name: "A Team",
+    });
+    const highIdTeamResponse = await createTeam(creator.accessToken, {
+      name: "B Team",
+    });
+    const lowIdTeam = harness.parseJson<{ team: { id: number } }>(lowIdTeamResponse.payload).team;
+    const highIdTeam = harness.parseJson<{ team: { id: number } }>(highIdTeamResponse.payload).team;
+
+    const directOrgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Direct Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const indirectOrgResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Indirect Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const directOrganizationId = harness.parseJson<{ organization: { id: number } }>(
+      directOrgResponse.payload,
+    ).organization.id;
+    const indirectOrganizationId = harness.parseJson<{ organization: { id: number } }>(
+      indirectOrgResponse.payload,
+    ).organization.id;
+
+    const lowTeamMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"],
+            userId: sharedManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${lowIdTeam.id}/members`,
+    });
+    const highTeamMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"],
+            userId: secondManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${highIdTeam.id}/members`,
+    });
+
+    expect(lowTeamMembershipResponse.statusCode).toBe(200);
+    expect(highTeamMembershipResponse.statusCode).toBe(200);
+
+    harness.databaseService.db.insert(projectsUsers).values({
+      projectId: project.id,
+      userId: sharedManager.user.id,
+    }).run();
+    harness.databaseService.db.insert(usersProjectsProjectRoles).values({
+      projectId: project.id,
+      roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+      userId: sharedManager.user.id,
+    }).run();
+    harness.databaseService.db.insert(projectsTeams).values([
+      {
+        projectId: project.id,
+        teamId: highIdTeam.id,
+      },
+      {
+        projectId: project.id,
+        teamId: lowIdTeam.id,
+      },
+    ]).run();
+    harness.databaseService.db.insert(projectsOrganizations).values({
+      organizationId: directOrganizationId,
+      projectId: project.id,
+    }).run();
+    harness.databaseService.db.insert(organizationsTeams).values([
+      {
+        organizationId: directOrganizationId,
+        teamId: lowIdTeam.id,
+      },
+      {
+        organizationId: indirectOrganizationId,
+        teamId: highIdTeam.id,
+      },
+    ]).run();
+    harness.databaseService.db.insert(usersOrganizations).values({
+      organizationId: directOrganizationId,
+      userId: sharedManager.user.id,
+    }).run();
+    harness.databaseService.db.insert(usersOrganizationsOrganizationRoles).values({
+      organizationId: directOrganizationId,
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: sharedManager.user.id,
+    }).run();
+    await harness.databaseService.persist();
+
+    const response = await getProject(creator.accessToken, project.id);
+    const body = harness.parseJson<{
+      organizations: Array<{ id: number }>;
+      projectManagers: Array<{
+        sourceKinds: Array<"direct" | "org" | "team">;
+        userId: number;
+        username: string;
+      }>;
+      teams: Array<{ id: number }>;
+    }>(response.payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.projectManagers).toEqual([
+      {
+        sourceKinds: ["direct"],
+        userId: creator.user.id,
+        username: creator.user.username,
+      },
+      {
+        sourceKinds: ["direct", "team", "org"],
+        userId: sharedManager.user.id,
+        username: sharedManager.user.username,
+      },
+      {
+        sourceKinds: ["team"],
+        userId: secondManager.user.id,
+        username: secondManager.user.username,
+      },
+    ]);
+    expect(body.teams.map((team) => team.id)).toEqual([lowIdTeam.id, highIdTeam.id]);
+    expect(body.organizations.map((organization) => organization.id)).toEqual([
+      directOrganizationId,
+      indirectOrganizationId,
+    ]);
   });
 
   it("requires a project manager or sysadmin to update project membership", async () => {

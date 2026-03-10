@@ -125,15 +125,15 @@ describe("auth and access v2 zod schemas", () => {
 
   it("accepts issue status and closed reason inserts", () => {
     const issueStatus = issueStatusesInsertSchema.parse({
-      code: issueStatusCodes.open,
-      displayName: "Open",
+      code: issueStatusCodes.inProgress,
+      displayName: "In Progress",
     });
     const closedReason = closedReasonsInsertSchema.parse({
       code: closedReasonCodes.resolved,
       displayName: "Resolved",
     });
 
-    expect(issueStatus.code).toBe(issueStatusCodes.open);
+    expect(issueStatus.code).toBe(issueStatusCodes.inProgress);
     expect(closedReason.code).toBe(closedReasonCodes.resolved);
   });
 

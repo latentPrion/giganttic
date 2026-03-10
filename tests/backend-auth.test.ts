@@ -345,21 +345,21 @@ describe("backend auth api", () => {
         .from(issues)
         .where(eq(issues.projectId, organizationProjectManagerProject!.id))
         .all(),
-    ).not.toHaveLength(0);
+    ).toHaveLength(4);
     expect(
       databaseService.db
         .select()
         .from(issues)
         .where(eq(issues.projectId, directProjectManagerProject!.id))
         .all(),
-    ).not.toHaveLength(0);
+    ).toHaveLength(4);
     expect(
       databaseService.db
         .select()
         .from(issues)
         .where(eq(issues.projectId, teamProjectManagerProject!.id))
         .all(),
-    ).not.toHaveLength(0);
+    ).toHaveLength(4);
     expect(
       databaseService.db
         .select()

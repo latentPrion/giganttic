@@ -16,7 +16,7 @@ interface ProjectManagerProjectNavigationProps {
   projectId: number | null;
 }
 
-const DETAIL_LABEL = "Detail";
+const DETAIL_LABEL = "Details";
 const GANTT_LABEL = "Gantt";
 const ISSUES_LABEL = "Issues";
 

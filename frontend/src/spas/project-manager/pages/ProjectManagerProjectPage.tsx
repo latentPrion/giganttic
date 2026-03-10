@@ -2,15 +2,24 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Box,
+  Chip,
   CircularProgress,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
+import { OrganizationListItem } from "../../../common/components/entity-list/OrganizationListItem.js";
 import { ProjectDeleteButton } from "../../../common/components/entity-actions/ProjectDeleteButton.js";
 import { ProjectEditButton } from "../../../common/components/entity-actions/ProjectEditButton.js";
 import { ProjectViewButton } from "../../../common/components/entity-actions/ProjectViewButton.js";
+import { OrganizationViewButton } from "../../../common/components/entity-actions/OrganizationViewButton.js";
 import { ProjectListItem } from "../../../common/components/entity-list/ProjectListItem.js";
+import { TeamListItem } from "../../../common/components/entity-list/TeamListItem.js";
+import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
+import { TeamViewButton } from "../../../common/components/entity-actions/TeamViewButton.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { isApiError } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
@@ -19,8 +28,10 @@ import type {
   LobbyProject,
   UpdateProjectRequest,
 } from "../../../lobby/contracts/lobby.contracts.js";
+import { OrganizationSummaryModal } from "../../../lobby/components/organization/OrganizationSummaryModal.js";
 import { ProjectEditModal } from "../../../lobby/components/project/ProjectEditModal.js";
 import { ProjectSummaryModal } from "../../../lobby/components/project/ProjectSummaryModal.js";
+import { TeamSummaryModal } from "../../../lobby/components/team/TeamSummaryModal.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { ProjectDetailsCard } from "../components/projects/ProjectDetailsCard.js";
 import { createProjectIssuesRoute } from "../routes/project-route-paths.js";
@@ -31,12 +42,21 @@ interface ProjectManagerProjectPageProps {
 }
 
 const DEFAULT_ERROR_MESSAGE = "Unable to load that project right now.";
+const DETAIL_SOURCE_LABEL = "Direct";
+const TEAM_SOURCE_LABEL = "Team";
+const ORGANIZATION_SOURCE_LABEL = "Org";
 const LIST_ITEM_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
+const LINK_ONLY_VIEW_MODE: EntityListItemViewMode = "link-only-no-action-buttons";
 const MISSING_ROUTE_MESSAGE = "Provide a valid projectId to view a project.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project";
 const PROJECT_DELETE_ERROR_MESSAGE = "Unable to delete that project.";
-const VIEW_DESCRIPTION = "Project entity detail view";
+const PROJECT_MANAGERS_HEADING = "Project Managers";
+const DETAILS_TAB_LABEL = "Details";
+const TEAMS_TAB_LABEL = "Teams";
+const ORGANIZATIONS_TAB_LABEL = "Organizations";
+
+type ProjectDetailsTabValue = "details" | "organizations" | "teams";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
   if (isApiError(error) && error.responseBody) {
@@ -54,15 +74,33 @@ function createProjectEntity(response: GetProjectResponse): LobbyProject {
   return response.project;
 }
 
+function createProjectManagerSourceLabels(sourceKinds: readonly string[]): string[] {
+  return sourceKinds.map((sourceKind) => {
+    switch (sourceKind) {
+      case "direct":
+        return DETAIL_SOURCE_LABEL;
+      case "team":
+        return TEAM_SOURCE_LABEL;
+      case "org":
+        return ORGANIZATION_SOURCE_LABEL;
+      default:
+        return sourceKind;
+    }
+  });
+}
+
 export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps) {
   const navigate = useNavigate();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
+  const [activeTab, setActiveTab] = useState<ProjectDetailsTabValue>("details");
+  const [organizationSummaryTargetId, setOrganizationSummaryTargetId] = useState<number | null>(null);
   const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
   const [projectSummaryRefreshKey, setProjectSummaryRefreshKey] = useState(0);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [teamSummaryTargetId, setTeamSummaryTargetId] = useState<number | null>(null);
 
   const project = projectResponse ? createProjectEntity(projectResponse) : null;
 
@@ -166,7 +204,72 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
       return <Alert severity="error">{errorMessage ?? DEFAULT_ERROR_MESSAGE}</Alert>;
     }
 
-    return <ProjectDetailsCard projectResponse={projectResponse} />;
+    switch (activeTab) {
+      case "teams":
+        return (
+          <EntityItemList viewMode={LIST_ITEM_VIEW_MODE}>
+            {projectResponse.teams.map((team) => (
+              <TeamListItem
+                actionContent={(
+                  <TeamViewButton
+                    onClick={() => setTeamSummaryTargetId(team.id)}
+                  />
+                )}
+                key={team.id}
+                team={team}
+                viewMode={LIST_ITEM_VIEW_MODE}
+              />
+            ))}
+          </EntityItemList>
+        );
+      case "organizations":
+        return (
+          <EntityItemList viewMode={LIST_ITEM_VIEW_MODE}>
+            {projectResponse.organizations.map((organization) => (
+              <OrganizationListItem
+                actionContent={(
+                  <OrganizationViewButton
+                    onClick={() => setOrganizationSummaryTargetId(organization.id)}
+                  />
+                )}
+                key={organization.id}
+                organization={organization}
+                viewMode={LIST_ITEM_VIEW_MODE}
+              />
+            ))}
+          </EntityItemList>
+        );
+      case "details":
+      default:
+        return (
+          <Stack spacing={2}>
+            <ProjectDetailsCard projectResponse={projectResponse} />
+            <Stack spacing={1.25}>
+              <Typography component="h2" variant="h6">
+                {PROJECT_MANAGERS_HEADING}
+              </Typography>
+              <EntityItemList viewMode={LINK_ONLY_VIEW_MODE}>
+                {projectResponse.projectManagers.map((projectManager) => (
+                  <UserListItem
+                    key={projectManager.userId}
+                    user={{
+                      id: projectManager.userId,
+                      username: projectManager.username,
+                    }}
+                    viewMode={LINK_ONLY_VIEW_MODE}
+                  >
+                    <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                      {createProjectManagerSourceLabels(projectManager.sourceKinds).map((label) => (
+                        <Chip key={`${projectManager.userId}-${label}`} label={label} size="small" />
+                      ))}
+                    </Stack>
+                  </UserListItem>
+                ))}
+              </EntityItemList>
+            </Stack>
+          </Stack>
+        );
+    }
   }
 
   return (
@@ -184,6 +287,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
+          <ProjectManagerProjectNavigation currentSection="detail" projectId={props.projectId} />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>
@@ -214,12 +318,14 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
             viewMode={LIST_ITEM_VIEW_MODE}
           />
         ) : null}
-        <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
-          <ProjectManagerProjectNavigation currentSection="detail" projectId={props.projectId} />
-          <Typography color="text.secondary" sx={{ alignSelf: { sm: "center", xs: "flex-start" } }} variant="body2">
-            {VIEW_DESCRIPTION}
-          </Typography>
-        </Stack>
+        <Tabs
+          onChange={(_event, nextValue: ProjectDetailsTabValue) => setActiveTab(nextValue)}
+          value={activeTab}
+        >
+          <Tab label={DETAILS_TAB_LABEL} value="details" />
+          <Tab label={TEAMS_TAB_LABEL} value="teams" />
+          <Tab label={ORGANIZATIONS_TAB_LABEL} value="organizations" />
+        </Tabs>
         {errorMessage && project ? <Alert severity="error">{errorMessage}</Alert> : null}
         {renderProjectContent()}
       </Stack>
@@ -234,6 +340,20 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
         isOpen={isSummaryModalOpen}
         onClose={() => setIsSummaryModalOpen(false)}
         projectId={props.projectId}
+        refreshKey={projectSummaryRefreshKey}
+        token={props.token}
+      />
+      <TeamSummaryModal
+        isOpen={teamSummaryTargetId !== null}
+        onClose={() => setTeamSummaryTargetId(null)}
+        refreshKey={projectSummaryRefreshKey}
+        teamId={teamSummaryTargetId}
+        token={props.token}
+      />
+      <OrganizationSummaryModal
+        isOpen={organizationSummaryTargetId !== null}
+        onClose={() => setOrganizationSummaryTargetId(null)}
+        organizationId={organizationSummaryTargetId}
         refreshKey={projectSummaryRefreshKey}
         token={props.token}
       />

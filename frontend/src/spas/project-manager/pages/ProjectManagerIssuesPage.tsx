@@ -3,7 +3,11 @@ import {
   Alert,
   Box,
   CircularProgress,
+  MenuItem,
   Stack,
+  Tab,
+  Tabs,
+  TextField,
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
@@ -34,10 +38,33 @@ interface ProjectManagerIssuesPageProps {
 
 const VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const DEFAULT_ERROR_MESSAGE = "Unable to load project issues right now.";
-const EMPTY_ISSUES_MESSAGE = "No issues exist for the selected project yet.";
+const EMPTY_ISSUES_MESSAGE = "No issues match the current filters yet.";
+const ISSUE_SORT_MODE_PRIORITY = "priority";
+const ISSUE_SORT_MODE_PROGRESS = "progress";
+const ISSUE_STATUS_TAB_OPEN = "ISSUE_STATUS_OPEN";
+const ISSUE_STATUS_TAB_IN_PROGRESS = "ISSUE_STATUS_IN_PROGRESS";
+const ISSUE_STATUS_TAB_BLOCKED = "ISSUE_STATUS_BLOCKED";
+const ISSUE_STATUS_TAB_CLOSED = "ISSUE_STATUS_CLOSED";
+const ISSUE_STATUS_TAB_LABEL_OPEN = "Open";
+const ISSUE_STATUS_TAB_LABEL_IN_PROGRESS = "In Progress";
+const ISSUE_STATUS_TAB_LABEL_BLOCKED = "Blocked";
+const ISSUE_STATUS_TAB_LABEL_CLOSED = "Closed";
 const MISSING_PROJECT_MESSAGE = "Select a valid project to view its issues.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Issues";
+const SORT_LABEL = "Sort By";
+const SORT_OPTION_LABEL_PRIORITY = "Priority";
+const SORT_OPTION_LABEL_PROGRESS = "Progress";
+
+type IssueFilterTab =
+  | "ISSUE_STATUS_OPEN"
+  | "ISSUE_STATUS_IN_PROGRESS"
+  | "ISSUE_STATUS_BLOCKED"
+  | "ISSUE_STATUS_CLOSED";
+
+type IssueSortMode =
+  | "priority"
+  | "progress";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
   if (isApiError(error) && error.responseBody) {
@@ -51,6 +78,38 @@ function sortIssuesById(issues: Issue[]): Issue[] {
   return [...issues].sort((left, right) => left.id - right.id);
 }
 
+function filterIssuesByStatus(
+  issues: Issue[],
+  status: IssueFilterTab,
+): Issue[] {
+  return issues.filter((issue) => issue.status === status);
+}
+
+function sortIssues(
+  issues: Issue[],
+  sortMode: IssueSortMode,
+): Issue[] {
+  return [...issues].sort((left, right) => {
+    if (sortMode === ISSUE_SORT_MODE_PRIORITY) {
+      if (right.priority !== left.priority) {
+        return right.priority - left.priority;
+      }
+      if (right.progressPercentage !== left.progressPercentage) {
+        return right.progressPercentage - left.progressPercentage;
+      }
+    } else {
+      if (right.progressPercentage !== left.progressPercentage) {
+        return right.progressPercentage - left.progressPercentage;
+      }
+      if (right.priority !== left.priority) {
+        return right.priority - left.priority;
+      }
+    }
+
+    return left.id - right.id;
+  });
+}
+
 function upsertIssueById(issues: Issue[], issue: Issue): Issue[] {
   return sortIssuesById([...issues.filter((entry) => entry.id !== issue.id), issue]);
 }
@@ -61,11 +120,17 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
+  const [activeStatusTab, setActiveStatusTab] = useState<IssueFilterTab>(ISSUE_STATUS_TAB_IN_PROGRESS);
   const [issueEditTargetId, setIssueEditTargetId] = useState<number | null>(null);
+  const [issueSortMode, setIssueSortMode] = useState<IssueSortMode>(ISSUE_SORT_MODE_PRIORITY);
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [issueSummaryTargetId, setIssueSummaryTargetId] = useState<number | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
 
+  const visibleIssues = useMemo(
+    () => sortIssues(filterIssuesByStatus(issues, activeStatusTab), issueSortMode),
+    [activeStatusTab, issueSortMode, issues],
+  );
   const issueEditTarget = useMemo(
     () => issues.find((issue) => issue.id === issueEditTargetId) ?? null,
     [issueEditTargetId, issues],
@@ -210,7 +275,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
       );
     }
 
-    if (issues.length === 0) {
+    if (visibleIssues.length === 0) {
       return (
         <Typography color="text.secondary" variant="body2">
           {EMPTY_ISSUES_MESSAGE}
@@ -220,7 +285,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
 
     return (
       <EntityItemList viewMode={VIEW_MODE}>
-        {issues.map((issue) => (
+        {visibleIssues.map((issue) => (
           <IssueListItem
             actionContent={(
               <>
@@ -263,6 +328,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
+          <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>
@@ -270,13 +336,39 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
             Selected project: {props.projectId ?? "None"}
           </Typography>
         </Stack>
-        <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
         <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
           <Typography variant="h6">All issues for the current project</Typography>
           <IssueCreateButton
             disabled={props.projectId === null || busyKey === "create-issue"}
             onClick={() => setIsCreateModalOpen(true)}
           />
+        </Stack>
+        <Stack
+          alignItems={{ sm: "center", xs: "stretch" }}
+          direction={{ sm: "row", xs: "column" }}
+          justifyContent="space-between"
+          spacing={1.5}
+        >
+          <Tabs
+            onChange={(_event, nextValue: IssueFilterTab) => setActiveStatusTab(nextValue)}
+            value={activeStatusTab}
+          >
+            <Tab label={ISSUE_STATUS_TAB_LABEL_OPEN} value={ISSUE_STATUS_TAB_OPEN} />
+            <Tab label={ISSUE_STATUS_TAB_LABEL_IN_PROGRESS} value={ISSUE_STATUS_TAB_IN_PROGRESS} />
+            <Tab label={ISSUE_STATUS_TAB_LABEL_BLOCKED} value={ISSUE_STATUS_TAB_BLOCKED} />
+            <Tab label={ISSUE_STATUS_TAB_LABEL_CLOSED} value={ISSUE_STATUS_TAB_CLOSED} />
+          </Tabs>
+          <TextField
+            label={SORT_LABEL}
+            onChange={(event) => setIssueSortMode(event.target.value as IssueSortMode)}
+            select
+            size="small"
+            sx={{ minWidth: { sm: 220, xs: "100%" } }}
+            value={issueSortMode}
+          >
+            <MenuItem value={ISSUE_SORT_MODE_PRIORITY}>{SORT_OPTION_LABEL_PRIORITY}</MenuItem>
+            <MenuItem value={ISSUE_SORT_MODE_PROGRESS}>{SORT_OPTION_LABEL_PROGRESS}</MenuItem>
+          </TextField>
         </Stack>
         {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
         {renderContent()}

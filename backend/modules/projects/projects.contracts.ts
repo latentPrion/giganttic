@@ -3,6 +3,7 @@ import { z } from "zod";
 const PROJECT_MANAGER_ROLE_CODE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
 const PROJECT_ROLE_CODES = [PROJECT_MANAGER_ROLE_CODE] as const;
 const PROJECT_ROLE_ENUM = z.enum(PROJECT_ROLE_CODES);
+const PROJECT_MANAGER_SOURCE_CODES = ["direct", "org", "team"] as const;
 const PROJECT_ID_PARAM_NAME = "projectId";
 const PROJECT_UPDATE_REQUIRED_MESSAGE = "At least one field must be provided";
 const PROJECT_DUPLICATE_MEMBERS_MESSAGE = "Each project member must be unique";
@@ -75,6 +76,30 @@ export const projectMemberSchema = z.object({
   username: z.string(),
 });
 
+export const projectManagerSourceSchema = z.enum(PROJECT_MANAGER_SOURCE_CODES);
+
+export const projectManagerSchema = z.object({
+  sourceKinds: z.array(projectManagerSourceSchema),
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
+
+export const projectTeamSchema = z.object({
+  createdAt: z.string(),
+  description: z.string().nullable(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  updatedAt: z.string(),
+});
+
+export const projectOrganizationSchema = z.object({
+  createdAt: z.string(),
+  description: z.string().nullable(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  updatedAt: z.string(),
+});
+
 export const createProjectResponseSchema = z.object({
   project: projectSchema,
 });
@@ -85,7 +110,10 @@ export const listProjectsResponseSchema = z.object({
 
 export const getProjectResponseSchema = z.object({
   members: z.array(projectMemberSchema),
+  organizations: z.array(projectOrganizationSchema),
   project: projectSchema,
+  projectManagers: z.array(projectManagerSchema),
+  teams: z.array(projectTeamSchema),
 });
 
 export const updateProjectResponseSchema = z.object({
@@ -111,7 +139,11 @@ export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
+export type ProjectManager = z.infer<typeof projectManagerSchema>;
+export type ProjectManagerSource = z.infer<typeof projectManagerSourceSchema>;
+export type ProjectOrganization = z.infer<typeof projectOrganizationSchema>;
 export type ProjectResponse = z.infer<typeof projectSchema>;
+export type ProjectTeam = z.infer<typeof projectTeamSchema>;
 export type ProjectRoleAssignmentRequest = z.infer<
   typeof projectRoleAssignmentRequestSchema
 >;

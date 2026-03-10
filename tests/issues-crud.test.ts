@@ -10,6 +10,7 @@ import {
 
 const harness = createCrudTestHarness("issues-crud.sqlite");
 const ISSUE_STATUS_OPEN = "ISSUE_STATUS_OPEN";
+const ISSUE_STATUS_IN_PROGRESS = "ISSUE_STATUS_IN_PROGRESS";
 const ISSUE_STATUS_CLOSED = "ISSUE_STATUS_CLOSED";
 const ISSUE_STATUS_BLOCKED = "ISSUE_STATUS_BLOCKED";
 const ISSUE_CLOSED_REASON_RESOLVED = "ISSUE_CLOSED_REASON_RESOLVED";
@@ -124,16 +125,22 @@ describe("issues crud api", () => {
   it("seeds sample issues with priority for every initially seeded project", () => {
     const seededProjects = harness.databaseService.db.select().from(projects).all();
     const seededIssues = harness.databaseService.db.select().from(issues).all();
-    const issueProjectIds = new Set(seededIssues.map((issue) => issue.projectId));
+    const issueCountByProjectId = new Map<number, number>();
+
+    for (const issue of seededIssues) {
+      const currentCount = issueCountByProjectId.get(issue.projectId) ?? 0;
+      issueCountByProjectId.set(issue.projectId, currentCount + 1);
+    }
 
     expect(seededProjects.length).toBeGreaterThan(0);
     expect(seededIssues.length).toBeGreaterThan(0);
 
     for (const project of seededProjects) {
-      expect(issueProjectIds.has(project.id)).toBe(true);
+      expect(issueCountByProjectId.get(project.id) ?? 0).toBeGreaterThanOrEqual(3);
     }
 
     expect(seededIssues.some((issue) => issue.priority > 0)).toBe(true);
+    expect(seededIssues.some((issue) => issue.status === ISSUE_STATUS_IN_PROGRESS)).toBe(true);
   });
 
   it("rejects unauthenticated access to all issue routes", async () => {
@@ -513,6 +520,104 @@ describe("issues crud api", () => {
     expect(validBody.issue.status).toBe(ISSUE_STATUS_CLOSED);
   });
 
+  it("allows creating and updating issues with in-progress status", async () => {
+    const creator = await harness.registerUser("issue-in-progress");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "In Progress Project" })).payload,
+    ).project.id;
+
+    const createResponse = await createIssue(creator.accessToken, projectId, {
+      name: "Active issue",
+      progressPercentage: 45,
+      status: ISSUE_STATUS_IN_PROGRESS,
+    });
+    const issueId = harness.parseJson<{ issue: { id: number } }>(createResponse.payload).issue.id;
+    const updateResponse = await updateIssue(creator.accessToken, projectId, issueId, {
+      progressPercentage: 65,
+      status: ISSUE_STATUS_IN_PROGRESS,
+    });
+    const getResponse = await getIssue(creator.accessToken, projectId, issueId);
+
+    expect(createResponse.statusCode).toBe(201);
+    expect(updateResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ issue: { status: string } }>(updateResponse.payload).issue.status,
+    ).toBe(ISSUE_STATUS_IN_PROGRESS);
+    expect(
+      harness.parseJson<{ issue: { status: string } }>(getResponse.payload).issue.status,
+    ).toBe(ISSUE_STATUS_IN_PROGRESS);
+  });
+
+  it("allows creating blocked issues without closed-only fields", async () => {
+    const creator = await harness.registerUser("issue-blocked");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Blocked Project" })).payload,
+    ).project.id;
+
+    const createResponse = await createIssue(creator.accessToken, projectId, {
+      name: "Blocked issue",
+      progressPercentage: 25,
+      status: ISSUE_STATUS_BLOCKED,
+    });
+    const issueId = harness.parseJson<{ issue: { id: number } }>(createResponse.payload).issue.id;
+    const getResponse = await getIssue(creator.accessToken, projectId, issueId);
+
+    expect(createResponse.statusCode).toBe(201);
+    expect(getResponse.statusCode).toBe(200);
+
+    const createBody = harness.parseJson<{
+      issue: {
+        closedAt: string | null;
+        closedReason: string | null;
+        status: string;
+      };
+    }>(createResponse.payload);
+    const getBody = harness.parseJson<{
+      issue: {
+        closedAt: string | null;
+        closedReason: string | null;
+        status: string;
+      };
+    }>(getResponse.payload);
+
+    expect(createBody.issue.status).toBe(ISSUE_STATUS_BLOCKED);
+    expect(createBody.issue.closedAt).toBeNull();
+    expect(createBody.issue.closedReason).toBeNull();
+    expect(getBody.issue.status).toBe(ISSUE_STATUS_BLOCKED);
+  });
+
+  it("allows creating closed issues when closed-only fields are provided", async () => {
+    const creator = await harness.registerUser("issue-closed-create");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Closed Create Project" })).payload,
+    ).project.id;
+
+    const createResponse = await createIssue(creator.accessToken, projectId, {
+      closedAt: "2026-03-08T12:00:00.000Z",
+      closedReason: ISSUE_CLOSED_REASON_WONTFIX,
+      closedReasonDescription: "Blocked by external vendor dependency",
+      name: "Closed issue",
+      progressPercentage: 100,
+      status: ISSUE_STATUS_CLOSED,
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+
+    const createBody = harness.parseJson<{
+      issue: {
+        closedAt: string | null;
+        closedReason: string | null;
+        closedReasonDescription: string | null;
+        status: string;
+      };
+    }>(createResponse.payload);
+
+    expect(createBody.issue.status).toBe(ISSUE_STATUS_CLOSED);
+    expect(createBody.issue.closedReason).toBe(ISSUE_CLOSED_REASON_WONTFIX);
+    expect(createBody.issue.closedReasonDescription).toBe("Blocked by external vendor dependency");
+    expect(createBody.issue.closedAt).not.toBeNull();
+  });
+
   it("defaults new issues to open with zero progress priority and null closed fields", async () => {
     const creator = await harness.registerUser("issue-defaults");
     const projectId = harness.parseJson<{ project: { id: number } }>(
@@ -591,7 +696,7 @@ describe("issues crud api", () => {
     expect(listedIssue?.progressPercentage).toBe(55);
   });
 
-  it("clears closed-only fields when updating a closed issue back to open or blocked", async () => {
+  it("clears closed-only fields when updating a closed issue back to open in-progress or blocked", async () => {
     const creator = await harness.registerUser("issue-reopen");
     const projectId = harness.parseJson<{ project: { id: number } }>(
       (await createProject(creator.accessToken, { name: "Reopen Project" })).payload,
@@ -612,9 +717,13 @@ describe("issues crud api", () => {
     const blockedResponse = await updateIssue(creator.accessToken, projectId, issueId, {
       status: ISSUE_STATUS_BLOCKED,
     });
+    const inProgressResponse = await updateIssue(creator.accessToken, projectId, issueId, {
+      status: ISSUE_STATUS_IN_PROGRESS,
+    });
 
     expect(reopenResponse.statusCode).toBe(200);
     expect(blockedResponse.statusCode).toBe(200);
+    expect(inProgressResponse.statusCode).toBe(200);
 
     const blockedBody = harness.parseJson<{
       issue: {
@@ -624,10 +733,22 @@ describe("issues crud api", () => {
         status: string;
       };
     }>(blockedResponse.payload);
+    const inProgressBody = harness.parseJson<{
+      issue: {
+        closedAt: string | null;
+        closedReason: string | null;
+        closedReasonDescription: string | null;
+        status: string;
+      };
+    }>(inProgressResponse.payload);
     expect(blockedBody.issue.status).toBe(ISSUE_STATUS_BLOCKED);
     expect(blockedBody.issue.closedAt).toBeNull();
     expect(blockedBody.issue.closedReason).toBeNull();
     expect(blockedBody.issue.closedReasonDescription).toBeNull();
+    expect(inProgressBody.issue.status).toBe(ISSUE_STATUS_IN_PROGRESS);
+    expect(inProgressBody.issue.closedAt).toBeNull();
+    expect(inProgressBody.issue.closedReason).toBeNull();
+    expect(inProgressBody.issue.closedReasonDescription).toBeNull();
   });
 
   it("enforces progressPercentage bounds", async () => {

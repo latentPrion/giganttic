@@ -5,6 +5,7 @@ const ISSUE_PRIORITY_MINIMUM = 0;
 
 export const issueStatusSchema = z.enum([
   "ISSUE_STATUS_OPEN",
+  "ISSUE_STATUS_IN_PROGRESS",
   "ISSUE_STATUS_CLOSED",
   "ISSUE_STATUS_BLOCKED",
 ]);

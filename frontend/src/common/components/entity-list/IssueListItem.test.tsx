@@ -69,6 +69,26 @@ describe("IssueListItem", () => {
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
+  it("hides action buttons but stays navigable in link-only-no-action-buttons view", async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+
+    renderWithTheme(
+      <IssueListItem
+        actionContent={<IssueEditButton onClick={vi.fn()} />}
+        issue={createIssue()}
+        onNavigate={onNavigate}
+        viewMode="link-only-no-action-buttons"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Fix upload summary mismatch/i }));
+
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
   it("does not trigger the summary handler when action buttons are clicked", async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();

@@ -1,9 +1,10 @@
 import React from "react";
-import { screen } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import type { ProjectManagerSource } from "../../../lobby/contracts/lobby.contracts.js";
 import { ProjectManagerProjectPage } from "./ProjectManagerProjectPage.js";
 
 const navigateMock = vi.fn();
@@ -27,12 +28,25 @@ const lobbyApiMock = vi.mocked(lobbyApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 
+function createProjectManagerSources(
+  ...sourceKinds: ProjectManagerSource[]
+): ProjectManagerSource[] {
+  return [...sourceKinds];
+}
+
 function createProjectResponse() {
   return {
     members: [{
       roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
       userId: 101,
       username: "demo-user",
+    }],
+    organizations: [{
+      createdAt: DEFAULT_TIMESTAMP,
+      description: "Org description",
+      id: 9,
+      name: "Org 9",
+      updatedAt: DEFAULT_TIMESTAMP,
     }],
     project: {
       createdAt: DEFAULT_TIMESTAMP,
@@ -41,6 +55,18 @@ function createProjectResponse() {
       name: "Project 42",
       updatedAt: DEFAULT_TIMESTAMP,
     },
+    projectManagers: [{
+      sourceKinds: createProjectManagerSources("direct", "team"),
+      userId: 101,
+      username: "demo-user",
+    }],
+    teams: [{
+      createdAt: DEFAULT_TIMESTAMP,
+      description: "Team description",
+      id: 7,
+      name: "Team 7",
+      updatedAt: DEFAULT_TIMESTAMP,
+    }],
   };
 }
 
@@ -70,6 +96,9 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByText("Project")).toBeVisible();
     expect(await screen.findByText("Project 42")).toBeVisible();
     expect(screen.getByText("Detailed Project View")).toBeVisible();
+    expect(screen.getByText("Project Managers")).toBeVisible();
+    expect(screen.getByText("Direct")).toBeVisible();
+    expect(screen.getByText("Team")).toBeVisible();
     expect(lobbyApiMock.getProject).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
   });
 
@@ -88,7 +117,7 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByRole("dialog", { name: "Project Summary" })).toBeVisible();
   });
 
-  it("navigates between detail and gantt views while preserving project id", async () => {
+  it("navigates between details and gantt views while preserving project id", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
@@ -116,5 +145,96 @@ describe("ProjectManagerProjectPage", () => {
     await user.click(await screen.findByRole("tab", { name: "Issues" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
+  });
+
+  it("switches between the local Details, Teams, and Organizations tabs", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByText("Project Managers")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Teams" }));
+    expect(await screen.findByText("Team 7")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "View" }).length).toBeGreaterThan(1);
+
+    await user.click(screen.getByRole("tab", { name: "Organizations" }));
+    expect(await screen.findByText("Org 9")).toBeVisible();
+
+    await user.click(screen.getAllByRole("tab", { name: "Details" })[1]!);
+    expect(await screen.findByText("Project Managers")).toBeVisible();
+  });
+
+  it("opens team and organization summary modals from their local tabs", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Teams" }));
+    const teamRow = screen.getByText("Team 7").closest(".MuiPaper-root");
+    expect(teamRow).not.toBeNull();
+    await user.click(within(teamRow as HTMLElement).getByRole("button", { name: "View" }));
+    expect(await screen.findByRole("heading", { name: "Team Summary" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Team Summary" })).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Organizations" }));
+    const organizationRow = screen.getByText("Org 9").closest(".MuiPaper-root");
+    expect(organizationRow).not.toBeNull();
+    await user.click(within(organizationRow as HTMLElement).getByRole("button", { name: "View" }));
+    expect(await screen.findByRole("heading", { name: "Organization Summary" })).toBeVisible();
+  });
+
+  it("does not load project data when projectId is missing and shows the route fallback", async () => {
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={null}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByText("Provide a valid projectId to view a project.")).toBeVisible();
+    expect(lobbyApiMock.getProject).not.toHaveBeenCalled();
+  });
+
+  it("shows the fallback error when loading the project fails", async () => {
+    lobbyApiMock.getProject.mockRejectedValueOnce(new Error("network down"));
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByText("Unable to load that project right now.")).toBeVisible();
+  });
+
+  it("renders project manager rows without action buttons", async () => {
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByText("Project Managers")).toBeVisible();
+    const managerRow = screen.getByRole("button", { name: /demo-user/i }).closest(".MuiPaper-root");
+
+    expect(managerRow).not.toBeNull();
+    expect(within(managerRow as HTMLElement).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(within(managerRow as HTMLElement).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

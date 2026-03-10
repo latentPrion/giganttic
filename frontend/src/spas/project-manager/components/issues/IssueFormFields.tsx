@@ -29,6 +29,7 @@ interface IssueFormFieldsProps {
 
 const ISSUE_STATUS_OPTIONS: IssueStatus[] = [
   "ISSUE_STATUS_OPEN",
+  "ISSUE_STATUS_IN_PROGRESS",
   "ISSUE_STATUS_BLOCKED",
   "ISSUE_STATUS_CLOSED",
 ];
@@ -40,7 +41,7 @@ const CLOSED_REASON_OPTIONS: ClosedReason[] = [
 const CLOSED_STATUS = "ISSUE_STATUS_CLOSED";
 
 function createIssueStatusLabel(status: IssueStatus): string {
-  return status.replace("ISSUE_STATUS_", "").toLowerCase();
+  return status.replace("ISSUE_STATUS_", "").toLowerCase().replace("_", " ");
 }
 
 function createClosedReasonLabel(reason: ClosedReason): string {

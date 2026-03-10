@@ -28,6 +28,7 @@ export const organizationRoleCodes = {
 export const issueStatusCodes = {
   blocked: "ISSUE_STATUS_BLOCKED",
   closed: "ISSUE_STATUS_CLOSED",
+  inProgress: "ISSUE_STATUS_IN_PROGRESS",
   open: "ISSUE_STATUS_OPEN",
 } as const;
 
@@ -837,6 +838,11 @@ export const authSeedData = {
       code: issueStatusCodes.open,
       description: "Issue is open and actionable.",
       displayName: "Open",
+    },
+    {
+      code: issueStatusCodes.inProgress,
+      description: "Issue is actively being worked on.",
+      displayName: "In Progress",
     },
     {
       code: issueStatusCodes.closed,

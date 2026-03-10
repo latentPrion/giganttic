@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const issueStatusCodes = [
   "ISSUE_STATUS_OPEN",
+  "ISSUE_STATUS_IN_PROGRESS",
   "ISSUE_STATUS_CLOSED",
   "ISSUE_STATUS_BLOCKED",
 ] as const;

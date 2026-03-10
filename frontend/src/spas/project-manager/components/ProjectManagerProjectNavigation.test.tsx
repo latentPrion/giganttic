@@ -39,7 +39,7 @@ describe("ProjectManagerProjectNavigation", () => {
       <ProjectManagerProjectNavigation currentSection="issues" projectId={null} />,
     );
 
-    expect(screen.getByRole("tab", { name: "Detail" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Gantt" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Issues" })).toBeDisabled();
   });

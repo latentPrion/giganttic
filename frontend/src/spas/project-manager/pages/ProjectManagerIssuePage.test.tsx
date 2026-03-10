@@ -136,7 +136,7 @@ describe("ProjectManagerIssuePage", () => {
       <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
     );
 
-    await user.click(await screen.findByRole("tab", { name: "Detail" }));
+    await user.click(await screen.findByRole("tab", { name: "Details" }));
     await user.click(screen.getByRole("tab", { name: "Gantt" }));
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");

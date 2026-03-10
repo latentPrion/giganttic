@@ -15,6 +15,12 @@ const projectMemberSchema = z.object({
   userId: z.number().int().positive(),
   username: z.string(),
 });
+const projectManagerSourceSchema = z.enum(["direct", "org", "team"]);
+const projectManagerSchema = z.object({
+  sourceKinds: z.array(projectManagerSourceSchema),
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
 
 const teamSchema = z.object({
   createdAt: timestampSchema,
@@ -56,7 +62,10 @@ export const createProjectResponseSchema = z.object({
 });
 export const getProjectResponseSchema = z.object({
   members: z.array(projectMemberSchema),
+  organizations: z.array(organizationSchema),
   project: projectSchema,
+  projectManagers: z.array(projectManagerSchema),
+  teams: z.array(teamSchema),
 });
 export const updateProjectRequestSchema = z.object({
   description: z.string().trim().min(1).nullable().optional(),
@@ -179,6 +188,8 @@ export type LobbyOrganization = z.infer<typeof organizationSchema>;
 export type LobbyProject = z.infer<typeof projectSchema>;
 export type LobbyTeam = z.infer<typeof teamSchema>;
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
+export type ProjectManager = z.infer<typeof projectManagerSchema>;
+export type ProjectManagerSource = z.infer<typeof projectManagerSourceSchema>;
 export type ReplaceOrganizationUsersRequest = z.infer<
   typeof replaceOrganizationUsersRequestSchema
 >;

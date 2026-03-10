@@ -1,4 +1,5 @@
 export const ENTITY_LIST_VIEW_MODES = [
+  "link-only-no-action-buttons",
   "main-listing-view",
   "side-nav-narrow-view",
 ] as const;

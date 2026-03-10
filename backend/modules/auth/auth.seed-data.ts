@@ -3,6 +3,7 @@ const SEEDED_PLAINTEXT_PASSWORD = "1234";
 const SEEDED_CLOSED_REASON_RESOLVED = "ISSUE_CLOSED_REASON_RESOLVED";
 const SEEDED_ISSUE_STATUS_BLOCKED = "ISSUE_STATUS_BLOCKED";
 const SEEDED_ISSUE_STATUS_CLOSED = "ISSUE_STATUS_CLOSED";
+const SEEDED_ISSUE_STATUS_IN_PROGRESS = "ISSUE_STATUS_IN_PROGRESS";
 const SEEDED_ISSUE_STATUS_OPEN = "ISSUE_STATUS_OPEN";
 const SEEDED_PRIORITY_LOW = 1;
 const SEEDED_PRIORITY_MEDIUM = 3;
@@ -96,6 +97,15 @@ export const seededScopedFixtures = {
         progressPercentage: 100,
         status: SEEDED_ISSUE_STATUS_CLOSED,
       }),
+      createSeededIssue({
+        description: "Document sample organization PM issue priority ordering for downstream UI work.",
+        journal: "Keeps the org project fixture useful for backlog sorting demos.",
+        name: "Document org PM backlog ordering",
+        openedAt: "2026-03-05T09:25:00.000Z",
+        priority: SEEDED_PRIORITY_MEDIUM,
+        progressPercentage: 60,
+        status: SEEDED_ISSUE_STATUS_IN_PROGRESS,
+      }),
     ],
     projectProjectManager: [
       createSeededIssue({
@@ -128,6 +138,15 @@ export const seededScopedFixtures = {
         progressPercentage: 100,
         status: SEEDED_ISSUE_STATUS_CLOSED,
       }),
+      createSeededIssue({
+        description: "Track a second open sample so direct-PM projects have a richer seeded backlog.",
+        journal: "Useful for seeded list ordering and detail-page regression tests.",
+        name: "Expand direct PM seeded backlog",
+        openedAt: "2026-03-06T10:05:00.000Z",
+        priority: SEEDED_PRIORITY_HIGH,
+        progressPercentage: 25,
+        status: SEEDED_ISSUE_STATUS_IN_PROGRESS,
+      }),
     ],
     teamProjectManager: [
       createSeededIssue({
@@ -159,6 +178,15 @@ export const seededScopedFixtures = {
         priority: SEEDED_PRIORITY_LOW,
         progressPercentage: 100,
         status: SEEDED_ISSUE_STATUS_CLOSED,
+      }),
+      createSeededIssue({
+        description: "Keep an extra routed-work sample on the team-derived project fixture.",
+        journal: "Supports seeded demos for issue prioritization and PM issue routing.",
+        name: "Seed team-derived routed work sample",
+        openedAt: "2026-03-05T14:10:00.000Z",
+        priority: SEEDED_PRIORITY_MEDIUM,
+        progressPercentage: 45,
+        status: SEEDED_ISSUE_STATUS_IN_PROGRESS,
       }),
     ],
   },

@@ -21,4 +21,18 @@ describe("EntityItemList", () => {
     expect(screen.getByText("First Item")).toBeVisible();
     expect(screen.getByText("Second Item")).toBeVisible();
   });
+
+  it("supports the reusable link-only-no-action-buttons view mode", () => {
+    renderWithTheme(
+      <EntityItemList viewMode="link-only-no-action-buttons">
+        <div>Linked Item</div>
+      </EntityItemList>,
+    );
+
+    const list = document.querySelector('[data-entity-item-list="true"]');
+
+    expect(list).not.toBeNull();
+    expect(list).toHaveAttribute("data-view-mode", "link-only-no-action-buttons");
+    expect(screen.getByText("Linked Item")).toBeVisible();
+  });
 });

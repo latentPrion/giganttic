@@ -144,7 +144,7 @@ describe("app routing", () => {
         priority: 2,
         progressPercentage: 15,
         projectId: 42,
-        status: "ISSUE_STATUS_OPEN",
+        status: "ISSUE_STATUS_IN_PROGRESS",
         updatedAt: "2026-03-08T00:00:00.000Z",
       }],
     });
@@ -154,6 +154,7 @@ describe("app routing", () => {
         userId: 101,
         username: "demo-user",
       }],
+      organizations: [],
       project: {
         createdAt: "2026-03-08T00:00:00.000Z",
         description: "Project description",
@@ -161,6 +162,12 @@ describe("app routing", () => {
         name: "Project 1",
         updatedAt: "2026-03-08T00:00:00.000Z",
       },
+      projectManagers: [{
+        sourceKinds: ["direct"],
+        userId: 101,
+        username: "demo-user",
+      }],
+      teams: [],
     });
   });
 
@@ -316,7 +323,7 @@ describe("app routing", () => {
 
     expect(await screen.findByText("Project Issues")).toBeVisible();
     expect(screen.getByText("Selected project: 42")).toBeVisible();
-    expect(await screen.findByText("Issue 7")).toBeVisible();
+    expect(await screen.findByRole("tab", { name: "In Progress", selected: true })).toBeVisible();
   });
 
   it("redirects unauthenticated PM issue-detail requests to the public home route", async () => {

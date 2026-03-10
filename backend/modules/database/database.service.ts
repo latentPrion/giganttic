@@ -8,7 +8,10 @@ import initSqlJs, { type Database as SqlJsDatabaseClient } from "sql.js";
 
 import {
   activeSchemaVersion,
+  closedReasons,
   credentialTypes,
+  issues,
+  issueStatuses,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -38,7 +41,10 @@ import {
 } from "../../config/backend-config.js";
 
 const dbSchema = {
+  closedReasons,
   credentialTypes,
+  issues,
+  issueStatuses,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -61,6 +67,14 @@ const dbSchema = {
   usersSystemRoles,
   usersTeamsTeamRoles,
 } as const;
+
+const REQUIRED_ACTIVE_SCHEMA_TABLES = [
+  "Users",
+  "Projects",
+  "Teams",
+  "Organizations",
+  "Issues",
+] as const;
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -109,12 +123,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureSchema(): Promise<void> {
-    const result = this.client.exec(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Users'",
-    );
-    if (result[0]?.values.length) {
+    if (this.hasActiveSchemaTables()) {
       return;
     }
+
+    this.client.close();
+    const SQL = await initSqlJs();
+    this.client = new SQL.Database();
+    this.client.exec("PRAGMA foreign_keys = ON;");
 
     const generatedSqlDdlPath = path.resolve(
       process.cwd(),
@@ -124,8 +140,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     for (const statement of ddl
       .split("--> statement-breakpoint")
       .map((entry) => entry.trim())
-      .filter(Boolean)) {
+        .filter(Boolean)) {
       this.client.exec(statement);
     }
+  }
+
+  private hasActiveSchemaTables(): boolean {
+    const existingTableRows = this.client.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    );
+    const existingTables = new Set(
+      (existingTableRows[0]?.values ?? []).map((row) => String(row[0])),
+    );
+
+    return REQUIRED_ACTIVE_SCHEMA_TABLES.every((tableName) =>
+      existingTables.has(tableName)
+    );
   }
 }

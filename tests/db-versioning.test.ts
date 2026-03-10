@@ -1,9 +1,15 @@
+import "reflect-metadata";
+
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { Test } from "@nestjs/testing";
 import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
+import { AppModule } from "../backend/app.module.js";
+import { buildBackendConfig } from "../backend/config/backend-config.js";
 import {
   issues,
   issuesInsertSchema,
@@ -60,6 +66,53 @@ describe("db version selection pipeline", () => {
 
     expect(result[0]?.values[0]?.[0]).toBe(3);
     db.close();
+  });
+
+  it("rebuilds a stale v1 runtime database to the active v2 schema on startup", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-runtime-db-"));
+    const dbPath = path.join(tempDir, "runtime.sqlite");
+    tempDirs.push(tempDir);
+
+    await applySqlDdl(dbPath, "v1");
+
+    const config = buildBackendConfig({
+      dbPath,
+      port: 0,
+      seedTestAccounts: false,
+    });
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule.register(config)],
+    }).compile();
+
+    const app = moduleRef.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
+    let isClosed = false;
+
+    try {
+      app.setGlobalPrefix(config.routePrefix);
+      await app.init();
+      await app.getHttpAdapter().getInstance().ready();
+
+      const SQL = await initSqlJs();
+      await app.close();
+      isClosed = true;
+
+      const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
+      try {
+        const result = db.exec(
+          "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('Projects', 'Organizations', 'Issues')",
+        );
+
+        expect(result[0]?.values[0]?.[0]).toBe(3);
+      } finally {
+        db.close();
+      }
+    } finally {
+      if (!isClosed) {
+        await app.close();
+      }
+    }
   });
 
   it("exports organization team artifacts from the active db facade", () => {

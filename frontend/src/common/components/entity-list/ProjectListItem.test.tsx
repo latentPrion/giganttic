@@ -66,6 +66,32 @@ describe("ProjectListItem", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
+  it("hides action buttons but stays navigable in link-only-no-action-buttons view", async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+
+    renderWithTheme(
+      <ProjectListItem
+        actionContent={(
+          <>
+            <ProjectEditButton onClick={vi.fn()} />
+            <ProjectDeleteButton onClick={vi.fn()} />
+          </>
+        )}
+        onNavigate={onNavigate}
+        project={createProject()}
+        viewMode="link-only-no-action-buttons"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Apollo/i }));
+
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
   it("does not trigger the summary handler when action buttons are clicked", async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();

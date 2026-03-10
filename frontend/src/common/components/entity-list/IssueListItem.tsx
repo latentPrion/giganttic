@@ -21,13 +21,15 @@ function createStatusColor(status: Issue["status"]) {
       return "success";
     case "ISSUE_STATUS_BLOCKED":
       return "warning";
+    case "ISSUE_STATUS_IN_PROGRESS":
+      return "info";
     default:
       return "primary";
   }
 }
 
 function createStatusLabel(status: Issue["status"]): string {
-  return status.replace("ISSUE_STATUS_", "").toLowerCase();
+  return status.replace("ISSUE_STATUS_", "").toLowerCase().replace("_", " ");
 }
 
 export function IssueListItem(props: IssueListItemProps) {

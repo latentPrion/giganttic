@@ -93,6 +93,15 @@ describe("lobbyApi", () => {
             username: "manager",
           },
         ],
+        organizations: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Org description",
+            id: 31,
+            name: "Org 31",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
         project: {
           createdAt: "2026-03-08T00:00:00.000Z",
           description: "Example project",
@@ -100,12 +109,31 @@ describe("lobbyApi", () => {
           name: "Alpha",
           updatedAt: "2026-03-08T00:00:00.000Z",
         },
+        projectManagers: [
+          {
+            sourceKinds: ["direct"],
+            userId: 9,
+            username: "manager",
+          },
+        ],
+        teams: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Team description",
+            id: 22,
+            name: "Ops",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
       }),
     );
 
     const response = await lobbyApi.getProject(TEST_TOKEN, 11);
 
     expect(response.members).toHaveLength(1);
+    expect(response.projectManagers[0]?.sourceKinds).toEqual(["direct"]);
+    expect(response.teams[0]?.id).toBe(22);
+    expect(response.organizations[0]?.id).toBe(31);
     expect(fetchSpy).toHaveBeenCalledWith(
       "/stc-proj-mgmt/api/projects/11",
       expect.objectContaining({
