@@ -1004,4 +1004,35 @@ describe("issues crud api", () => {
       harness.databaseService.db.select().from(issues).where(eq(issues.id, secondIssueId)).all(),
     ).toHaveLength(0);
   });
+
+  it("removes all issue rows for a deleted project and returns 404 from the issue routes afterward", async () => {
+    const creator = await harness.registerUser("issue-project-route-delete");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Deleted Project Issue Routes" })).payload,
+    ).project.id;
+    const firstIssueId = harness.parseJson<{ issue: { id: number } }>(
+      (await createIssue(creator.accessToken, projectId, { name: "Deleted issue one" })).payload,
+    ).issue.id;
+    const secondIssueId = harness.parseJson<{ issue: { id: number } }>(
+      (await createIssue(creator.accessToken, projectId, { name: "Deleted issue two" })).payload,
+    ).issue.id;
+
+    const deleteProjectResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}`,
+    });
+    const listAfterDeleteResponse = await listIssues(creator.accessToken, projectId);
+    const getAfterDeleteResponse = await getIssue(creator.accessToken, projectId, firstIssueId);
+
+    expect(deleteProjectResponse.statusCode).toBe(200);
+    expect(listAfterDeleteResponse.statusCode).toBe(404);
+    expect(getAfterDeleteResponse.statusCode).toBe(404);
+    expect(
+      harness.databaseService.db.select().from(issues).where(eq(issues.projectId, projectId)).all(),
+    ).toHaveLength(0);
+    expect(
+      harness.databaseService.db.select().from(issues).where(eq(issues.id, secondIssueId)).all(),
+    ).toHaveLength(0);
+  });
 });
