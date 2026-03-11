@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1a15b766-177a-4f6c-9112-f77edffe59b4",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "1964f607-fed0-4ace-9881-0bd72927ed08",
+  "prevId": "5bb2679a-a8f2-4afe-ba13-b123f3f3b1cc",
   "tables": {
     "ClosedReasons": {
       "name": "ClosedReasons",
@@ -1895,7 +1895,10 @@
   "enums": {},
   "_meta": {
     "schemas": {},
-    "tables": {},
+    "tables": {
+      "\"Roles\"": "\"OrganizationRoles\"",
+      "\"Users_Roles\"": "\"SystemRoles\""
+    },
     "columns": {}
   },
   "internal": {

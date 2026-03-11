@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import {
   access,
   copyFile,
@@ -31,64 +31,6 @@ const SCHEMA_FILE_NAME = "schema.ts";
 const SCHEMA_SQL_FILE_NAME = "schema.sql";
 const SQLITE_DIALECT = "sqlite";
 const TEMP_DIR_PREFIX = "giganttic-drizzle-tooling-";
-const TTY_PYTHON_SCRIPT = `
-import os
-import pty
-import select
-import subprocess
-import sys
-import time
-
-command = sys.argv[1:]
-master_fd, slave_fd = pty.openpty()
-process = subprocess.Popen(command, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd)
-os.close(slave_fd)
-
-def write_enter():
-    try:
-        os.write(master_fd, b"\\r")
-    except OSError:
-        pass
-
-last_enter_at = 0.0
-
-while True:
-    if process.poll() is not None:
-        break
-
-    readable, _, _ = select.select([master_fd], [], [], 0.1)
-    if readable:
-        try:
-            data = os.read(master_fd, 4096)
-        except OSError:
-            data = b""
-        if data:
-            sys.stdout.buffer.write(data)
-            sys.stdout.flush()
-
-    now = time.time()
-    if now - last_enter_at >= 0.05:
-        write_enter()
-        last_enter_at = now
-
-remaining = b""
-while True:
-    try:
-        chunk = os.read(master_fd, 4096)
-    except OSError:
-        break
-    if not chunk:
-        break
-    remaining += chunk
-
-if remaining:
-    sys.stdout.buffer.write(remaining)
-    sys.stdout.flush()
-
-os.close(master_fd)
-sys.exit(process.wait())
-`;
-
 function createPathError(message, targetPath) {
   return new Error(`${message}: ${targetPath}`);
 }
@@ -203,12 +145,13 @@ async function runDrizzleGenerateNonInteractive(projectRoot, schemaFilePath, out
   });
 }
 
-async function runDrizzleGenerateWithPythonTty(projectRoot, schemaFilePath, outDirPath) {
+function canUseInteractiveTty() {
+  return Boolean(process.stdin.isTTY && process.stdout.isTTY && process.stderr.isTTY);
+}
+
+async function runDrizzleGenerateWithInheritedTty(projectRoot, schemaFilePath, outDirPath) {
   const drizzleKitBin = createDrizzleKitBinPath(projectRoot);
   const args = [
-    "-c",
-    TTY_PYTHON_SCRIPT,
-    drizzleKitBin,
     "generate",
     "--dialect",
     SQLITE_DIALECT,
@@ -218,9 +161,26 @@ async function runDrizzleGenerateWithPythonTty(projectRoot, schemaFilePath, outD
     createRelativePath(projectRoot, outDirPath),
   ];
 
-  return execFileAsync("python3", args, {
-    cwd: projectRoot,
-    env: process.env,
+  await new Promise((resolve, reject) => {
+    const child = spawn(drizzleKitBin, args, {
+      cwd: projectRoot,
+      env: process.env,
+      stdio: "inherit",
+    });
+
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(
+        new Error(
+          `drizzle-kit generate exited with code ${code ?? "unknown"}${signal ? ` (signal: ${signal})` : ""}.`,
+        ),
+      );
+    });
   });
 }
 
@@ -244,6 +204,16 @@ async function ensureGeneratedSqlExists(targetDir) {
 }
 
 async function runDrizzleGenerate(projectRoot, schemaFilePath, outDirPath) {
+  if (canUseInteractiveTty()) {
+    await runDrizzleGenerateWithInheritedTty(
+      projectRoot,
+      schemaFilePath,
+      outDirPath,
+    );
+    await ensureGeneratedSqlExists(outDirPath);
+    return;
+  }
+
   let firstAttempt;
 
   try {
@@ -266,20 +236,15 @@ async function runDrizzleGenerate(projectRoot, schemaFilePath, outDirPath) {
   }
 
   try {
-    return await runDrizzleGenerateWithPythonTty(
-      projectRoot,
-      schemaFilePath,
-      outDirPath,
+    throw new Error(
+      [
+        "Unable to generate Drizzle migration diff non-interactively.",
+        "The schema change likely triggered rename prompts.",
+        "Run the same command from a real TTY so Drizzle can ask its interactive questions.",
+      ].join(" "),
     );
   } catch (error) {
-    const message = [
-      "Unable to generate Drizzle migration diff non-interactively.",
-      "The schema change likely triggered rename prompts.",
-      "Install python3 with PTY support or run the equivalent drizzle generate command manually in a TTY.",
-      error instanceof Error ? error.message : String(error),
-    ].join(" ");
-
-    throw new Error(message);
+    throw error;
   }
 }
 
@@ -429,4 +394,3 @@ export async function generateMigration({
     preStructuralDataMigrationPath,
   };
 }
-
