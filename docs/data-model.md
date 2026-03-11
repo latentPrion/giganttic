@@ -12,7 +12,7 @@ db/
 ├── apply-sql-ddl.mjs
 ├── config.json
 ├── config.ts
-├── create-db.mjs
+├── create-from-schema.mjs
 ├── generate-ddl.mjs
 ├── index.ts
 ├── migrations/

@@ -15,20 +15,23 @@ export const runtimeSqliteDbPath = path.resolve(
 
 export function getGeneratedSqlDdlDir(
   schemaVersion = config.activeSchemaVersion,
+  projectRoot = process.cwd(),
 ) {
-  return path.resolve(process.cwd(), `db/${schemaVersion}/generated-sql-ddl`);
+  return path.resolve(projectRoot, `db/${schemaVersion}/generated-sql-ddl`);
 }
 
 export function getGeneratedSqlDdlFilePath(
   schemaVersion = config.activeSchemaVersion,
+  projectRoot = process.cwd(),
 ) {
-  return path.join(getGeneratedSqlDdlDir(schemaVersion), "schema.sql");
+  return path.join(getGeneratedSqlDdlDir(schemaVersion, projectRoot), "schema.sql");
 }
 
 export async function readGeneratedSqlStatements(
   schemaVersion = config.activeSchemaVersion,
+  projectRoot = process.cwd(),
 ) {
-  const ddl = await readFile(getGeneratedSqlDdlFilePath(schemaVersion), "utf8");
+  const ddl = await readFile(getGeneratedSqlDdlFilePath(schemaVersion, projectRoot), "utf8");
 
   return ddl
     .split("--> statement-breakpoint")
@@ -39,10 +42,11 @@ export async function readGeneratedSqlStatements(
 export async function applySqlDdl(
   outputPath = runtimeSqliteDbPath,
   schemaVersion = config.activeSchemaVersion,
+  projectRoot = process.cwd(),
 ) {
   const SQL = await initSqlJs();
   const db = new SQL.Database();
-  const statements = await readGeneratedSqlStatements(schemaVersion);
+  const statements = await readGeneratedSqlStatements(schemaVersion, projectRoot);
 
   db.exec("PRAGMA foreign_keys = ON;");
   for (const statement of statements) {

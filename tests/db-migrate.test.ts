@@ -212,6 +212,22 @@ describe("db migrate tooling", () => {
     await expect(tableExists(targetDbPath, "Widgets")).resolves.toBe(true);
   });
 
+  it("fails clearly for proddev migration when the prod source DB does not exist", async () => {
+    await createTempProjectRoot();
+    await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
+      drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
+    });
+
+    await expect(migrateDatabase({
+      dbTarget: "proddev",
+      env: {
+        GGTC_DB_PATH: defaultProdSqliteDbPath,
+      },
+      migrationPairName: "foo--bar",
+      projectRoot: tempProjectRoot,
+    })).rejects.toThrow(/Missing source DB for proddev migration dry-run/i);
+  });
+
   it("does not mutate the prod source DB file contents during proddev migration", async () => {
     await createTempProjectRoot();
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {

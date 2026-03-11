@@ -5,4 +5,3 @@
 - Always isolate configurable behaviour into configuration variables appropriate for the language and framework being used.
 - Never bake in literals; at minimum, declare them at the top of the file with a semantically meaningful name.
 - UI should be responsive. Always prefer to use pre-packaged UI toolkit widgets, containers and colour sets harmoniously, instead of writing custom CSS overrides. Write custom CSS only if there's no UI toolkit mechanism available.
-

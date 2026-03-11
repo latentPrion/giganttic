@@ -185,6 +185,39 @@ This allows `db:migrate` to verify:
 
 If the target DB reports a different schema name, migration aborts.
 
+## Explicit DB Creation
+
+Fresh DB creation is a separate command and must use an already-generated schema snapshot.
+
+Command:
+
+```bash
+npm run db:createfrom -- --on <dev|prod> --schema <schema-name> [--overwrite-existing]
+```
+
+Notes:
+
+- `db:createfrom` creates a brand-new DB directly from `db/<schema-name>/generated-sql-ddl/schema.sql`
+- it writes runtime schema metadata so the new DB records `<schema-name>` as its current schema
+- it refuses to overwrite an existing DB unless `--overwrite-existing` is explicitly passed
+- it does not apply migrations
+- it does not seed test data
+
+### Supported create targets
+
+- `dev`
+  - creates the dev DB directly
+  - defaults to `run/giganttic-dev.sqlite` unless `GGTC_DEV_DB_PATH` is set
+
+- `prod`
+  - creates the prod DB directly
+  - defaults to `run/giganttic-prod.sqlite` unless `GGTC_DB_PATH` is set
+
+- `proddev`
+  - intentionally unsupported for `db:createfrom`
+  - `proddev` is defined as a migration sandbox copied from `prod`
+  - create prod explicitly first if needed, then use `db:migrate -- --on proddev --with <from>--<to>`
+
 ## Recommended Operator Flow
 
 ### 1. Change the target schema
@@ -215,13 +248,22 @@ Review at minimum:
 - `db/migrations/<from>--<to>/pre-structural-data-migration.sql`
 - `db/migrations/<from>--<to>/post-structural-data-migration.sql`
 
-### 5. Dry-run against a copied production DB
+### 5. If a fresh base DB is needed, create it explicitly
+
+Examples:
+
+```bash
+npm run db:createfrom -- --on dev --schema <schema-name>
+npm run db:createfrom -- --on prod --schema <schema-name>
+```
+
+### 6. Dry-run against a copied production DB
 
 ```bash
 npm run db:migrate -- --on proddev --with <from-schema>--<to-schema>
 ```
 
-### 6. Apply to production deliberately
+### 7. Apply to production deliberately
 
 ```bash
 npm run db:migrate -- --on prod --with <from-schema>--<to-schema>

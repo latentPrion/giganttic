@@ -13,7 +13,7 @@
     "db:prepare": "node db/prepare.mjs",
     "db:test-data": "node db/test-data.mjs",
     "db:migrate": "node db/migrate.mjs",
-    "db:create": "node db/create-db.mjs",
+    "db:createfrom": "node db/create-from-schema.mjs",
     "charts:development-planner": "node scripts/generate-development-planner-gantt.mjs",
     "dev": "node scripts/dev-launcher.mjs",
     "dev:lan": "node scripts/dev-launcher.mjs --lan",
