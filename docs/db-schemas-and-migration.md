@@ -6,13 +6,26 @@ This repository separates three concerns that must not be conflated:
 
 - schema snapshots
 - migration deliverables
-- data seeding
+- runtime/build configuration and DB maintenance
 
 The core production safety rule is:
 
 - application launch must not invent or generate migrations
 - application launch must not wipe an existing production database
 - reviewed migration packages under `db/migrations/` are the only supported input to DB schema upgrade commands
+
+The configuration split is:
+
+- `GGTC_DB_SCHEMA_*`
+  - internal variables set by snapshot/diff generation commands from required CLI args
+- `GGTC_DB_MIGRATION_*`
+  - internal variables set by `db:createfrom`, `db:migrate`, and `db:prepare` from required CLI args
+- `GGTC_DB_RT_*`
+  - runtime/build variables for the app, taken from CLI first and otherwise from checked-in config values:
+    - `CONFIG_GGTC_DB_RT_TARGET`
+    - `CONFIG_GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR`
+
+There is no `activeSchemaVersion` fallback anymore.
 
 ## Schema Snapshot Layout
 
@@ -145,22 +158,23 @@ Important discipline:
 
 - `db:migrate` must not generate migrations
 - `db:migrate` must only apply the explicit migration package it is pointed at
+- the `--on`/`--with` values are mandatory CLI inputs
+- the command does not read target or migration selection from env/config
 
 ### DB target modes
 
 - `dev`
   - applies the selected migration package directly to the dev DB file
-  - defaults to `run/giganttic-dev.sqlite` unless `GGTC_DEV_DB_PATH` is set
+  - target DB path resolves to `run/giganttic-dev.sqlite`
 
 - `proddev`
   - copies the configured prod DB to a local scratch DB first
   - applies the migration package to that copy
-  - uses `GGTC_DB_PATH` if set, otherwise defaults the source DB to `run/giganttic-prod.sqlite`
-  - defaults the scratch target to `run/giganttic-proddev-<migration-pair>.sqlite` unless `GGTC_PRODDEV_DB_PATH` is set
+  - source DB path resolves to `run/giganttic-prod.sqlite`
+  - scratch target resolves to `run/giganttic-proddev-<migration-pair>.sqlite`
 
 - `prod`
-  - applies the migration package directly to the configured production DB
-  - uses `GGTC_DB_PATH` if set, otherwise defaults to `run/giganttic-prod.sqlite`
+  - applies the migration package directly to `run/giganttic-prod.sqlite`
 
 ### Current schema-state verification
 
@@ -202,16 +216,18 @@ Notes:
 - it refuses to overwrite an existing DB unless `--overwrite-existing` is explicitly passed
 - it does not apply migrations
 - it does not seed test data
+- the `--on` and `--schema` values are mandatory CLI inputs
+- it does not read DB target or schema selection from env/config
 
 ### Supported create targets
 
 - `dev`
   - creates the dev DB directly
-  - defaults to `run/giganttic-dev.sqlite` unless `GGTC_DEV_DB_PATH` is set
+  - target DB path resolves to `run/giganttic-dev.sqlite`
 
 - `prod`
   - creates the prod DB directly
-  - defaults to `run/giganttic-prod.sqlite` unless `GGTC_DB_PATH` is set
+  - target DB path resolves to `run/giganttic-prod.sqlite`
 
 - `proddev`
   - intentionally unsupported for `db:createfrom`
@@ -269,6 +285,28 @@ npm run db:migrate -- --on proddev --with <from-schema>--<to-schema>
 npm run db:migrate -- --on prod --with <from-schema>--<to-schema>
 ```
 
+### 8. Prepare the DB for runtime
+
+`db:prepare` is a DB-maintenance command, not a migration generator:
+
+```bash
+npm run db:prepare -- --on <dev|proddev|prod>
+```
+
+It:
+
+- verifies the selected DB exists
+- verifies the selected DB's recorded schema matches the runtime schema selection
+- reconciles immutable/reference data
+- enforces test-data policy for the selected target
+
+It does not:
+
+- generate migrations
+- apply migrations
+- choose targets from env/config
+- wipe the DB
+
 ## Test Data Management
 
 Test data is a separate concern from schema snapshots and migrations.
@@ -278,6 +316,28 @@ The intended long-term separation is:
 - immutable/reference data management
 - test data management
 - schema migration management
+
+## Runtime Configuration
+
+Runtime/build configuration is separate from schema tooling and migration actions.
+
+The checked-in defaults live in `db/config.json`:
+
+- `CONFIG_GGTC_DB_RT_TARGET`
+- `CONFIG_GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR`
+
+Runtime resolution order is:
+
+1. CLI / process env values:
+   - `GGTC_DB_RT_TARGET`
+   - `GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR`
+2. checked-in config values above
+
+At runtime:
+
+- `GGTC_DB_RT_TARGET` selects the DB instance/path the backend connects to
+- `GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR` selects the schema snapshot/contract set the backend expects
+- backend startup fails if the DB metadata schema name does not match `GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR`
 
 Migration application must not:
 

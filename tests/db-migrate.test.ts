@@ -177,7 +177,6 @@ describe("db migrate tooling", () => {
 
     await migrateDatabase({
       dbTarget: "dev",
-      env: {},
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     });
@@ -193,16 +192,12 @@ describe("db migrate tooling", () => {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
     const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
-    const env = {
-      GGTC_DB_PATH: defaultProdSqliteDbPath,
-    };
     const {
       targetDbPath,
-    } = resolveDbTargetPaths(tempProjectRoot, "proddev", "foo--bar", env);
+    } = resolveDbTargetPaths(tempProjectRoot, "proddev", "foo--bar");
 
     await migrateDatabase({
       dbTarget: "proddev",
-      env,
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     });
@@ -220,9 +215,6 @@ describe("db migrate tooling", () => {
 
     await expect(migrateDatabase({
       dbTarget: "proddev",
-      env: {
-        GGTC_DB_PATH: defaultProdSqliteDbPath,
-      },
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     })).rejects.toThrow(/Missing source DB for proddev migration dry-run/i);
@@ -235,16 +227,11 @@ describe("db migrate tooling", () => {
     });
     const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
     const originalProdDbPath = path.join(tempProjectRoot, "run", "prod-original.sqlite");
-    const env = {
-      GGTC_DB_PATH: defaultProdSqliteDbPath,
-    };
-
     await copyFile(prodDbPath, originalProdDbPath);
     const beforeHash = await createFileHash(prodDbPath);
 
     await migrateDatabase({
       dbTarget: "proddev",
-      env,
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     });
@@ -262,7 +249,6 @@ describe("db migrate tooling", () => {
 
     await expect(migrateDatabase({
       dbTarget: "dev",
-      env: {},
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     })).rejects.toThrow(/migration expects foo/);
@@ -285,7 +271,6 @@ describe("db migrate tooling", () => {
 
     await expect(migrateDatabase({
       dbTarget: "dev",
-      env: {},
       migrationPairName,
       projectRoot: tempProjectRoot,
     })).rejects.toThrow(/Missing Drizzle migration SQL/);
@@ -303,7 +288,6 @@ describe("db migrate tooling", () => {
 
     await expect(migrateDatabase({
       dbTarget: "dev",
-      env: {},
       migrationPairName: "foo--bar",
       projectRoot: tempProjectRoot,
     })).rejects.toThrow();

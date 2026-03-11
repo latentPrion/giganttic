@@ -22,7 +22,10 @@ import {
   getGeneratedSqlDdlDir,
   getGeneratedSqlDdlFilePath,
 } from "../db/apply-sql-ddl.mjs";
-import { activeSchemaVersion, availableSchemaVersions } from "../db/config.js";
+import {
+  availableSchemaVersions,
+  configuredRuntimeSchemaSnapshotSubdir,
+} from "../db/config.js";
 
 describe("db version selection pipeline", () => {
   const tempDirs: string[] = [];
@@ -38,7 +41,7 @@ describe("db version selection pipeline", () => {
 
   it("advertises v2 as the active schema version", () => {
     expect(availableSchemaVersions).toContain("v2");
-    expect(activeSchemaVersion).toBe("v2");
+    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v2");
   });
 
   it("resolves generated artifact paths from explicit version arguments", () => {
@@ -57,7 +60,10 @@ describe("db version selection pipeline", () => {
     const outputPath = path.join(tempDir, "active.sqlite");
     tempDirs.push(tempDir);
 
-    const appliedPath = await applySqlDdl(outputPath, activeSchemaVersion);
+    const appliedPath = await applySqlDdl(
+      outputPath,
+      configuredRuntimeSchemaSnapshotSubdir,
+    );
     const SQL = await initSqlJs();
     const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));
     const result = db.exec(
@@ -90,7 +96,7 @@ describe("db version selection pipeline", () => {
 
     app.setGlobalPrefix(config.routePrefix);
 
-    await expect(app.init()).rejects.toThrow(/does not match active schema/i);
+    await expect(app.init()).rejects.toThrow(/does not match runtime schema/i);
     await app.close();
   });
 

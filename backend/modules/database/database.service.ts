@@ -7,7 +7,6 @@ import { drizzle, type SQLJsDatabase } from "drizzle-orm/sql-js";
 import initSqlJs, { type Database as SqlJsDatabaseClient } from "sql.js";
 
 import {
-  activeSchemaVersion,
   closedReasons,
   credentialTypes,
   issues,
@@ -139,14 +138,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
 
     throw new Error(
-      `Database at ${this.resolvedConfig.dbPath} does not match active schema ${activeSchemaVersion}. Run db:migrate or recreate it explicitly.`,
+      `Database at ${this.resolvedConfig.dbPath} does not match runtime schema ${this.resolvedConfig.runtimeSchemaSnapshotSubdir}. Run db:migrate or recreate it explicitly.`,
     );
   }
 
   private async applyActiveSchemaDdl(): Promise<void> {
     const generatedSqlDdlPath = path.resolve(
       process.cwd(),
-      `db/${activeSchemaVersion}/generated-sql-ddl/schema.sql`,
+      `db/${this.resolvedConfig.runtimeSchemaSnapshotSubdir}/generated-sql-ddl/schema.sql`,
     );
     const ddl = await readFile(generatedSqlDdlPath, "utf8");
 

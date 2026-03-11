@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -8,23 +8,29 @@ import path from "node:path";
 import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { activeSchemaVersion } from "../db/config.js";
+import { configuredRuntimeSchemaSnapshotSubdir } from "../db/config.js";
 import { prepareDatabase } from "../db/prepare.mjs";
 import { manageTestData } from "../db/test-data.mjs";
 import {
   openDatabaseFromPath,
   readCurrentSchemaName,
 } from "../db/runtime-db-state.mjs";
+import {
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+} from "../db/sqlite-db-paths.mjs";
 import { seededTestAccounts } from "../backend/modules/auth/auth.seed-data.js";
 
 const TEMP_DIR_PREFIX = "giganttic-db-lifecycle-";
-const TEST_DB_FILE_NAME = "dev-lifecycle.sqlite";
 const ISSUE_STATUSES_TABLE_NAME = "IssueStatuses";
 const NON_TEST_EMAIL = "realuser@example.com";
 const NON_TEST_USERNAME = "realuser";
 
-function createRelativeDbPath(tempDir: string) {
-  return path.relative(process.cwd(), path.join(tempDir, TEST_DB_FILE_NAME));
+function createTargetDbPath(projectRoot: string, dbTarget: "dev" | "prod") {
+  return path.join(
+    projectRoot,
+    dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
+  );
 }
 
 async function querySingleNumber(dbPath: string, sql: string) {
@@ -143,6 +149,7 @@ async function createEmptyDbFile(dbPath: string) {
   const db = new SQL.Database();
   const bytes = db.export();
   db.close();
+  await mkdir(path.dirname(dbPath), { recursive: true });
   await writeFile(dbPath, Buffer.from(bytes));
 }
 
@@ -173,24 +180,22 @@ describe("db lifecycle scripts", () => {
   it("prepareDatabase in dev mode creates a missing DB and seeds reference plus test data idempotently", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe(activeSchemaVersion);
+    expect(await readSchemaName(dbPath)).toBe(
+      configuredRuntimeSchemaSnapshotSubdir,
+    );
     const firstSeededUserCount = await countSeededUsers(dbPath);
     expect(firstSeededUserCount).toBe(Object.keys(seededTestAccounts).length);
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
     const secondSeededUserCount = await countSeededUsers(dbPath);
@@ -200,44 +205,37 @@ describe("db lifecycle scripts", () => {
   it("prepareDatabase in prod mode fails when test data is present", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
+    const devDbPath = createTargetDbPath(tempDir, "dev");
+    const prodDbPath = createTargetDbPath(tempDir, "prod");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: relativeDbPath,
-      },
+      projectRoot: tempDir,
     });
+    await writeFile(prodDbPath, await readFile(devDbPath));
 
     await expect(prepareDatabase({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: relativeDbPath,
-      },
+      projectRoot: tempDir,
     })).rejects.toThrow(/Test data is present/i);
 
-    expect(await countSeededUsers(dbPath)).toBeGreaterThan(0);
+    expect(await countSeededUsers(prodDbPath)).toBeGreaterThan(0);
   }, 20_000);
 
   it("manageTestData can report and purge seeded test data", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
     await expect(manageTestData({
       dbTarget: "dev",
-      env,
       mode: "status",
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       mode: "status",
       present: true,
@@ -245,14 +243,14 @@ describe("db lifecycle scripts", () => {
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     });
 
     await expect(manageTestData({
       dbTarget: "dev",
-      env,
       mode: "status",
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       mode: "status",
       present: false,
@@ -264,53 +262,44 @@ describe("db lifecycle scripts", () => {
   it("prepareDatabase in prod mode succeeds without modifying a cleaned DB", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
+    const devDbPath = createTargetDbPath(tempDir, "dev");
+    const prodDbPath = createTargetDbPath(tempDir, "prod");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: relativeDbPath,
-      },
+      projectRoot: tempDir,
     });
 
     await manageTestData({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: relativeDbPath,
-      },
       mode: "purge",
+      projectRoot: tempDir,
     });
+    await writeFile(prodDbPath, await readFile(devDbPath));
 
-    const beforeHash = await createFileHash(dbPath);
+    const beforeHash = await createFileHash(prodDbPath);
 
     await expect(prepareDatabase({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: relativeDbPath,
-      },
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       dbTarget: "prod",
-      targetDbPath: dbPath,
+      targetDbPath: prodDbPath,
     });
 
-    const afterHash = await createFileHash(dbPath);
+    const afterHash = await createFileHash(prodDbPath);
     expect(afterHash).toBe(beforeHash);
-    expect(await countManagedTestDataRecords(dbPath)).toBe(0);
+    expect(await countManagedTestDataRecords(prodDbPath)).toBe(0);
   }, 20_000);
 
   it("purges tracked test data even after a seeded row changes non-id fields", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
     await renameSeededUser(dbPath);
 
@@ -321,8 +310,8 @@ describe("db lifecycle scripts", () => {
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     });
 
     expect(await countAllUsers(dbPath)).toBe(0);
@@ -332,23 +321,19 @@ describe("db lifecycle scripts", () => {
   it("purges tracked test data for renamed tracked projects and leaves non-test rows untouched", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
     await insertNonTestUser(dbPath);
     await renameSeededProject(dbPath);
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     });
 
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
@@ -359,22 +344,18 @@ describe("db lifecycle scripts", () => {
   it("purges tracked test data successfully even if some tracked rows were deleted beforehand", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
     await deleteOneSeededUser(dbPath);
 
     await expect(manageTestData({
       dbTarget: "dev",
-      env,
       mode: "status",
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       mode: "status",
       present: true,
@@ -382,8 +363,8 @@ describe("db lifecycle scripts", () => {
 
     await expect(manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       mode: "purge",
       present: false,
@@ -396,15 +377,11 @@ describe("db lifecycle scripts", () => {
   it("manageTestData ensure is idempotent and repairs stale tracked IDs after manual deletion", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
     const initialTrackedRecordCount = await countManagedTestDataRecords(dbPath);
@@ -412,8 +389,8 @@ describe("db lifecycle scripts", () => {
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "ensure",
+      projectRoot: tempDir,
     });
 
     const repairedTrackedRecordCount = await countManagedTestDataRecords(dbPath);
@@ -422,8 +399,8 @@ describe("db lifecycle scripts", () => {
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "ensure",
+      projectRoot: tempDir,
     });
 
     expect(await countManagedTestDataRecords(dbPath)).toBe(repairedTrackedRecordCount);
@@ -433,27 +410,23 @@ describe("db lifecycle scripts", () => {
   it("manageTestData purge is idempotent when run multiple times", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
     await manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     });
 
     await expect(manageTestData({
       dbTarget: "dev",
-      env,
       mode: "purge",
+      projectRoot: tempDir,
     })).resolves.toMatchObject({
       mode: "purge",
       present: false,
@@ -466,15 +439,11 @@ describe("db lifecycle scripts", () => {
   it("prepareDatabase in dev mode preserves non-test rows while keeping reference data stable", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
-    const env = {
-      GGTC_DEV_DB_PATH: relativeDbPath,
-    };
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
     await insertNonTestUser(dbPath);
 
@@ -482,7 +451,7 @@ describe("db lifecycle scripts", () => {
 
     await prepareDatabase({
       dbTarget: "dev",
-      env,
+      projectRoot: tempDir,
     });
 
     expect(await countUserByUsername(dbPath, NON_TEST_USERNAME)).toBe(1);
@@ -493,16 +462,13 @@ describe("db lifecycle scripts", () => {
   it("prepareDatabase fails cleanly when the DB exists but has no schema metadata", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
-    const relativeDbPath = createRelativeDbPath(tempDir);
-    const dbPath = path.join(process.cwd(), relativeDbPath);
+    const dbPath = createTargetDbPath(tempDir, "dev");
 
     await createEmptyDbFile(dbPath);
 
     await expect(prepareDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: relativeDbPath,
-      },
-    })).rejects.toThrow(/active schema is/i);
+      projectRoot: tempDir,
+    })).rejects.toThrow(/runtime schema is/i);
   }, 20_000);
 });

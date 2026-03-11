@@ -169,7 +169,9 @@ describe("AuthSessionContext", () => {
 
     renderWithProvider();
 
-    expect(await screen.findByTestId("status")).toHaveTextContent("error");
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("error");
+    });
     expect(screen.getByTestId("message")).toHaveTextContent("Invalid or expired session");
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
   });
@@ -195,7 +197,9 @@ describe("AuthSessionContext", () => {
 
     renderWithProvider();
 
-    expect(await screen.findByTestId("status")).toHaveTextContent("error");
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("error");
+    });
     await user.click(screen.getByRole("button", { name: DISMISS_BUTTON_LABEL }));
     expect(await screen.findByTestId("status")).toHaveTextContent("anonymous");
   });

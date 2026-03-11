@@ -16,6 +16,8 @@ if (!schemaName) {
   throw new Error("Usage: node db/generate-schema-snapshot.mjs --schema <schema-name>");
 }
 
+process.env.GGTC_DB_SCHEMA_SNAPSHOT_SUBDIR = schemaName;
+
 await generateSchemaSnapshot({
   schemaName,
 });

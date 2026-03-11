@@ -30,6 +30,9 @@ if (!fromSchemaName || !toSchemaName) {
   );
 }
 
+process.env.GGTC_DB_SCHEMA_MIGRATION_SUBDIR_FROM = fromSchemaName;
+process.env.GGTC_DB_SCHEMA_MIGRATION_SUBDIR_TO = toSchemaName;
+
 await generateMigration({
   fromSchemaName,
   toSchemaName,

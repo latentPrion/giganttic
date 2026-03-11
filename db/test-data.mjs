@@ -110,10 +110,11 @@ async function manageTestData({
 }) {
   ensureSupportedMode(mode);
   ensureSupportedTarget(dbTarget);
+  process.env.GGTC_DB_MIGRATION_TARGET = dbTarget;
 
   const {
     targetDbPath,
-  } = resolveDbTargetPaths(projectRoot, dbTarget, "test-data", env);
+  } = resolveDbTargetPaths(projectRoot, dbTarget, "test-data");
   if (mode === "ensure") {
     return {
       mode,

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { activeSchemaVersion, availableSchemaVersions } from "./config.js";
+import {
+  availableSchemaVersions,
+  configuredRuntimeSchemaSnapshotSubdir,
+  resolveRuntimeSchemaSnapshotSubdir,
+} from "./config.js";
 import * as v1 from "./v1/index.js";
 import * as v2 from "./v2/index.js";
 
@@ -11,11 +15,19 @@ const schemaModules = {
 
 type SchemaModuleVersion = keyof typeof schemaModules;
 
+const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
+  process.env,
+);
+
 const activeDbModule = schemaModules[
-  activeSchemaVersion as SchemaModuleVersion
+  runtimeSchemaSnapshotSubdir as SchemaModuleVersion
 ] as typeof v2;
 
-export { activeSchemaVersion, availableSchemaVersions };
+export {
+  availableSchemaVersions,
+  configuredRuntimeSchemaSnapshotSubdir,
+  runtimeSchemaSnapshotSubdir,
+};
 
 export const {
   closedReasonCodes,

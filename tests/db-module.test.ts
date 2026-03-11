@@ -1,8 +1,9 @@
 import {
-  activeSchemaVersion,
   availableSchemaVersions,
+  configuredRuntimeSchemaSnapshotSubdir,
   credentialTypeCodes,
   projectsInsertSchema,
+  runtimeSchemaSnapshotSubdir,
   systemRoleCodes,
   teamsInsertSchema,
   users,
@@ -13,8 +14,11 @@ import { describe, expect, it } from "vitest";
 
 describe("db module facade", () => {
   it("resolves the configured schema version through the db alias", () => {
-    expect(availableSchemaVersions).toContain(activeSchemaVersion);
-    expect(activeSchemaVersion).toBe("v2");
+    expect(availableSchemaVersions).toContain(
+      configuredRuntimeSchemaSnapshotSubdir,
+    );
+    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v2");
+    expect(runtimeSchemaSnapshotSubdir).toBe("v2");
     expect(users).toBeDefined();
   });
 

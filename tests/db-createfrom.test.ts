@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createDatabaseFromSchema,
   parseCreateFromArgs,
+  resolveCreateFromTargetPath,
 } from "../db/create-from-schema.mjs";
 import { migrateDatabase } from "../db/migrate.mjs";
 import { prepareDatabase } from "../db/prepare.mjs";
@@ -16,7 +17,11 @@ import {
   openDatabaseFromPath,
   readCurrentSchemaName,
 } from "../db/runtime-db-state.mjs";
-import { activeSchemaVersion } from "../db/config.js";
+import { configuredRuntimeSchemaSnapshotSubdir } from "../db/config.js";
+import {
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+} from "../db/sqlite-db-paths.mjs";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-createfrom-test-";
 const CUSTOM_SCHEMA_SQL = `
@@ -25,15 +30,27 @@ CREATE TABLE "_Giganttic_RuntimeMetadata" (
   "value" text NOT NULL
 );
 `;
+const MISSING_SCHEMA_TS_SCHEMA_NAME = "missing-schema-ts-case";
+const MISSING_SCHEMA_SQL_SCHEMA_NAME = "missing-schema-sql-case";
 
 let tempProjectRoot = "";
 
 async function createTempProjectRoot() {
   tempProjectRoot = await mkdtemp(path.join(os.tmpdir(), TEMP_ROOT_PREFIX));
+  await cp(path.join(process.cwd(), "db"), path.join(tempProjectRoot, "db"), {
+    recursive: true,
+  });
 }
 
 function createTempDbPath(fileName: string) {
   return path.join(tempProjectRoot, fileName);
+}
+
+function createDefaultTargetDbPath(dbTarget: "dev" | "prod") {
+  return path.join(
+    tempProjectRoot,
+    dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
+  );
 }
 
 async function pathExists(targetPath: string) {
@@ -120,13 +137,10 @@ describe("db createfrom tooling", () => {
 
   it("creates a fresh dev DB from an explicit schema snapshot", async () => {
     await createTempProjectRoot();
-    const dbPath = createTempDbPath("fresh-dev.sqlite");
+    const dbPath = createDefaultTargetDbPath("dev");
     const result = await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
@@ -137,13 +151,10 @@ describe("db createfrom tooling", () => {
 
   it("creates a fresh prod DB from an explicit schema snapshot", async () => {
     await createTempProjectRoot();
-    const dbPath = createTempDbPath("fresh-prod.sqlite");
+    const dbPath = createDefaultTargetDbPath("prod");
     const result = await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: dbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v2",
     });
 
@@ -152,17 +163,13 @@ describe("db createfrom tooling", () => {
     await expect(readSchemaNameFromDb(result.targetDbPath)).resolves.toBe("v2");
   });
 
-  it("respects GGTC_DEV_DB_PATH when creating the dev DB", async () => {
+  it("uses the canonical default dev DB target path", async () => {
     await createTempProjectRoot();
-    const customDbPath = path.join(tempProjectRoot, "nested", "dev", "custom-dev.sqlite");
-    const expectedPath = customDbPath;
+    const expectedPath = createDefaultTargetDbPath("dev");
 
     const result = await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: customDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
@@ -171,17 +178,13 @@ describe("db createfrom tooling", () => {
     await expect(readSchemaNameFromDb(expectedPath)).resolves.toBe("v1");
   });
 
-  it("respects GGTC_DB_PATH when creating the prod DB", async () => {
+  it("uses the canonical default prod DB target path", async () => {
     await createTempProjectRoot();
-    const customDbPath = path.join(tempProjectRoot, "nested", "prod", "custom-prod.sqlite");
-    const expectedPath = customDbPath;
+    const expectedPath = createDefaultTargetDbPath("prod");
 
     const result = await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: customDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v2",
     });
 
@@ -192,22 +195,16 @@ describe("db createfrom tooling", () => {
 
   it("refuses to overwrite an existing DB unless explicitly told to", async () => {
     await createTempProjectRoot();
-    const existingDbPath = createTempDbPath("existing-dev.sqlite");
+    const existingDbPath = createDefaultTargetDbPath("dev");
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: existingDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
     await expect(createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: existingDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v2",
     })).rejects.toThrow(/--overwrite-existing/);
 
@@ -216,25 +213,19 @@ describe("db createfrom tooling", () => {
 
   it("replaces an existing DB when overwrite is explicitly enabled", async () => {
     await createTempProjectRoot();
-    const existingDbPath = createTempDbPath("existing-prod.sqlite");
+    const existingDbPath = createDefaultTargetDbPath("prod");
 
     await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: existingDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
     await writeGarbageDb(existingDbPath);
 
     await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: existingDbPath,
-      },
       overwriteExisting: true,
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v2",
     });
 
@@ -243,14 +234,11 @@ describe("db createfrom tooling", () => {
 
   it("overwrite replaces the entire DB contents and leaves no applied migrations table", async () => {
     await createTempProjectRoot();
-    const existingDbPath = createTempDbPath("noise-prod.sqlite");
+    const existingDbPath = createDefaultTargetDbPath("prod");
 
     await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: existingDbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
@@ -264,11 +252,8 @@ describe("db createfrom tooling", () => {
 
     await createDatabaseFromSchema({
       dbTarget: "prod",
-      env: {
-        GGTC_DB_PATH: existingDbPath,
-      },
       overwriteExisting: true,
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v2",
     });
 
@@ -283,7 +268,7 @@ describe("db createfrom tooling", () => {
 
     await expect(createDatabaseFromSchema({
       dbTarget: "proddev",
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     })).rejects.toThrow(/db:createfrom does not support --on proddev/i);
   });
@@ -293,34 +278,42 @@ describe("db createfrom tooling", () => {
 
     await expect(createDatabaseFromSchema({
       dbTarget: "sandbox" as never,
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     })).rejects.toThrow(/--on must be one of/i);
   });
 
   it("fails clearly when schema.ts is missing for the requested schema", async () => {
     await createTempProjectRoot();
-    const schemaDirPath = path.join(tempProjectRoot, "db", "test-schema");
+    const schemaDirPath = path.join(
+      tempProjectRoot,
+      "db",
+      MISSING_SCHEMA_TS_SCHEMA_NAME,
+    );
     await mkdir(path.join(schemaDirPath, "generated-sql-ddl"), { recursive: true });
     await writeFile(path.join(schemaDirPath, "generated-sql-ddl", "schema.sql"), CUSTOM_SCHEMA_SQL);
 
     await expect(createDatabaseFromSchema({
       dbTarget: "dev",
       projectRoot: tempProjectRoot,
-      schemaName: "test-schema",
+      schemaName: MISSING_SCHEMA_TS_SCHEMA_NAME,
     })).rejects.toThrow(/Missing schema\.ts/i);
   });
 
   it("fails clearly when generated schema.sql is missing for the requested schema", async () => {
     await createTempProjectRoot();
-    const schemaDirPath = path.join(tempProjectRoot, "db", "test-schema");
+    const schemaDirPath = path.join(
+      tempProjectRoot,
+      "db",
+      MISSING_SCHEMA_SQL_SCHEMA_NAME,
+    );
     await mkdir(schemaDirPath, { recursive: true });
     await writeFile(path.join(schemaDirPath, "schema.ts"), "export {};\n");
 
     await expect(createDatabaseFromSchema({
       dbTarget: "dev",
       projectRoot: tempProjectRoot,
-      schemaName: "test-schema",
+      schemaName: MISSING_SCHEMA_SQL_SCHEMA_NAME,
     })).rejects.toThrow(/Missing generated schema\.sql/i);
   });
 
@@ -337,15 +330,12 @@ describe("db createfrom tooling", () => {
     await expect(readSchemaNameFromDb(result.targetDbPath)).resolves.toBe("foobar-v6.7");
   });
 
-  it("creates parent directories for nested overridden DB paths", async () => {
+  it("creates parent directories for the canonical nested dev DB path", async () => {
     await createArbitrarySchemaProjectRoot("test-schema");
-    const nestedDbPath = path.join(tempProjectRoot, "a", "deep", "tree", "test.sqlite");
+    const nestedDbPath = resolveCreateFromTargetPath(tempProjectRoot, "dev");
 
     const result = await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: path.relative(tempProjectRoot, nestedDbPath),
-      },
       projectRoot: tempProjectRoot,
       schemaName: "test-schema",
     });
@@ -356,15 +346,12 @@ describe("db createfrom tooling", () => {
 
   it("does not seed reference data or test data by itself", async () => {
     await createTempProjectRoot();
-    const dbPath = createTempDbPath("unseeded-dev.sqlite");
+    const dbPath = createDefaultTargetDbPath("dev");
 
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
-      projectRoot: process.cwd(),
-      schemaName: activeSchemaVersion,
+      projectRoot: tempProjectRoot,
+      schemaName: configuredRuntimeSchemaSnapshotSubdir,
     });
 
     await expect(countRows(dbPath, "Users")).resolves.toBe(0);
@@ -374,23 +361,17 @@ describe("db createfrom tooling", () => {
 
   it("supports createfrom v1 followed by migrate v1--v2", async () => {
     await createTempProjectRoot();
-    const devDbPath = createTempDbPath("migrate-dev.sqlite");
+    const devDbPath = createDefaultTargetDbPath("dev");
     await cp(path.join(process.cwd(), "db"), path.join(tempProjectRoot, "db"), { recursive: true });
 
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: devDbPath,
-      },
       projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
     await migrateDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: devDbPath,
-      },
       migrationPairName: "v1--v2",
       projectRoot: tempProjectRoot,
     });
@@ -402,45 +383,34 @@ describe("db createfrom tooling", () => {
   it("fails migrating v1--v2 after createfrom already created a v2 DB", async () => {
     await createTempProjectRoot();
     await cp(path.join(process.cwd(), "db"), path.join(tempProjectRoot, "db"), { recursive: true });
-    const devDbPath = createTempDbPath("already-v2.sqlite");
+    const devDbPath = createDefaultTargetDbPath("dev");
 
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: devDbPath,
-      },
       projectRoot: tempProjectRoot,
       schemaName: "v2",
     });
 
     await expect(migrateDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: devDbPath,
-      },
       migrationPairName: "v1--v2",
       projectRoot: tempProjectRoot,
     })).rejects.toThrow(/migration expects v1/i);
   }, 20_000);
 
-  it("prepare succeeds after createfrom when the created schema is the active schema", async () => {
+  it("prepare succeeds after createfrom when the created schema matches the runtime schema", async () => {
     await createTempProjectRoot();
-    const dbPath = path.join(tempProjectRoot, "prepared-dev.sqlite");
+    const dbPath = createDefaultTargetDbPath("dev");
 
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
-      projectRoot: process.cwd(),
-      schemaName: activeSchemaVersion,
+      projectRoot: tempProjectRoot,
+      schemaName: configuredRuntimeSchemaSnapshotSubdir,
     });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
+      projectRoot: tempProjectRoot,
     })).resolves.toMatchObject({
       dbTarget: "dev",
       targetDbPath: dbPath,
@@ -450,24 +420,18 @@ describe("db createfrom tooling", () => {
     expect(await countRows(dbPath, "ManagedTestDataRecords")).toBeGreaterThan(0);
   }, 20_000);
 
-  it("prepare fails after createfrom when the created schema is not the active schema", async () => {
+  it("prepare fails after createfrom when the created schema does not match the runtime schema", async () => {
     await createTempProjectRoot();
-    const dbPath = path.join(tempProjectRoot, "prepared-dev.sqlite");
 
     await createDatabaseFromSchema({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
-      projectRoot: process.cwd(),
+      projectRoot: tempProjectRoot,
       schemaName: "v1",
     });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
-      env: {
-        GGTC_DEV_DB_PATH: dbPath,
-      },
-    })).rejects.toThrow(/active schema is/i);
+      projectRoot: tempProjectRoot,
+    })).rejects.toThrow(/runtime schema is/i);
   }, 20_000);
 });

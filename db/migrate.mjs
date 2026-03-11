@@ -139,18 +139,15 @@ function resolveDbPath(projectRoot, candidatePath) {
   return path.resolve(projectRoot, candidatePath);
 }
 
-function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName, env) {
+function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName) {
   if (dbTarget === "dev") {
     return {
       sourceDbPath: null,
-      targetDbPath: resolveDbPath(
-        projectRoot,
-        env.GGTC_DEV_DB_PATH ?? defaultDevSqliteDbPath,
-      ),
+      targetDbPath: resolveDbPath(projectRoot, defaultDevSqliteDbPath),
     };
   }
 
-  const prodDbPath = env.GGTC_DB_PATH ?? defaultProdSqliteDbPath;
+  const prodDbPath = defaultProdSqliteDbPath;
 
   if (dbTarget === "prod") {
     return {
@@ -159,8 +156,7 @@ function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName, env) {
     };
   }
 
-  const proddevDbPath = env.GGTC_PRODDEV_DB_PATH
-    ?? createDefaultProddevSqliteDbPath(migrationPairName);
+  const proddevDbPath = createDefaultProddevSqliteDbPath(migrationPairName);
 
   return {
     sourceDbPath: resolveDbPath(projectRoot, prodDbPath),
@@ -285,7 +281,6 @@ async function applyMigrationToSqliteDatabase({
 
 async function migrateDatabase({
   dbTarget,
-  env = process.env,
   migrationPairName,
   projectRoot = process.cwd(),
 }) {
@@ -298,10 +293,13 @@ async function migrateDatabase({
 
   await ensureMigrationFilesExist(migrationFilePaths);
 
+  process.env.GGTC_DB_MIGRATION_TARGET = dbTarget;
+  process.env.GGTC_DB_MIGRATION_WITH_SUBDIR = migrationPairName;
+
   const {
     sourceDbPath,
     targetDbPath,
-  } = resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName, env);
+  } = resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName);
 
   if (dbTarget === "proddev") {
     await copyDbForProddev(sourceDbPath, targetDbPath);

@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { generateSchemaSnapshot } from "./drizzle-tooling.mjs";
 
 function parseSchemaNameFromArgs(argv) {
@@ -12,11 +10,13 @@ function parseSchemaNameFromArgs(argv) {
   return null;
 }
 
-const config = JSON.parse(
-  await readFile(new URL("./config.json", import.meta.url), "utf8"),
-);
-const schemaName = parseSchemaNameFromArgs(process.argv.slice(2))
-  ?? config.activeSchemaVersion;
+const schemaName = parseSchemaNameFromArgs(process.argv.slice(2));
+
+if (!schemaName) {
+  throw new Error("Usage: node db/generate-ddl.mjs --schema <schema-name>");
+}
+
+process.env.GGTC_DB_SCHEMA_SNAPSHOT_SUBDIR = schemaName;
 
 await generateSchemaSnapshot({
   schemaName,

@@ -1,5 +1,10 @@
 import path from "node:path";
 
+import {
+  resolveRuntimeSchemaSnapshotSubdir,
+  resolveRuntimeTarget,
+} from "../../db/config.js";
+
 export interface BackendConfig {
   dbPath: string;
   ensureReferenceData: boolean;
@@ -7,6 +12,7 @@ export interface BackendConfig {
   host: string;
   port: number;
   routePrefix: string;
+  runtimeSchemaSnapshotSubdir: string;
   seedTestAccounts: boolean;
   sessionTtlMs: number;
   createDbIfMissing: boolean;
@@ -18,13 +24,14 @@ export function buildBackendConfig(
   overrides: Partial<BackendConfig> = {},
 ): BackendConfig {
   return {
-    dbPath: path.resolve(process.cwd(), "run/giganttic.sqlite"),
+    dbPath: path.resolve(process.cwd(), resolveRuntimeTarget(process.env)),
     createDbIfMissing: false,
     ensureReferenceData: true,
     failIfTestDataPresent: false,
     host: "127.0.0.1",
     port: 3000,
     routePrefix: "stc-proj-mgmt/api",
+    runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),
     seedTestAccounts: false,
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
     ...overrides,
@@ -36,9 +43,8 @@ export function buildBackendConfigFromEnv(
 ): BackendConfig {
   const overrides: Partial<BackendConfig> = {};
 
-  if (env.GGTC_DB_PATH) {
-    overrides.dbPath = path.resolve(process.cwd(), env.GGTC_DB_PATH);
-  }
+  overrides.dbPath = path.resolve(process.cwd(), resolveRuntimeTarget(env));
+  overrides.runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(env);
 
   if (env.GGTC_CREATE_DB_IF_MISSING) {
     overrides.createDbIfMissing = env.GGTC_CREATE_DB_IF_MISSING !== "false";

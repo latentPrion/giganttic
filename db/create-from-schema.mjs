@@ -96,18 +96,12 @@ function createGeneratedSqlDdlFilePath(projectRoot, schemaName) {
   );
 }
 
-function resolveCreateFromTargetPath(projectRoot, dbTarget, env) {
+function resolveCreateFromTargetPath(projectRoot, dbTarget) {
   if (dbTarget === "dev") {
-    return resolveDbPath(
-      projectRoot,
-      env.GGTC_DEV_DB_PATH ?? defaultDevSqliteDbPath,
-    );
+    return resolveDbPath(projectRoot, defaultDevSqliteDbPath);
   }
 
-  return resolveDbPath(
-    projectRoot,
-    env.GGTC_DB_PATH ?? defaultProdSqliteDbPath,
-  );
+  return resolveDbPath(projectRoot, defaultProdSqliteDbPath);
 }
 
 async function pathExists(targetPath) {
@@ -136,7 +130,6 @@ async function ensureSchemaSnapshotArtifactsExist(projectRoot, schemaName) {
 
 async function createDatabaseFromSchema({
   dbTarget,
-  env = process.env,
   overwriteExisting = false,
   projectRoot = process.cwd(),
   schemaName,
@@ -146,7 +139,10 @@ async function createDatabaseFromSchema({
   ensureNonEmptyValue(schemaName, "Schema name");
   await ensureSchemaSnapshotArtifactsExist(projectRoot, schemaName);
 
-  const targetDbPath = resolveCreateFromTargetPath(projectRoot, dbTarget, env);
+  process.env.GGTC_DB_MIGRATION_TARGET = dbTarget;
+  process.env.GGTC_DB_MIGRATION_SNAPSHOT_SUBDIR = schemaName;
+
+  const targetDbPath = resolveCreateFromTargetPath(projectRoot, dbTarget);
 
   if (await pathExists(targetDbPath)) {
     if (!overwriteExisting) {
@@ -192,4 +188,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export {
   createDatabaseFromSchema,
   parseArgs as parseCreateFromArgs,
+  resolveCreateFromTargetPath,
 };
