@@ -5,20 +5,33 @@ import {
   BACKEND_CONFIG,
   type BackendConfig,
 } from "../../config/backend-config.js";
-import { AuthService } from "./auth.service.js";
+import { TestDataService } from "../test-data/test-data.service.js";
+import { AuthReferenceDataService } from "./auth-reference-data.service.js";
 
 @Injectable()
 export class AuthSeedService implements OnModuleInit {
   constructor(
-    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(AuthReferenceDataService)
+    private readonly authReferenceDataService: AuthReferenceDataService,
+    @Inject(TestDataService)
+    private readonly testDataService: TestDataService,
     @Inject(BACKEND_CONFIG) private readonly config: BackendConfig,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    if (!this.config.seedTestAccounts) {
-      return;
+    if (this.config.ensureReferenceData) {
+      await this.authReferenceDataService.ensureReferenceData();
     }
 
-    await this.authService.ensureSeedData();
+    if (this.config.seedTestAccounts) {
+      await this.testDataService.ensureTestData();
+    }
+
+    if (
+      this.config.failIfTestDataPresent
+      && await this.testDataService.hasTestData()
+    ) {
+      throw new Error("Test data is present but forbidden by backend config.");
+    }
   }
 }

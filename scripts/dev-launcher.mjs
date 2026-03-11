@@ -5,7 +5,7 @@ import process from "node:process";
 const SCRIPT_NAMES = {
   backendBuild: "backend:build",
   backendStart: "backend:start",
-  dbCreate: "db:create",
+  dbPrepare: "db:prepare",
   frontendDev: "frontend:dev",
   frontendDevLan: "frontend:dev:lan",
 };
@@ -20,8 +20,8 @@ const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM"];
 const NPM_EXECUTABLE = process.platform === "win32" ? "npm.cmd" : "npm";
 const LAN_FLAG = "--lan";
 
-function buildScriptCommand(scriptName) {
-  return ["run", scriptName];
+function buildScriptCommand(scriptName, extraArgs = []) {
+  return ["run", scriptName, ...extraArgs];
 }
 
 function isLanModeEnabled(argv) {
@@ -44,11 +44,11 @@ function buildDetachedSpawnOptions() {
   };
 }
 
-function runBlockingScript(scriptName) {
+function runBlockingScript(scriptName, extraArgs = []) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       NPM_EXECUTABLE,
-      buildScriptCommand(scriptName),
+      buildScriptCommand(scriptName, extraArgs),
       buildInheritedSpawnOptions(),
     );
 
@@ -130,7 +130,7 @@ function registerChildExitHandlers(childProcesses) {
 }
 
 async function prepareRuntime() {
-  await runBlockingScript(SCRIPT_NAMES.dbCreate);
+  await runBlockingScript(SCRIPT_NAMES.dbPrepare, ["--", "--on", "dev"]);
   await runBlockingScript(SCRIPT_NAMES.backendBuild);
 }
 

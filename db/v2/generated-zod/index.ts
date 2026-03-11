@@ -5,6 +5,7 @@ import {
   credentialTypes,
   issueStatuses,
   issues,
+  managedTestDataRecords,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -42,6 +43,11 @@ export const organizationsSelectSchema = createSelectSchema(organizations);
 
 export const issuesInsertSchema = createInsertSchema(issues);
 export const issuesSelectSchema = createSelectSchema(issues);
+
+export const managedTestDataRecordsInsertSchema =
+  createInsertSchema(managedTestDataRecords);
+export const managedTestDataRecordsSelectSchema =
+  createSelectSchema(managedTestDataRecords);
 
 export const systemRolesInsertSchema = createInsertSchema(systemRoles);
 export const systemRolesSelectSchema = createSelectSchema(systemRoles);

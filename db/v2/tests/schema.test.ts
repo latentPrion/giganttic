@@ -15,6 +15,7 @@ import {
   organizationsTeamsInsertSchema,
   issuesInsertSchema,
   issueStatusesInsertSchema,
+  managedTestDataRecordsInsertSchema,
   projectsOrganizationsInsertSchema,
   projectsInsertSchema,
   projectsTeamsInsertSchema,
@@ -148,5 +149,16 @@ describe("auth and access v2 zod schemas", () => {
     expect(issue.priority).toBe(2);
     expect(issue.projectId).toBe(7);
     expect(issue.status).toBe(issueStatusCodes.open);
+  });
+
+  it("accepts a managed test-data tracking insert payload", () => {
+    const trackedRow = managedTestDataRecordsInsertSchema.parse({
+      entityId: 7,
+      entityTable: "Users",
+      seedKey: "user:admin",
+    });
+
+    expect(trackedRow.entityId).toBe(7);
+    expect(trackedRow.seedKey).toBe("user:admin");
   });
 });

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "606749a4-8e2d-49c0-9976-c9b5c3ceb307",
+  "id": "c1596e0c-b771-4fc9-b0df-91225461e045",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "ClosedReasons": {
@@ -291,6 +291,76 @@
           "value": "\"Issues\".\"progressPercentage\" >= 0 AND \"Issues\".\"progressPercentage\" <= 100"
         }
       }
+    },
+    "ManagedTestDataRecords": {
+      "name": "ManagedTestDataRecords",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "seedKey": {
+          "name": "seedKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityTable": {
+          "name": "entityTable",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityId": {
+          "name": "entityId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "ManagedTestDataRecords_seedKey_unique": {
+          "name": "ManagedTestDataRecords_seedKey_unique",
+          "columns": [
+            "seedKey"
+          ],
+          "isUnique": true
+        },
+        "ManagedTestDataRecords_entityTable_entityId_unique": {
+          "name": "ManagedTestDataRecords_entityTable_entityId_unique",
+          "columns": [
+            "entityTable",
+            "entityId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "OrganizationRoles": {
       "name": "OrganizationRoles",

@@ -38,6 +38,9 @@ export const {
   issuesInsertSchema,
   issuesRelations,
   issuesSelectSchema,
+  managedTestDataRecords,
+  managedTestDataRecordsInsertSchema,
+  managedTestDataRecordsSelectSchema,
   organizationRoleCodes,
   organizationRoles,
   organizationRolesInsertSchema,
@@ -138,6 +141,8 @@ export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type Issue = typeof issues.$inferSelect;
 export type NewIssue = typeof issues.$inferInsert;
+export type ManagedTestDataRecord = typeof managedTestDataRecords.$inferSelect;
+export type NewManagedTestDataRecord = typeof managedTestDataRecords.$inferInsert;
 export type SystemRole = typeof systemRoles.$inferSelect;
 export type NewSystemRole = typeof systemRoles.$inferInsert;
 export type ProjectRole = typeof projectRoles.$inferSelect;
@@ -192,6 +197,12 @@ export type OrganizationInsertInput = z.infer<typeof organizationsInsertSchema>;
 export type OrganizationRecord = z.infer<typeof organizationsSelectSchema>;
 export type IssueInsertInput = z.infer<typeof issuesInsertSchema>;
 export type IssueRecord = z.infer<typeof issuesSelectSchema>;
+export type ManagedTestDataRecordInsertInput = z.infer<
+  typeof managedTestDataRecordsInsertSchema
+>;
+export type ManagedTestDataRecordRecord = z.infer<
+  typeof managedTestDataRecordsSelectSchema
+>;
 export type SystemRoleInsertInput = z.infer<typeof systemRolesInsertSchema>;
 export type SystemRoleRecord = z.infer<typeof systemRolesSelectSchema>;
 export type ProjectRoleInsertInput = z.infer<typeof projectRolesInsertSchema>;

@@ -42,6 +42,17 @@ CREATE TABLE `Issues` (
 	CONSTRAINT "Issues_progressPercentage_range_check" CHECK("Issues"."progressPercentage" >= 0 AND "Issues"."progressPercentage" <= 100)
 );
 --> statement-breakpoint
+CREATE TABLE `ManagedTestDataRecords` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`seedKey` text NOT NULL,
+	`entityTable` text NOT NULL,
+	`entityId` integer NOT NULL,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+	`updatedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `ManagedTestDataRecords_seedKey_unique` ON `ManagedTestDataRecords` (`seedKey`);--> statement-breakpoint
+CREATE UNIQUE INDEX `ManagedTestDataRecords_entityTable_entityId_unique` ON `ManagedTestDataRecords` (`entityTable`,`entityId`);--> statement-breakpoint
 CREATE TABLE `OrganizationRoles` (
 	`code` text PRIMARY KEY NOT NULL,
 	`displayName` text NOT NULL,

@@ -80,6 +80,7 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
 
   async function buildApp(tempDirectory: string): Promise<NestFastifyApplication> {
     const config = buildBackendConfig({
+      createDbIfMissing: true,
       dbPath: path.join(tempDirectory, dbFileName),
       port: 0,
       seedTestAccounts: true,

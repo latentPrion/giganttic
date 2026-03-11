@@ -68,7 +68,7 @@ describe("db version selection pipeline", () => {
     db.close();
   });
 
-  it("rebuilds a stale v1 runtime database to the active v2 schema on startup", async () => {
+  it("fails startup for a stale v1 runtime database instead of silently rebuilding it", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-runtime-db-"));
     const dbPath = path.join(tempDir, "runtime.sqlite");
     tempDirs.push(tempDir);
@@ -87,32 +87,11 @@ describe("db version selection pipeline", () => {
     const app = moduleRef.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
     );
-    let isClosed = false;
 
-    try {
-      app.setGlobalPrefix(config.routePrefix);
-      await app.init();
-      await app.getHttpAdapter().getInstance().ready();
+    app.setGlobalPrefix(config.routePrefix);
 
-      const SQL = await initSqlJs();
-      await app.close();
-      isClosed = true;
-
-      const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-      try {
-        const result = db.exec(
-          "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('Projects', 'Organizations', 'Issues')",
-        );
-
-        expect(result[0]?.values[0]?.[0]).toBe(3);
-      } finally {
-        db.close();
-      }
-    } finally {
-      if (!isClosed) {
-        await app.close();
-      }
-    }
+    await expect(app.init()).rejects.toThrow(/does not match active schema/i);
+    await app.close();
   });
 
   it("exports organization team artifacts from the active db facade", () => {

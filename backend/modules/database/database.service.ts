@@ -127,22 +127,42 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.client.close();
-    const SQL = await initSqlJs();
-    this.client = new SQL.Database();
-    this.client.exec("PRAGMA foreign_keys = ON;");
+    if (this.isDatabaseEmpty()) {
+      if (!this.resolvedConfig.createDbIfMissing) {
+        throw new Error(
+          `Database at ${this.resolvedConfig.dbPath} is empty and createDbIfMissing is disabled.`,
+        );
+      }
 
+      await this.applyActiveSchemaDdl();
+      return;
+    }
+
+    throw new Error(
+      `Database at ${this.resolvedConfig.dbPath} does not match active schema ${activeSchemaVersion}. Run db:migrate or recreate it explicitly.`,
+    );
+  }
+
+  private async applyActiveSchemaDdl(): Promise<void> {
     const generatedSqlDdlPath = path.resolve(
       process.cwd(),
       `db/${activeSchemaVersion}/generated-sql-ddl/schema.sql`,
     );
     const ddl = await readFile(generatedSqlDdlPath, "utf8");
+
     for (const statement of ddl
       .split("--> statement-breakpoint")
       .map((entry) => entry.trim())
-        .filter(Boolean)) {
+      .filter(Boolean)) {
       this.client.exec(statement);
     }
+  }
+
+  private isDatabaseEmpty(): boolean {
+    const existingTableRows = this.client.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    );
+    return (existingTableRows[0]?.values ?? []).length === 0;
   }
 
   private hasActiveSchemaTables(): boolean {

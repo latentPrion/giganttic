@@ -81,7 +81,7 @@ describe("generated sqlite ddl for v2", () => {
 
     const presentTableCount = querySingleValue(
       db,
-      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         "Users",
         "CredentialTypes",
@@ -89,6 +89,7 @@ describe("generated sqlite ddl for v2", () => {
         "Teams",
         "Organizations",
         "Issues",
+        "ManagedTestDataRecords",
         "SystemRoles",
         "ProjectRoles",
         "TeamRoles",
@@ -113,7 +114,7 @@ describe("generated sqlite ddl for v2", () => {
       ["Roles", "Users_Roles"],
     );
 
-    expect(presentTableCount).toBe(22);
+    expect(presentTableCount).toBe(23);
     expect(removedTableCount).toBe(0);
     db.close();
   });
@@ -144,6 +145,18 @@ describe("generated sqlite ddl for v2", () => {
     const columnNames = result[0]?.values.map((row) => row[1]);
 
     expect(columnNames).toContain("journal");
+    db.close();
+  });
+
+  it("creates the managed test-data tracking table", async () => {
+    const db = await createV2Database();
+
+    const result = db.exec("PRAGMA table_info('ManagedTestDataRecords');");
+    const columnNames = result[0]?.values.map((row) => row[1]);
+
+    expect(columnNames).toContain("seedKey");
+    expect(columnNames).toContain("entityTable");
+    expect(columnNames).toContain("entityId");
     db.close();
   });
 

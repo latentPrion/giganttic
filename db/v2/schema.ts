@@ -175,6 +175,29 @@ export const issues = sqliteTable(
   ],
 );
 
+export const managedTestDataRecords = sqliteTable(
+  "ManagedTestDataRecords",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seedKey: text("seedKey").notNull(),
+    entityTable: text("entityTable").notNull(),
+    entityId: integer("entityId").notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowTimestampExpression),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowTimestampExpression),
+  },
+  (table) => [
+    uniqueIndex("ManagedTestDataRecords_seedKey_unique").on(table.seedKey),
+    uniqueIndex("ManagedTestDataRecords_entityTable_entityId_unique").on(
+      table.entityTable,
+      table.entityId,
+    ),
+  ],
+);
+
 export const credentialTypes = sqliteTable("CredentialTypes", {
   code: text("code").primaryKey(),
   displayName: text("displayName").notNull(),

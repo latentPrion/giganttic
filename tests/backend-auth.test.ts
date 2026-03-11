@@ -17,6 +17,7 @@ import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
 import {
   issues,
+  managedTestDataRecords,
   organizations,
   organizationsTeams,
   projects,
@@ -45,6 +46,7 @@ describe("backend auth api", () => {
 
   async function buildApp(): Promise<NestFastifyApplication> {
     const config = buildBackendConfig({
+      createDbIfMissing: true,
       dbPath: path.join(tempDir, "auth.sqlite"),
       port: 0,
       seedTestAccounts: true,
@@ -932,6 +934,13 @@ describe("backend auth api", () => {
       "GGTC_SYSTEMROLE_ADMIN",
     ]);
     expect(noRoleUserRoles).toEqual([]);
+    expect(
+      databaseService.db
+        .select({ id: managedTestDataRecords.id })
+        .from(managedTestDataRecords)
+        .all()
+        .length,
+    ).toBeGreaterThan(0);
 
     const loginResponse = await app.inject({
       method: "POST",
