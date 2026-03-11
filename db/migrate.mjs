@@ -20,8 +20,8 @@ import {
   PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
 } from "./migration-files.mjs";
 import {
-  createDefaultProddevSqliteDbPath,
   defaultDevSqliteDbPath,
+  defaultProddevSqliteDbPath,
   defaultProdSqliteDbPath,
 } from "./sqlite-db-paths.mjs";
 
@@ -156,11 +156,9 @@ function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName) {
     };
   }
 
-  const proddevDbPath = createDefaultProddevSqliteDbPath(migrationPairName);
-
   return {
     sourceDbPath: resolveDbPath(projectRoot, prodDbPath),
-    targetDbPath: resolveDbPath(projectRoot, proddevDbPath),
+    targetDbPath: resolveDbPath(projectRoot, defaultProddevSqliteDbPath),
   };
 }
 

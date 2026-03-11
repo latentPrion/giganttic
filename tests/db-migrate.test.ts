@@ -29,6 +29,7 @@ import {
 } from "../db/runtime-db-state.mjs";
 import {
   defaultDevSqliteDbPath,
+  defaultProddevSqliteDbPath,
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
 
@@ -192,9 +193,7 @@ describe("db migrate tooling", () => {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
     const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
-    const {
-      targetDbPath,
-    } = resolveDbTargetPaths(tempProjectRoot, "proddev", "foo--bar");
+    const targetDbPath = path.join(tempProjectRoot, defaultProddevSqliteDbPath);
 
     await migrateDatabase({
       dbTarget: "proddev",

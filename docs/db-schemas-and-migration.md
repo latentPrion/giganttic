@@ -171,7 +171,7 @@ Important discipline:
   - copies the configured prod DB to a local scratch DB first
   - applies the migration package to that copy
   - source DB path resolves to `run/giganttic-prod.sqlite`
-  - scratch target resolves to `run/giganttic-proddev-<migration-pair>.sqlite`
+  - scratch target resolves to `run/giganttic-proddev.sqlite`
 
 - `prod`
   - applies the migration package directly to `run/giganttic-prod.sqlite`
@@ -302,10 +302,19 @@ It:
 
 It does not:
 
+- create a missing DB
 - generate migrations
 - apply migrations
+- ensure test data
 - choose targets from env/config
 - wipe the DB
+
+This means `db:prepare` is only valid after one of:
+
+- `db:createfrom`
+- `db:migrate`
+
+For `dev`, `npm run dev` now assumes the dev DB already exists and has already been created or migrated explicitly.
 
 ## Test Data Management
 

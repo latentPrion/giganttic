@@ -417,7 +417,7 @@ describe("db createfrom tooling", () => {
     });
 
     expect(await countRows(dbPath, "IssueStatuses")).toBeGreaterThan(0);
-    expect(await countRows(dbPath, "ManagedTestDataRecords")).toBeGreaterThan(0);
+    expect(await countRows(dbPath, "ManagedTestDataRecords")).toBe(0);
   }, 20_000);
 
   it("prepare fails after createfrom when the created schema does not match the runtime schema", async () => {

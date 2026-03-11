@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +9,8 @@ import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { configuredRuntimeSchemaSnapshotSubdir } from "../db/config.js";
+import { createDatabaseFromSchema } from "../db/create-from-schema.mjs";
+import { migrateDatabase } from "../db/migrate.mjs";
 import { prepareDatabase } from "../db/prepare.mjs";
 import { manageTestData } from "../db/test-data.mjs";
 import {
@@ -17,6 +19,7 @@ import {
 } from "../db/runtime-db-state.mjs";
 import {
   defaultDevSqliteDbPath,
+  defaultProddevSqliteDbPath,
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
 import { seededTestAccounts } from "../backend/modules/auth/auth.seed-data.js";
@@ -31,6 +34,10 @@ function createTargetDbPath(projectRoot: string, dbTarget: "dev" | "prod") {
     projectRoot,
     dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
   );
+}
+
+function createProddevDbPath(projectRoot: string) {
+  return path.join(projectRoot, defaultProddevSqliteDbPath);
 }
 
 async function querySingleNumber(dbPath: string, sql: string) {
@@ -165,6 +172,36 @@ async function readSchemaName(dbPath: string) {
   return schemaName;
 }
 
+async function createRuntimeSchemaDb(projectRoot: string, dbTarget: "dev" | "prod") {
+  await ensureDbArtifacts(projectRoot);
+  return createDatabaseFromSchema({
+    dbTarget,
+    projectRoot,
+    schemaName: configuredRuntimeSchemaSnapshotSubdir,
+  });
+}
+
+async function ensureDbArtifacts(projectRoot: string) {
+  await cp(path.join(process.cwd(), "db"), path.join(projectRoot, "db"), {
+    errorOnExist: false,
+    force: false,
+    recursive: true,
+  });
+}
+
+async function prepareDevDbWithTestData(projectRoot: string) {
+  await createRuntimeSchemaDb(projectRoot, "dev");
+  await prepareDatabase({
+    dbTarget: "dev",
+    projectRoot,
+  });
+  await manageTestData({
+    dbTarget: "dev",
+    mode: "ensure",
+    projectRoot,
+  });
+}
+
 describe("db lifecycle scripts", () => {
   const tempDirs: string[] = [];
 
@@ -177,29 +214,97 @@ describe("db lifecycle scripts", () => {
     }
   });
 
-  it("prepareDatabase in dev mode creates a missing DB and seeds reference plus test data idempotently", async () => {
+  it("prepareDatabase in dev mode fails when the target DB is missing", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    tempDirs.push(tempDir);
+
+    await expect(prepareDatabase({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+    })).rejects.toThrow(/Missing DB for prepare target dev/i);
+  }, 20_000);
+
+  it("supports the explicit fresh dev flow of createfrom then prepare without ensuring test data", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
+    await createRuntimeSchemaDb(tempDir, "dev");
+
+    await expect(prepareDatabase({
       dbTarget: "dev",
+      projectRoot: tempDir,
+    })).resolves.toMatchObject({
+      dbTarget: "dev",
+      targetDbPath: dbPath,
+    });
+
+    expect(await readSchemaName(dbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await countIssueStatuses(dbPath)).toBeGreaterThan(0);
+    expect(await countManagedTestDataRecords(dbPath)).toBe(0);
+    await expect(manageTestData({
+      dbTarget: "dev",
+      mode: "status",
+      projectRoot: tempDir,
+    })).resolves.toMatchObject({
+      mode: "status",
+      present: false,
+    });
+  }, 20_000);
+
+  it("supports the explicit historical dev flow of createfrom then migrate then prepare", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+      schemaName: "v1",
+    });
+
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v1--v2",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe(
-      configuredRuntimeSchemaSnapshotSubdir,
-    );
-    const firstSeededUserCount = await countSeededUsers(dbPath);
-    expect(firstSeededUserCount).toBe(Object.keys(seededTestAccounts).length);
-
-    await prepareDatabase({
+    await expect(prepareDatabase({
       dbTarget: "dev",
+      projectRoot: tempDir,
+    })).resolves.toMatchObject({
+      dbTarget: "dev",
+      targetDbPath: dbPath,
+    });
+
+    expect(await readSchemaName(dbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await countIssueStatuses(dbPath)).toBeGreaterThan(0);
+    expect(await countManagedTestDataRecords(dbPath)).toBe(0);
+  }, 20_000);
+
+  it("supports the proddev sandbox flow by copying prod and migrating the copy without mutating prod", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    tempDirs.push(tempDir);
+    const prodDbPath = createTargetDbPath(tempDir, "prod");
+    const proddevDbPath = createProddevDbPath(tempDir);
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "prod",
+      projectRoot: tempDir,
+      schemaName: "v1",
+    });
+
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v1--v2",
       projectRoot: tempDir,
     });
 
-    const secondSeededUserCount = await countSeededUsers(dbPath);
-    expect(secondSeededUserCount).toBe(firstSeededUserCount);
+    expect(await readSchemaName(prodDbPath)).toBe("v1");
+    expect(await readSchemaName(proddevDbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await countIssueStatuses(proddevDbPath)).toBe(0);
   }, 20_000);
 
   it("prepareDatabase in prod mode fails when test data is present", async () => {
@@ -208,10 +313,7 @@ describe("db lifecycle scripts", () => {
     const devDbPath = createTargetDbPath(tempDir, "dev");
     const prodDbPath = createTargetDbPath(tempDir, "prod");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
     await writeFile(prodDbPath, await readFile(devDbPath));
 
     await expect(prepareDatabase({
@@ -227,10 +329,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
 
     await expect(manageTestData({
       dbTarget: "dev",
@@ -265,10 +364,7 @@ describe("db lifecycle scripts", () => {
     const devDbPath = createTargetDbPath(tempDir, "dev");
     const prodDbPath = createTargetDbPath(tempDir, "prod");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
 
     await manageTestData({
       dbTarget: "dev",
@@ -297,10 +393,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
     await renameSeededUser(dbPath);
 
     expect(await countSeededUsers(dbPath)).toBe(
@@ -323,10 +416,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
     await insertNonTestUser(dbPath);
     await renameSeededProject(dbPath);
 
@@ -346,10 +436,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
     await deleteOneSeededUser(dbPath);
 
     await expect(manageTestData({
@@ -379,10 +466,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
 
     const initialTrackedRecordCount = await countManagedTestDataRecords(dbPath);
     await deleteTrackedEntityBySeedKey(dbPath, seededTestAccounts.teamTeamManager.seedKey);
@@ -412,10 +496,7 @@ describe("db lifecycle scripts", () => {
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
-    await prepareDatabase({
-      dbTarget: "dev",
-      projectRoot: tempDir,
-    });
+    await prepareDevDbWithTestData(tempDir);
 
     await manageTestData({
       dbTarget: "dev",
@@ -436,11 +517,12 @@ describe("db lifecycle scripts", () => {
     expect(await countAllUsers(dbPath)).toBe(0);
   }, 20_000);
 
-  it("prepareDatabase in dev mode preserves non-test rows while keeping reference data stable", async () => {
+  it("prepareDatabase in dev mode preserves non-test rows while keeping reference data stable without ensuring test data", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
+    await createRuntimeSchemaDb(tempDir, "dev");
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
@@ -456,7 +538,8 @@ describe("db lifecycle scripts", () => {
 
     expect(await countUserByUsername(dbPath, NON_TEST_USERNAME)).toBe(1);
     expect(await countIssueStatuses(dbPath)).toBe(initialIssueStatusCount);
-    expect(await countSeededUsers(dbPath)).toBe(Object.keys(seededTestAccounts).length);
+    expect(await countSeededUsers(dbPath)).toBe(0);
+    expect(await countManagedTestDataRecords(dbPath)).toBe(0);
   }, 20_000);
 
   it("prepareDatabase fails cleanly when the DB exists but has no schema metadata", async () => {

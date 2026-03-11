@@ -1,10 +1,12 @@
-import { createMaintenanceContext } from "./backend-maintenance-context.mjs";
+import { access } from "node:fs/promises";
 import { resolveDbTargetPaths } from "./migrate.mjs";
 import {
   openDatabaseFromPath,
   persistDatabaseToPath,
+  readCurrentSchemaName,
 } from "./runtime-db-state.mjs";
 import {
+  ensureSeededTestData,
   hasSeededTestData,
   purgeSeededTestData,
 } from "./sqlite-test-data-manager.mjs";
@@ -52,30 +54,30 @@ function ensureSupportedMode(mode) {
   }
 }
 
-function createMaintenanceConfig(targetDbPath) {
-  return {
-    createDbIfMissing: false,
-    dbPath: targetDbPath,
-    ensureReferenceData: false,
-    failIfTestDataPresent: false,
-    port: 0,
-    seedTestAccounts: false,
-  };
+async function pathExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-async function ensureManagedTestData(targetDbPath, env) {
-  const appContext = await createMaintenanceContext(
-    {
-      ...createMaintenanceConfig(targetDbPath),
-      seedTestAccounts: true,
-    },
-    env,
-  );
+async function ensureManagedTestData(targetDbPath) {
+  const db = await openDatabaseFromPath(targetDbPath);
 
   try {
+    const schemaName = readCurrentSchemaName(db);
+
+    if (schemaName === null) {
+      throw new Error(`DB at ${targetDbPath} has no recorded schema name.`);
+    }
+
+    ensureSeededTestData(db, schemaName);
+    await persistDatabaseToPath(targetDbPath, db);
     return { present: true };
   } finally {
-    await appContext.close();
+    db.close();
   }
 }
 
@@ -104,7 +106,6 @@ async function purgeManagedTestData(targetDbPath) {
 
 async function manageTestData({
   dbTarget,
-  env = process.env,
   mode,
   projectRoot = process.cwd(),
 }) {
@@ -115,11 +116,16 @@ async function manageTestData({
   const {
     targetDbPath,
   } = resolveDbTargetPaths(projectRoot, dbTarget, "test-data");
+
+  if (!await pathExists(targetDbPath)) {
+    throw new Error(`Missing DB for test-data target ${dbTarget}: ${targetDbPath}`);
+  }
+
   if (mode === "ensure") {
     return {
       mode,
       targetDbPath,
-      ...(await ensureManagedTestData(targetDbPath, env)),
+      ...(await ensureManagedTestData(targetDbPath)),
     };
   }
 

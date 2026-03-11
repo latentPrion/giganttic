@@ -1,15 +1,13 @@
 import { access } from "node:fs/promises";
 
-import { createMaintenanceContext } from "./backend-maintenance-context.mjs";
-import { applySqlDdl } from "./apply-sql-ddl.mjs";
 import { resolveDbTargetPaths } from "./migrate.mjs";
 import {
   openDatabaseFromPath,
-  persistDatabaseToPath,
   readCurrentSchemaName,
-  writeCurrentSchemaName,
+  persistDatabaseToPath,
 } from "./runtime-db-state.mjs";
 import { resolveRuntimeSchemaSnapshotSubdir } from "./runtime-config.mjs";
+import { ensureReferenceData } from "./sqlite-reference-data-manager.mjs";
 import { hasSeededTestData } from "./sqlite-test-data-manager.mjs";
 
 const SUPPORTED_DB_TARGETS = ["dev", "proddev", "prod"];
@@ -48,20 +46,6 @@ async function pathExists(targetPath) {
   }
 }
 
-async function initializeDevDatabaseIfMissing(targetDbPath, schemaName) {
-  const dbExists = await pathExists(targetDbPath);
-
-  if (dbExists) {
-    return;
-  }
-
-  await applySqlDdl(targetDbPath, schemaName);
-  const db = await openDatabaseFromPath(targetDbPath);
-  writeCurrentSchemaName(db, schemaName);
-  await persistDatabaseToPath(targetDbPath, db);
-  db.close();
-}
-
 async function verifySchemaState(targetDbPath, expectedSchemaName) {
   const db = await openDatabaseFromPath(targetDbPath);
   const schemaName = readCurrentSchemaName(db);
@@ -72,17 +56,6 @@ async function verifySchemaState(targetDbPath, expectedSchemaName) {
       `DB at ${targetDbPath} is on schema ${schemaName ?? "<unset>"} but runtime schema is ${expectedSchemaName}.`,
     );
   }
-}
-
-function createMaintenanceConfig(dbTarget, targetDbPath) {
-  return {
-    createDbIfMissing: false,
-    dbPath: targetDbPath,
-    ensureReferenceData: true,
-    failIfTestDataPresent: dbTarget === "prod",
-    port: 0,
-    seedTestAccounts: dbTarget === "dev",
-  };
 }
 
 async function ensureProdHasNoTestData(targetDbPath) {
@@ -111,30 +84,26 @@ async function prepareDatabase({
     targetDbPath,
   } = resolveDbTargetPaths(projectRoot, dbTarget, "prepare");
 
-  if (dbTarget === "dev") {
-    await initializeDevDatabaseIfMissing(
-      targetDbPath,
-      runtimeSchemaSnapshotSubdir,
+  if (!await pathExists(targetDbPath)) {
+    throw new Error(
+      dbTarget === "proddev"
+        ? `Missing DB for prepare target ${dbTarget}: ${targetDbPath}. Create prod first, then use db:migrate -- --on proddev --with <from>--<to>.`
+        : `Missing DB for prepare target ${dbTarget}: ${targetDbPath}. Create it first with db:createfrom -- --on ${dbTarget} --schema <schema>.`,
     );
   }
 
-  if (!await pathExists(targetDbPath)) {
-    throw new Error(`Missing DB for prepare target ${dbTarget}: ${targetDbPath}`);
-  }
-
   await verifySchemaState(targetDbPath, runtimeSchemaSnapshotSubdir);
-
-  const appContext = await createMaintenanceContext(
-    createMaintenanceConfig(dbTarget, targetDbPath),
-    process.env,
-  );
+  const db = await openDatabaseFromPath(targetDbPath);
 
   try {
-    if (dbTarget === "prod") {
-      await ensureProdHasNoTestData(targetDbPath);
-    }
+    ensureReferenceData(db, runtimeSchemaSnapshotSubdir);
+    await persistDatabaseToPath(targetDbPath, db);
   } finally {
-    await appContext.close();
+    db.close();
+  }
+
+  if (dbTarget === "prod") {
+    await ensureProdHasNoTestData(targetDbPath);
   }
 
   return {
