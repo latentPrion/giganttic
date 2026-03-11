@@ -14,15 +14,18 @@ import {
   recordAppliedMigration,
   writeCurrentSchemaName,
 } from "./runtime-db-state.mjs";
+import {
+  DRIZZLE_MIGRATIONS_FILE_NAME,
+  POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
+  PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
+} from "./migration-files.mjs";
+import {
+  createDefaultProddevSqliteDbPath,
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+} from "./sqlite-db-paths.mjs";
 
-const DEFAULT_DEV_DB_PATH = "run/giganttic.sqlite";
-const DEFAULT_PRODDEV_DB_DIR = "run/proddev";
-const DRIZZLE_MIGRATIONS_FILE_NAME = "drizzle-migrations.sql";
 const MIGRATIONS_DIR_NAME = "migrations";
-const POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME =
-  "post-structural-data-migration.sql";
-const PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME =
-  "pre-structural-data-migration.sql";
 const SUPPORTED_DB_TARGETS = ["dev", "proddev", "prod"];
 
 function createMigrationUsageError() {
@@ -132,10 +135,6 @@ async function ensurePathExists(targetPath, message) {
   }
 }
 
-function sanitizeMigrationPairName(migrationPairName) {
-  return migrationPairName.replaceAll(/[^A-Za-z0-9._-]/g, "_");
-}
-
 function resolveDbPath(projectRoot, candidatePath) {
   return path.resolve(projectRoot, candidatePath);
 }
@@ -146,16 +145,12 @@ function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName, env) {
       sourceDbPath: null,
       targetDbPath: resolveDbPath(
         projectRoot,
-        env.GGTC_DEV_DB_PATH ?? DEFAULT_DEV_DB_PATH,
+        env.GGTC_DEV_DB_PATH ?? defaultDevSqliteDbPath,
       ),
     };
   }
 
-  const prodDbPath = env.GGTC_DB_PATH;
-
-  if (!prodDbPath) {
-    throw new Error("GGTC_DB_PATH must be set for --on-db prod or proddev.");
-  }
+  const prodDbPath = env.GGTC_DB_PATH ?? defaultProdSqliteDbPath;
 
   if (dbTarget === "prod") {
     return {
@@ -165,10 +160,7 @@ function resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName, env) {
   }
 
   const proddevDbPath = env.GGTC_PRODDEV_DB_PATH
-    ?? path.join(
-      DEFAULT_PRODDEV_DB_DIR,
-      `${sanitizeMigrationPairName(migrationPairName)}.sqlite`,
-    );
+    ?? createDefaultProddevSqliteDbPath(migrationPairName);
 
   return {
     sourceDbPath: resolveDbPath(projectRoot, prodDbPath),

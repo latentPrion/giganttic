@@ -150,17 +150,17 @@ Important discipline:
 
 - `dev`
   - applies the selected migration package directly to the dev DB file
-  - defaults to `run/giganttic.sqlite` unless `GGTC_DEV_DB_PATH` is set
+  - defaults to `run/giganttic-dev.sqlite` unless `GGTC_DEV_DB_PATH` is set
 
 - `proddev`
   - copies the configured prod DB to a local scratch DB first
   - applies the migration package to that copy
-  - requires `GGTC_DB_PATH`
-  - defaults the scratch target to `run/proddev/<migration-pair>.sqlite` unless `GGTC_PRODDEV_DB_PATH` is set
+  - uses `GGTC_DB_PATH` if set, otherwise defaults the source DB to `run/giganttic-prod.sqlite`
+  - defaults the scratch target to `run/giganttic-proddev-<migration-pair>.sqlite` unless `GGTC_PRODDEV_DB_PATH` is set
 
 - `prod`
   - applies the migration package directly to the configured production DB
-  - requires `GGTC_DB_PATH`
+  - uses `GGTC_DB_PATH` if set, otherwise defaults to `run/giganttic-prod.sqlite`
 
 ### Current schema-state verification
 

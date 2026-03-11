@@ -13,19 +13,25 @@ import { afterEach, describe, expect, it } from "vitest";
 import initSqlJs from "sql.js";
 
 import {
+  DRIZZLE_MIGRATIONS_FILE_NAME,
+  POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
+  PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
+} from "../db/migration-files.mjs";
+import {
   migrateDatabase,
   parseMigrateArgs,
   resolveDbTargetPaths,
 } from "../db/migrate.mjs";
+import {
+  APPLIED_MIGRATIONS_TABLE_NAME,
+  RUNTIME_METADATA_TABLE_NAME,
+  SCHEMA_NAME_METADATA_KEY,
+} from "../db/runtime-db-state.mjs";
+import {
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+} from "../db/sqlite-db-paths.mjs";
 
-const DRIZZLE_MIGRATIONS_FILE_NAME = "drizzle-migrations.sql";
-const APPLIED_MIGRATIONS_TABLE_NAME = "_Giganttic_AppliedMigrations";
-const METADATA_TABLE_NAME = "_Giganttic_RuntimeMetadata";
-const POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME =
-  "post-structural-data-migration.sql";
-const PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME =
-  "pre-structural-data-migration.sql";
-const SCHEMA_NAME_METADATA_KEY = "schemaName";
 const TEMP_ROOT_PREFIX = "giganttic-db-migrate-test-";
 
 let tempProjectRoot = "";
@@ -36,11 +42,11 @@ function createMigrationDirPath(projectRoot: string, migrationPairName: string):
 
 function createSqliteBufferSql(fromSchemaName: string): string {
   return `
-CREATE TABLE IF NOT EXISTS ${METADATA_TABLE_NAME} (
+CREATE TABLE IF NOT EXISTS ${RUNTIME_METADATA_TABLE_NAME} (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL
 );
-INSERT INTO ${METADATA_TABLE_NAME} (key, value)
+INSERT INTO ${RUNTIME_METADATA_TABLE_NAME} (key, value)
 VALUES ('${SCHEMA_NAME_METADATA_KEY}', '${fromSchemaName}');
 `;
 }
@@ -94,7 +100,7 @@ async function readSchemaNameFromDb(dbPath: string) {
   const buffer = await readFile(dbPath);
   const db = new SQL.Database(buffer);
   const rows = db.exec(
-    `SELECT value FROM ${METADATA_TABLE_NAME} WHERE key = '${SCHEMA_NAME_METADATA_KEY}';`,
+    `SELECT value FROM ${RUNTIME_METADATA_TABLE_NAME} WHERE key = '${SCHEMA_NAME_METADATA_KEY}';`,
   );
   db.close();
 
@@ -167,7 +173,7 @@ describe("db migrate tooling", () => {
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
-    const devDbPath = await createDbFile(tempProjectRoot, "run/giganttic.sqlite", "foo");
+    const devDbPath = await createDbFile(tempProjectRoot, defaultDevSqliteDbPath, "foo");
 
     await migrateDatabase({
       dbTarget: "dev",
@@ -186,9 +192,9 @@ describe("db migrate tooling", () => {
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
-    const prodDbPath = await createDbFile(tempProjectRoot, "run/prod.sqlite", "foo");
+    const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
     const env = {
-      GGTC_DB_PATH: "run/prod.sqlite",
+      GGTC_DB_PATH: defaultProdSqliteDbPath,
     };
     const {
       targetDbPath,
@@ -211,10 +217,10 @@ describe("db migrate tooling", () => {
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
-    const prodDbPath = await createDbFile(tempProjectRoot, "run/prod.sqlite", "foo");
+    const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
     const originalProdDbPath = path.join(tempProjectRoot, "run", "prod-original.sqlite");
     const env = {
-      GGTC_DB_PATH: "run/prod.sqlite",
+      GGTC_DB_PATH: defaultProdSqliteDbPath,
     };
 
     await copyFile(prodDbPath, originalProdDbPath);
@@ -236,7 +242,7 @@ describe("db migrate tooling", () => {
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
-    await createDbFile(tempProjectRoot, "run/giganttic.sqlite", "baz");
+    await createDbFile(tempProjectRoot, defaultDevSqliteDbPath, "baz");
 
     await expect(migrateDatabase({
       dbTarget: "dev",
@@ -259,7 +265,7 @@ describe("db migrate tooling", () => {
       path.join(migrationDirPath, POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME),
       "-- post\n",
     );
-    const devDbPath = await createDbFile(tempProjectRoot, "run/giganttic.sqlite", "foo");
+    const devDbPath = await createDbFile(tempProjectRoot, defaultDevSqliteDbPath, "foo");
 
     await expect(migrateDatabase({
       dbTarget: "dev",
@@ -277,7 +283,7 @@ describe("db migrate tooling", () => {
     await createMigrationDeliverable(tempProjectRoot, "foo--bar", {
       drizzleSql: "THIS IS NOT VALID SQL;",
     });
-    const devDbPath = await createDbFile(tempProjectRoot, "run/giganttic.sqlite", "foo");
+    const devDbPath = await createDbFile(tempProjectRoot, defaultDevSqliteDbPath, "foo");
 
     await expect(migrateDatabase({
       dbTarget: "dev",

@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
+import { defaultDevSqliteDbPath } from "./sqlite-db-paths.mjs";
 
 const config = JSON.parse(
   await readFile(new URL("./config.json", import.meta.url), "utf8"),
@@ -9,7 +10,7 @@ const config = JSON.parse(
 
 export const runtimeSqliteDbPath = path.resolve(
   process.cwd(),
-  "run/giganttic.sqlite",
+  defaultDevSqliteDbPath,
 );
 
 export function getGeneratedSqlDdlDir(
