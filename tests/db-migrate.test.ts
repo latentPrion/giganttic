@@ -32,8 +32,13 @@ import {
   defaultProddevSqliteDbPath,
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "./db-test-runtime-guard.js";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-migrate-test-";
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 let tempProjectRoot = "";
 
@@ -90,6 +95,11 @@ async function createDbFile(projectRoot: string, relativePath: string, fromSchem
   const outputPath = path.join(projectRoot, relativePath);
 
   await mkdir(path.dirname(outputPath), { recursive: true });
+  assertDoesNotUseRuntimeDbPath(
+    outputPath,
+    dbTestRuntimeConfig,
+    "db:migrate test database",
+  );
   await writeFile(outputPath, Buffer.from(db.export()));
   db.close();
 
@@ -194,6 +204,11 @@ describe("db migrate tooling", () => {
     });
     const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
     const targetDbPath = path.join(tempProjectRoot, defaultProddevSqliteDbPath);
+    assertDoesNotUseRuntimeDbPath(
+      targetDbPath,
+      dbTestRuntimeConfig,
+      "db:migrate proddev sandbox",
+    );
 
     await migrateDatabase({
       dbTarget: "proddev",
@@ -204,6 +219,17 @@ describe("db migrate tooling", () => {
     await expect(readSchemaNameFromDb(prodDbPath)).resolves.toBe("foo");
     await expect(readSchemaNameFromDb(targetDbPath)).resolves.toBe("bar");
     await expect(tableExists(targetDbPath, "Widgets")).resolves.toBe(true);
+  });
+
+  it("uses isolated temp DB paths instead of the runtime DB path", async () => {
+    await createTempProjectRoot();
+
+    expect(
+      path.resolve(path.join(tempProjectRoot, defaultDevSqliteDbPath)),
+    ).not.toBe(path.resolve(dbTestRuntimeConfig.runtimeTargetPath));
+    expect(
+      path.resolve(path.join(tempProjectRoot, defaultProddevSqliteDbPath)),
+    ).not.toBe(path.resolve(dbTestRuntimeConfig.runtimeTargetPath));
   });
 
   it("fails clearly for proddev migration when the prod source DB does not exist", async () => {

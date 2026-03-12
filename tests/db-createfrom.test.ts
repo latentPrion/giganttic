@@ -17,11 +17,14 @@ import {
   openDatabaseFromPath,
   readCurrentSchemaName,
 } from "../db/runtime-db-state.mjs";
-import { configuredRuntimeSchemaSnapshotSubdir } from "../db/config.js";
 import {
   defaultDevSqliteDbPath,
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "./db-test-runtime-guard.js";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-createfrom-test-";
 const CUSTOM_SCHEMA_SQL = `
@@ -32,6 +35,7 @@ CREATE TABLE "_Giganttic_RuntimeMetadata" (
 `;
 const MISSING_SCHEMA_TS_SCHEMA_NAME = "missing-schema-ts-case";
 const MISSING_SCHEMA_SQL_SCHEMA_NAME = "missing-schema-sql-case";
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 let tempProjectRoot = "";
 
@@ -47,10 +51,18 @@ function createTempDbPath(fileName: string) {
 }
 
 function createDefaultTargetDbPath(dbTarget: "dev" | "prod") {
-  return path.join(
+  const targetPath = path.join(
     tempProjectRoot,
     dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
   );
+
+  assertDoesNotUseRuntimeDbPath(
+    targetPath,
+    dbTestRuntimeConfig,
+    "db:createfrom test database",
+  );
+
+  return targetPath;
 }
 
 async function pathExists(targetPath: string) {
@@ -176,6 +188,15 @@ describe("db createfrom tooling", () => {
     expect(result.targetDbPath).toBe(expectedPath);
     await expect(pathExists(expectedPath)).resolves.toBe(true);
     await expect(readSchemaNameFromDb(expectedPath)).resolves.toBe("v1");
+  });
+
+  it("uses a temp target path distinct from the runtime DB path", async () => {
+    await createTempProjectRoot();
+    const expectedPath = createDefaultTargetDbPath("dev");
+
+    expect(path.resolve(expectedPath)).not.toBe(
+      path.resolve(dbTestRuntimeConfig.runtimeTargetPath),
+    );
   });
 
   it("uses the canonical default prod DB target path", async () => {
@@ -351,7 +372,7 @@ describe("db createfrom tooling", () => {
     await createDatabaseFromSchema({
       dbTarget: "dev",
       projectRoot: tempProjectRoot,
-      schemaName: configuredRuntimeSchemaSnapshotSubdir,
+      schemaName: dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
     });
 
     await expect(countRows(dbPath, "Users")).resolves.toBe(0);
@@ -405,7 +426,7 @@ describe("db createfrom tooling", () => {
     await createDatabaseFromSchema({
       dbTarget: "dev",
       projectRoot: tempProjectRoot,
-      schemaName: configuredRuntimeSchemaSnapshotSubdir,
+      schemaName: dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
     });
 
     await expect(prepareDatabase({

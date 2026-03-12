@@ -34,6 +34,12 @@ import {
   usersSystemRoles,
   usersTeamsTeamRoles,
 } from "../db/index.js";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "./db-test-runtime-guard.js";
+
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 describe("backend auth api", () => {
   let app: NestFastifyApplication;
@@ -45,9 +51,15 @@ describe("backend auth api", () => {
   }
 
   async function buildApp(): Promise<NestFastifyApplication> {
+    const dbPath = path.join(tempDir, "auth.sqlite");
+    assertDoesNotUseRuntimeDbPath(
+      dbPath,
+      dbTestRuntimeConfig,
+      "backend auth integration database",
+    );
     const config = buildBackendConfig({
       createDbIfMissing: true,
-      dbPath: path.join(tempDir, "auth.sqlite"),
+      dbPath,
       port: 0,
       seedTestAccounts: true,
     });

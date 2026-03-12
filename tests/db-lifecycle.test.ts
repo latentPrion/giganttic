@@ -8,7 +8,6 @@ import path from "node:path";
 import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { configuredRuntimeSchemaSnapshotSubdir } from "../db/config.js";
 import { createDatabaseFromSchema } from "../db/create-from-schema.mjs";
 import { migrateDatabase } from "../db/migrate.mjs";
 import { prepareDatabase } from "../db/prepare.mjs";
@@ -23,21 +22,40 @@ import {
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
 import { seededTestAccounts } from "../backend/modules/auth/auth.seed-data.js";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "./db-test-runtime-guard.js";
 
 const TEMP_DIR_PREFIX = "giganttic-db-lifecycle-";
 const ISSUE_STATUSES_TABLE_NAME = "IssueStatuses";
 const NON_TEST_EMAIL = "realuser@example.com";
 const NON_TEST_USERNAME = "realuser";
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 function createTargetDbPath(projectRoot: string, dbTarget: "dev" | "prod") {
-  return path.join(
+  const targetPath = path.join(
     projectRoot,
     dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
   );
+
+  assertDoesNotUseRuntimeDbPath(
+    targetPath,
+    dbTestRuntimeConfig,
+    "db lifecycle test database",
+  );
+
+  return targetPath;
 }
 
 function createProddevDbPath(projectRoot: string) {
-  return path.join(projectRoot, defaultProddevSqliteDbPath);
+  const targetPath = path.join(projectRoot, defaultProddevSqliteDbPath);
+  assertDoesNotUseRuntimeDbPath(
+    targetPath,
+    dbTestRuntimeConfig,
+    "db lifecycle proddev sandbox",
+  );
+  return targetPath;
 }
 
 async function querySingleNumber(dbPath: string, sql: string) {
@@ -177,7 +195,7 @@ async function createRuntimeSchemaDb(projectRoot: string, dbTarget: "dev" | "pro
   return createDatabaseFromSchema({
     dbTarget,
     projectRoot,
-    schemaName: configuredRuntimeSchemaSnapshotSubdir,
+    schemaName: dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
   });
 }
 
@@ -224,6 +242,18 @@ describe("db lifecycle scripts", () => {
     })).rejects.toThrow(/Missing DB for prepare target dev/i);
   }, 20_000);
 
+  it("uses isolated temp DB paths instead of the runtime DB path", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    tempDirs.push(tempDir);
+
+    expect(path.resolve(createTargetDbPath(tempDir, "dev"))).not.toBe(
+      path.resolve(dbTestRuntimeConfig.runtimeTargetPath),
+    );
+    expect(path.resolve(createProddevDbPath(tempDir))).not.toBe(
+      path.resolve(dbTestRuntimeConfig.runtimeTargetPath),
+    );
+  }, 20_000);
+
   it("supports the explicit fresh dev flow of createfrom then prepare without ensuring test data", async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
     tempDirs.push(tempDir);
@@ -239,7 +269,9 @@ describe("db lifecycle scripts", () => {
       targetDbPath: dbPath,
     });
 
-    expect(await readSchemaName(dbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await readSchemaName(dbPath)).toBe(
+      dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
+    );
     expect(await countIssueStatuses(dbPath)).toBeGreaterThan(0);
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
     await expect(manageTestData({
@@ -278,7 +310,9 @@ describe("db lifecycle scripts", () => {
       targetDbPath: dbPath,
     });
 
-    expect(await readSchemaName(dbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await readSchemaName(dbPath)).toBe(
+      dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
+    );
     expect(await countIssueStatuses(dbPath)).toBeGreaterThan(0);
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
   }, 20_000);
@@ -303,7 +337,9 @@ describe("db lifecycle scripts", () => {
     });
 
     expect(await readSchemaName(prodDbPath)).toBe("v1");
-    expect(await readSchemaName(proddevDbPath)).toBe(configuredRuntimeSchemaSnapshotSubdir);
+    expect(await readSchemaName(proddevDbPath)).toBe(
+      dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
+    );
     expect(await countIssueStatuses(proddevDbPath)).toBe(0);
   }, 20_000);
 

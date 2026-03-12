@@ -1,18 +1,25 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import initSqlJs from "sql.js";
 import type { Database } from "sql.js";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   applySqlDdl,
   getGeneratedSqlDdlDir,
   getGeneratedSqlDdlFilePath,
   readGeneratedSqlStatements,
-  runtimeSqliteDbPath,
 } from "../../apply-sql-ddl.mjs";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "../../../tests/db-test-runtime-guard.js";
 
 const SCHEMA_VERSION = "v1";
+const TEMP_DIR_PREFIX = "giganttic-v1-ddl-";
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 function querySingleValue(
   db: Database,
@@ -30,6 +37,17 @@ function querySingleValue(
 }
 
 describe("generated sqlite ddl", () => {
+  const tempPaths: string[] = [];
+
+  afterEach(async () => {
+    while (tempPaths.length > 0) {
+      const tempPath = tempPaths.pop();
+      if (tempPath) {
+        await rm(tempPath, { force: true, recursive: true });
+      }
+    }
+  });
+
   it("contains executable SQL statements", async () => {
     const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
@@ -48,9 +66,17 @@ describe("generated sqlite ddl", () => {
   });
 
   it("applies cleanly and creates the expected tables", async () => {
-    const outputPath = await applySqlDdl(runtimeSqliteDbPath, SCHEMA_VERSION);
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const outputPath = path.join(tempDir, "v1.sqlite");
+    tempPaths.push(tempDir);
+    assertDoesNotUseRuntimeDbPath(
+      outputPath,
+      dbTestRuntimeConfig,
+      "v1 sqlite-ddl test database",
+    );
+    const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
     const SQL = await initSqlJs();
-    const db = new SQL.Database(new Uint8Array(await readFile(outputPath)));
+    const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));
 
     const tableCount = querySingleValue(
       db,
@@ -67,7 +93,7 @@ describe("generated sqlite ddl", () => {
     );
 
     expect(tableCount).toBe(7);
-    expect(outputPath).toBe(runtimeSqliteDbPath);
+    expect(appliedPath).toBe(outputPath);
     db.close();
   });
 

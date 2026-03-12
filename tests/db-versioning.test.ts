@@ -24,8 +24,10 @@ import {
 } from "../db/apply-sql-ddl.mjs";
 import {
   availableSchemaVersions,
-  configuredRuntimeSchemaSnapshotSubdir,
 } from "../db/config.js";
+import { requireDbTestRuntimeConfig } from "./db-test-runtime-guard.js";
+
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 describe("db version selection pipeline", () => {
   const tempDirs: string[] = [];
@@ -41,7 +43,7 @@ describe("db version selection pipeline", () => {
 
   it("advertises v2 as the active schema version", () => {
     expect(availableSchemaVersions).toContain("v2");
-    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v2");
+    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v2");
   });
 
   it("resolves generated artifact paths from explicit version arguments", () => {
@@ -62,7 +64,7 @@ describe("db version selection pipeline", () => {
 
     const appliedPath = await applySqlDdl(
       outputPath,
-      configuredRuntimeSchemaSnapshotSubdir,
+      dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
     );
     const SQL = await initSqlJs();
     const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));

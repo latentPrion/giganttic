@@ -13,8 +13,13 @@ import { Test } from "@nestjs/testing";
 import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "./db-test-runtime-guard.js";
 
 export const MISSING_ENTITY_ID = 999_999;
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 export interface AuthSession {
   accessToken: string;
@@ -79,9 +84,15 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   }
 
   async function buildApp(tempDirectory: string): Promise<NestFastifyApplication> {
+    const dbPath = path.join(tempDirectory, dbFileName);
+    assertDoesNotUseRuntimeDbPath(
+      dbPath,
+      dbTestRuntimeConfig,
+      "CRUD integration database",
+    );
     const config = buildBackendConfig({
       createDbIfMissing: true,
-      dbPath: path.join(tempDirectory, dbFileName),
+      dbPath,
       port: 0,
       seedTestAccounts: true,
     });

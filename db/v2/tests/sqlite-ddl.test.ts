@@ -12,8 +12,13 @@ import {
   getGeneratedSqlDdlFilePath,
   readGeneratedSqlStatements,
 } from "../../apply-sql-ddl.mjs";
+import {
+  assertDoesNotUseRuntimeDbPath,
+  requireDbTestRuntimeConfig,
+} from "../../../tests/db-test-runtime-guard.js";
 
 const SCHEMA_VERSION = "v2";
+const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 function querySingleValue(
   db: Database,
@@ -74,6 +79,11 @@ describe("generated sqlite ddl for v2", () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-v2-ddl-"));
     const outputPath = path.join(tempDir, "v2.sqlite");
     tempPaths.push(tempDir);
+    assertDoesNotUseRuntimeDbPath(
+      outputPath,
+      dbTestRuntimeConfig,
+      "v2 sqlite-ddl test database",
+    );
 
     const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
     const SQL = await initSqlJs();
