@@ -24,9 +24,17 @@ Or pass it directly with `--token`.
 python3 fireflies-ai/fireflies_transcripts_cli.py list
 ```
 
+This default `list` output shows only the compact one-line table. To show the
+expanded per-transcript detail view instead, use:
+
+```bash
+python3 fireflies-ai/fireflies_transcripts_cli.py --detail list
+```
+
 Optional filters:
 
 ```bash
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 25 --page 2 list
 python3 fireflies-ai/fireflies_transcripts_cli.py --limit 50 --skip 0 --keyword demo list
 python3 fireflies-ai/fireflies_transcripts_cli.py --from-date 2026-01-01T00:00:00.000Z list
 python3 fireflies-ai/fireflies_transcripts_cli.py --last-n-days 14 list
@@ -34,6 +42,19 @@ python3 fireflies-ai/fireflies_transcripts_cli.py --last-n-days 14 list
 
 `--last-n-days N` computes a UTC `fromDate` for the preceding `N` days and cannot
 be combined with `--from-date`.
+
+Fireflies transcript listing uses `limit` and `skip` pagination. The CLI now
+adds `--page` as a convenience layer:
+
+- `--page 1` is the default
+- effective skip is computed as `(page - 1) * limit`
+- `--page` and `--skip` cannot be used together unless `--page` is left at `1`
+
+For example, to fetch the third page of 25 meetings:
+
+```bash
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 25 --page 3 list
+```
 
 ## Interactive download flow
 
@@ -65,6 +86,23 @@ Downloaded files go into `fireflies-ai/downloads/` by default.
 ```bash
 python3 fireflies-ai/fireflies_transcripts_cli.py -o fireflies-ai/downloads download 1,3-5 --assets audio
 python3 fireflies-ai/fireflies_transcripts_cli.py -o fireflies-ai/downloads download 1,3-5 --assets transcript,audio
+```
+
+When you use `--page`, the displayed indexes and the accepted download indexes
+follow that page offset instead of resetting to `1`. For example, page 2 of
+25 items will display indexes `26..50`, and those are the indexes you should
+pass to `download`:
+
+```bash
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 25 --page 2 list
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 25 --page 2 download 26,27 --assets transcript
+```
+
+The `download` command now accepts those absolute listing indexes even if you
+omit `--page`; it will fetch the required page(s) automatically:
+
+```bash
+python3 fireflies-ai/fireflies_transcripts_cli.py --limit 25 download 26,27 --assets transcript
 ```
 
 ## Transcript downloads

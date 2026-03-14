@@ -61,7 +61,7 @@ class DownloadResult:
     success: bool
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "List Fireflies transcripts and interactively download available "
@@ -89,6 +89,15 @@ def parse_arguments() -> argparse.Namespace:
         help="Number of transcript records to skip before listing.",
     )
     parser.add_argument(
+        "--page",
+        type=int,
+        default=1,
+        help=(
+            "1-based page number for transcript listings. "
+            "Used with --limit to compute skip automatically."
+        ),
+    )
+    parser.add_argument(
         "--from-date",
         dest="from_date",
         help="Optional ISO 8601 lower bound, e.g. 2026-01-01T00:00:00.000Z.",
@@ -110,6 +119,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--keyword",
         help="Optional Fireflies transcript keyword filter.",
+    )
+    parser.add_argument(
+        "--detail",
+        action="store_true",
+        help="Show expanded per-transcript detail output instead of the compact table.",
     )
     parser.add_argument(
         "-o",
@@ -151,7 +165,7 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
 
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def validate_date_filters(arguments: argparse.Namespace) -> None:
@@ -159,6 +173,14 @@ def validate_date_filters(arguments: argparse.Namespace) -> None:
         raise SystemExit("Use either --from-date or --last-n-days, not both.")
     if arguments.last_n_days is not None and arguments.last_n_days < 0:
         raise SystemExit("--last-n-days must be zero or greater.")
+    if arguments.limit < 1:
+        raise SystemExit("--limit must be greater than zero.")
+    if arguments.skip < 0:
+        raise SystemExit("--skip must be zero or greater.")
+    if arguments.page < 1:
+        raise SystemExit("--page must be a positive integer.")
+    if arguments.page != 1 and arguments.skip != 0:
+        raise SystemExit("Use either --page or --skip, not both.")
 
 
 def create_from_date(arguments: argparse.Namespace) -> str | None:
@@ -167,12 +189,18 @@ def create_from_date(arguments: argparse.Namespace) -> str | None:
     return create_relative_from_date(arguments.last_n_days)
 
 
+def create_effective_skip(arguments: argparse.Namespace) -> int:
+    if arguments.page > 1:
+        return (arguments.page - 1) * arguments.limit
+    return arguments.skip
+
+
 def build_graphql_payload(arguments: argparse.Namespace) -> dict[str, Any]:
     return create_transcripts_payload(
         from_date=create_from_date(arguments),
         keyword=arguments.keyword,
         limit=arguments.limit,
-        skip=arguments.skip,
+        skip=create_effective_skip(arguments),
         to_date=arguments.to_date,
     )
 
@@ -221,7 +249,11 @@ def truncate_text(value: str, length: int) -> str:
     return value[: max(0, length - 1)] + "…"
 
 
-def print_transcripts(records: list[TranscriptRecord]) -> None:
+def create_display_index_base(arguments: argparse.Namespace) -> int:
+    return create_effective_skip(arguments) + 1
+
+
+def print_transcripts(records: list[TranscriptRecord], display_index_base: int = 1) -> None:
     if not records:
         print("No transcript records matched the current query.")
         return
@@ -233,7 +265,7 @@ def print_transcripts(records: list[TranscriptRecord]) -> None:
     print(header)
     print(INDEX_SEPARATOR)
 
-    for index, record in enumerate(records, start=1):
+    for index, record in enumerate(records, start=display_index_base):
         date_label = truncate_text(record.date_string or "-", 24)
         title_label = truncate_text(record.title, 30)
         print(
@@ -246,8 +278,10 @@ def print_transcripts(records: list[TranscriptRecord]) -> None:
     print()
 
 
-def print_transcript_details(records: list[TranscriptRecord]) -> None:
-    for index, record in enumerate(records, start=1):
+def print_transcript_details(
+    records: list[TranscriptRecord], display_index_base: int = 1
+) -> None:
+    for index, record in enumerate(records, start=display_index_base):
         print(f"[{index}] {record.title}")
         print(f"    id: {record.identifier}")
         print(f"    date_epoch_millis: {record.date_epoch_millis or '-'}")
@@ -260,7 +294,7 @@ def print_transcript_details(records: list[TranscriptRecord]) -> None:
         print()
 
 
-def parse_selection(selection: str, maximum_index: int) -> list[int]:
+def parse_selection(selection: str, minimum_index: int, maximum_index: int) -> list[int]:
     indexes: set[int] = set()
 
     for token in [part.strip() for part in selection.split(",") if part.strip()]:
@@ -269,27 +303,57 @@ def parse_selection(selection: str, maximum_index: int) -> list[int]:
             start_index = int(start_token)
             end_index = int(end_token)
             for index in range(min(start_index, end_index), max(start_index, end_index) + 1):
-                validate_index(index, maximum_index)
+                validate_index(index, minimum_index, maximum_index)
                 indexes.add(index)
             continue
 
         index = int(token)
-        validate_index(index, maximum_index)
+        validate_index(index, minimum_index, maximum_index)
         indexes.add(index)
 
     return sorted(indexes)
 
 
-def validate_index(index: int, maximum_index: int) -> None:
-    if index < 1 or index > maximum_index:
+def validate_index(index: int, minimum_index: int, maximum_index: int) -> None:
+    if index < minimum_index or index > maximum_index:
         raise SystemExit(
-            f"Selection index {index} is out of range. Valid values are 1..{maximum_index}."
+            "Selection index "
+            f"{index} is out of range. Valid values are {minimum_index}..{maximum_index}."
         )
 
 
-def prompt_for_selection(maximum_index: int) -> str:
+def parse_absolute_selection(selection: str) -> list[int]:
+    indexes: set[int] = set()
+
+    for token in [part.strip() for part in selection.split(",") if part.strip()]:
+        if "-" in token:
+            start_token, end_token = token.split("-", maxsplit=1)
+            start_index = int(start_token)
+            end_index = int(end_token)
+            for index in range(min(start_index, end_index), max(start_index, end_index) + 1):
+                validate_absolute_index(index)
+                indexes.add(index)
+            continue
+
+        index = int(token)
+        validate_absolute_index(index)
+        indexes.add(index)
+
+    return sorted(indexes)
+
+
+def validate_absolute_index(index: int) -> None:
+    if index < 1:
+        raise SystemExit(
+            f"Selection index {index} is invalid. Valid values are positive integers."
+        )
+
+
+def prompt_for_selection(minimum_index: int, maximum_index: int) -> str:
     return input(
-        "Enter transcript indexes to download (e.g. 1,3-5), or press Enter to cancel: "
+        "Enter transcript indexes to download "
+        f"(valid range {minimum_index}-{maximum_index}, e.g. {minimum_index},{minimum_index + 2}-{minimum_index + 4}), "
+        "or press Enter to cancel: "
     ).strip()
 
 
@@ -496,9 +560,13 @@ def download_selected_records(
     return attempted_downloads
 
 
-def run_list_command(records: list[TranscriptRecord]) -> None:
-    print_transcripts(records)
-    print_transcript_details(records)
+def run_list_command(
+    arguments: argparse.Namespace, records: list[TranscriptRecord], display_index_base: int
+) -> None:
+    if arguments.detail:
+        print_transcript_details(records, display_index_base)
+        return
+    print_transcripts(records, display_index_base)
 
 
 def run_download_command(
@@ -506,11 +574,8 @@ def run_download_command(
     records: list[TranscriptRecord],
     token: str,
 ) -> None:
-    if not records:
-        raise SystemExit("No transcripts available to download from the current page.")
-
-    selected_indexes = parse_selection(arguments.selection, len(records))
-    selected_records = [records[index - 1] for index in selected_indexes]
+    selected_indexes = parse_absolute_selection(arguments.selection)
+    selected_records = fetch_records_for_absolute_indexes(arguments, token, selected_indexes)
     output_directory = Path(arguments.output_dir)
     download_selected_records(
         token,
@@ -520,24 +585,59 @@ def run_download_command(
     )
 
 
+def fetch_records_for_absolute_indexes(
+    arguments: argparse.Namespace,
+    token: str,
+    selected_indexes: list[int],
+) -> list[TranscriptRecord]:
+    records_by_index: dict[int, TranscriptRecord] = {}
+    fetched_page_skips: set[int] = set()
+
+    for selected_index in selected_indexes:
+        zero_based_offset = selected_index - 1
+        page_number = (zero_based_offset // arguments.limit) + 1
+        page_skip = (page_number - 1) * arguments.limit
+        page_arguments = argparse.Namespace(**vars(arguments))
+        page_arguments.page = page_number
+        page_arguments.skip = 0
+
+        if page_skip not in fetched_page_skips:
+            payload = build_graphql_payload(page_arguments)
+            response = execute_graphql_query(token, payload)
+            page_records = parse_transcripts_response(response)
+            for offset, record in enumerate(page_records, start=page_skip + 1):
+                records_by_index[offset] = record
+            fetched_page_skips.add(page_skip)
+
+        record = records_by_index.get(selected_index)
+        if record is None:
+            raise SystemExit(
+                f"Selection index {selected_index} was not found in the Fireflies transcript listing."
+            )
+
+    return [records_by_index[index] for index in selected_indexes]
+
+
 def run_interactive_command(
     arguments: argparse.Namespace,
     records: list[TranscriptRecord],
     token: str,
 ) -> None:
-    print_transcripts(records)
-    print_transcript_details(records)
+    minimum_index = create_display_index_base(arguments)
+    maximum_index = minimum_index + len(records) - 1
+    print_transcripts(records, minimum_index)
+    print_transcript_details(records, minimum_index)
 
     if not records:
         return
 
-    selection = prompt_for_selection(len(records))
+    selection = prompt_for_selection(minimum_index, maximum_index)
     if not selection:
         print("Cancelled.")
         return
 
-    selected_indexes = parse_selection(selection, len(records))
-    selected_records = [records[index - 1] for index in selected_indexes]
+    selected_indexes = parse_selection(selection, minimum_index, maximum_index)
+    selected_records = [records[index - minimum_index] for index in selected_indexes]
     selected_assets = prompt_for_download_assets(arguments.default_assets)
     output_directory = Path(arguments.output_dir)
     download_selected_records(token, output_directory, selected_records, selected_assets)
@@ -550,9 +650,10 @@ def main() -> int:
     payload = build_graphql_payload(arguments)
     response = execute_graphql_query(token, payload)
     records = parse_transcripts_response(response)
+    display_index_base = create_display_index_base(arguments)
 
     if arguments.command == "list":
-        run_list_command(records)
+        run_list_command(arguments, records, display_index_base)
         return 0
 
     if arguments.command == "download":
