@@ -1,7 +1,6 @@
 import "reflect-metadata";
 
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import os from "node:os";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -26,6 +25,7 @@ import {
   availableSchemaVersions,
 } from "../db/config.js";
 import { requireDbTestRuntimeConfig } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionSandbox, createDbTestTempDir } from "./db-test-execution-db.js";
 
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
@@ -58,8 +58,15 @@ describe("db version selection pipeline", () => {
   });
 
   it("can apply the active schema version without script edits", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-active-db-"));
-    const outputPath = path.join(tempDir, "active.sqlite");
+    const sandbox = await createDbTestExecutionSandbox({
+      contextLabel: "active schema version test database",
+      copyBaseDb: false,
+      dbFileName: "active.sqlite",
+      runtimeConfig: dbTestRuntimeConfig,
+      tempDirPrefix: "giganttic-active-db-",
+    });
+    const outputPath = sandbox.dbPath;
+    const tempDir = sandbox.tempDir;
     tempDirs.push(tempDir);
 
     const appliedPath = await applySqlDdl(
@@ -77,7 +84,7 @@ describe("db version selection pipeline", () => {
   });
 
   it("fails startup for a stale v1 runtime database instead of silently rebuilding it", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-runtime-db-"));
+    const tempDir = await createDbTestTempDir("giganttic-runtime-db-");
     const dbPath = path.join(tempDir, "runtime.sqlite");
     tempDirs.push(tempDir);
 

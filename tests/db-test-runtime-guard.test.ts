@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { defaultTestsuiteSqliteDbPath } from "../db/sqlite-db-paths.mjs";
 import {
   assertDoesNotUseRuntimeDbPath,
   getRequiredDbTestRuntimeConfig,
@@ -29,35 +30,62 @@ describe("db test runtime guard", () => {
       getRequiredDbTestRuntimeConfig(
         {
           GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR: "v2",
-          GGTC_DB_RT_TARGET: "run/giganttic-dev.sqlite",
+          GGTC_DB_RT_TARGET: defaultTestsuiteSqliteDbPath,
         },
         "/tmp/project-root",
       ),
     ).toEqual({
       runtimeSchemaSnapshotSubdir: "v2",
-      runtimeTarget: "run/giganttic-dev.sqlite",
+      runtimeTarget: defaultTestsuiteSqliteDbPath,
       runtimeTargetPath: path.resolve(
         "/tmp/project-root",
-        "run/giganttic-dev.sqlite",
+        defaultTestsuiteSqliteDbPath,
       ),
     });
+  });
+
+  it("fails when the runtime DB target is not the shared testsuite DB", () => {
+    expect(() =>
+      getRequiredDbTestRuntimeConfig({
+        GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR: "v2",
+        GGTC_DB_RT_TARGET: "run/giganttic-dev.sqlite",
+      }),
+    ).toThrow(/must be set to run\/giganttic-testsuite\.sqlite/i);
   });
 
   it("fails when a destructive test path points at the runtime DB", () => {
     const runtimeConfig = getRequiredDbTestRuntimeConfig(
       {
         GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR: "v2",
-        GGTC_DB_RT_TARGET: "run/giganttic-dev.sqlite",
+        GGTC_DB_RT_TARGET: defaultTestsuiteSqliteDbPath,
       },
       "/tmp/project-root",
     );
 
     expect(() =>
       assertDoesNotUseRuntimeDbPath(
-        path.resolve("/tmp/project-root", "run/giganttic-dev.sqlite"),
+        path.resolve("/tmp/project-root", defaultTestsuiteSqliteDbPath),
         runtimeConfig,
         "destructive suite",
       ),
-    ).toThrow(/must not target the runtime DB path/i);
+    ).toThrow(/must not target the runtime DB path or canonical dev\/prod\/proddev DBs/i);
+  });
+
+  it("fails when a destructive test path points at the canonical dev DB", () => {
+    const runtimeConfig = getRequiredDbTestRuntimeConfig(
+      {
+        GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR: "v2",
+        GGTC_DB_RT_TARGET: defaultTestsuiteSqliteDbPath,
+      },
+      process.cwd(),
+    );
+
+    expect(() =>
+      assertDoesNotUseRuntimeDbPath(
+        path.resolve(process.cwd(), "run/giganttic-dev.sqlite"),
+        runtimeConfig,
+        "destructive suite",
+      ),
+    ).toThrow(/must not target the runtime DB path or canonical dev\/prod\/proddev DBs/i);
   });
 });

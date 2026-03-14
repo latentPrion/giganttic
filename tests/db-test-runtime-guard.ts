@@ -1,7 +1,24 @@
 import path from "node:path";
 
+import {
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+  defaultProddevSqliteDbPath,
+  defaultTestsuiteSqliteDbPath,
+} from "../db/sqlite-db-paths.mjs";
+
 const REQUIRED_DB_TEST_ENV_ERROR_PREFIX =
   "DB-affecting tests require explicit GGTC_DB_RT_* configuration.";
+const CANONICAL_DB_TEST_RUNTIME_TARGET = defaultTestsuiteSqliteDbPath;
+const FORBIDDEN_CANONICAL_DB_TARGETS = [
+  defaultDevSqliteDbPath,
+  defaultProdSqliteDbPath,
+  defaultProddevSqliteDbPath,
+] as const;
+
+function createRequiredTargetMessage() {
+  return `GGTC_DB_RT_TARGET must be set to ${CANONICAL_DB_TEST_RUNTIME_TARGET} for DB-affecting tests.`;
+}
 
 function readRequiredValue(
   env: NodeJS.ProcessEnv,
@@ -38,6 +55,10 @@ export function getRequiredDbTestRuntimeConfig(
     "GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR",
   );
 
+  if (runtimeTarget !== CANONICAL_DB_TEST_RUNTIME_TARGET) {
+    throw new Error(createRequiredTargetMessage());
+  }
+
   return {
     runtimeSchemaSnapshotSubdir,
     runtimeTarget,
@@ -57,9 +78,14 @@ export function assertDoesNotUseRuntimeDbPath(
   runtimeConfig: DbTestRuntimeConfig,
   contextLabel: string,
 ) {
-  if (path.resolve(dbPath) === runtimeConfig.runtimeTargetPath) {
+  const forbiddenPaths = [
+    runtimeConfig.runtimeTargetPath,
+    ...FORBIDDEN_CANONICAL_DB_TARGETS.map((target) => path.resolve(process.cwd(), target)),
+  ];
+
+  if (forbiddenPaths.includes(path.resolve(dbPath))) {
     throw new Error(
-      `${contextLabel} must not target the runtime DB path ${runtimeConfig.runtimeTargetPath}.`,
+      `${contextLabel} must not target the runtime DB path or canonical dev/prod/proddev DBs.`,
     );
   }
 }

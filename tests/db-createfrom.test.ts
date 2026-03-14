@@ -1,5 +1,4 @@
-import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
@@ -22,9 +21,9 @@ import {
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-createfrom-test-";
 const CUSTOM_SCHEMA_SQL = `
@@ -40,7 +39,7 @@ const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 let tempProjectRoot = "";
 
 async function createTempProjectRoot() {
-  tempProjectRoot = await mkdtemp(path.join(os.tmpdir(), TEMP_ROOT_PREFIX));
+  tempProjectRoot = await createDbTestTempDir(TEMP_ROOT_PREFIX);
   await cp(path.join(process.cwd(), "db"), path.join(tempProjectRoot, "db"), {
     recursive: true,
   });
@@ -51,18 +50,14 @@ function createTempDbPath(fileName: string) {
 }
 
 function createDefaultTargetDbPath(dbTarget: "dev" | "prod") {
-  const targetPath = path.join(
-    tempProjectRoot,
-    dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
-  );
-
-  assertDoesNotUseRuntimeDbPath(
-    targetPath,
+  return createDbTestExecutionPath(
+    path.join(tempProjectRoot, "run"),
+    path.basename(
+      dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
+    ),
     dbTestRuntimeConfig,
     "db:createfrom test database",
   );
-
-  return targetPath;
 }
 
 async function pathExists(targetPath: string) {

@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import os from "node:os";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
@@ -13,9 +12,12 @@ import {
   readGeneratedSqlStatements,
 } from "../../apply-sql-ddl.mjs";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "../../../tests/db-test-runtime-guard.js";
+import {
+  createDbTestExecutionPath,
+  createDbTestTempDir,
+} from "../../../tests/db-test-execution-db.js";
 
 const SCHEMA_VERSION = "v1";
 const TEMP_DIR_PREFIX = "giganttic-v1-ddl-";
@@ -66,14 +68,14 @@ describe("generated sqlite ddl", () => {
   });
 
   it("applies cleanly and creates the expected tables", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
-    const outputPath = path.join(tempDir, "v1.sqlite");
-    tempPaths.push(tempDir);
-    assertDoesNotUseRuntimeDbPath(
-      outputPath,
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    const outputPath = createDbTestExecutionPath(
+      tempDir,
+      "v1.sqlite",
       dbTestRuntimeConfig,
       "v1 sqlite-ddl test database",
     );
+    tempPaths.push(tempDir);
     const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
     const SQL = await initSqlJs();
     const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));

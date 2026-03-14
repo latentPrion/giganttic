@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import os from "node:os";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
@@ -13,9 +12,12 @@ import {
   readGeneratedSqlStatements,
 } from "../../apply-sql-ddl.mjs";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "../../../tests/db-test-runtime-guard.js";
+import {
+  createDbTestExecutionPath,
+  createDbTestTempDir,
+} from "../../../tests/db-test-execution-db.js";
 
 const SCHEMA_VERSION = "v2";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
@@ -76,14 +78,14 @@ describe("generated sqlite ddl for v2", () => {
   });
 
   it("applies cleanly and creates the expected v2 tables while removing v1 role tables", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-v2-ddl-"));
-    const outputPath = path.join(tempDir, "v2.sqlite");
-    tempPaths.push(tempDir);
-    assertDoesNotUseRuntimeDbPath(
-      outputPath,
+    const tempDir = await createDbTestTempDir("giganttic-v2-ddl-");
+    const outputPath = createDbTestExecutionPath(
+      tempDir,
+      "v2.sqlite",
       dbTestRuntimeConfig,
       "v2 sqlite-ddl test database",
     );
+    tempPaths.push(tempDir);
 
     const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
     const SQL = await initSqlJs();

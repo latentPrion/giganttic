@@ -1,8 +1,6 @@
 import "reflect-metadata";
 
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { rm } from "node:fs/promises";
 
 import {
   FastifyAdapter,
@@ -35,15 +33,16 @@ import {
   usersTeamsTeamRoles,
 } from "../db/index.js";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionSandbox } from "./db-test-execution-db.js";
 
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 describe("backend auth api", () => {
   let app: NestFastifyApplication;
   let databaseService: DatabaseService;
+  let dbPath: string;
   let tempDir: string;
 
   function parseJson<T>(payload: string): T {
@@ -51,12 +50,6 @@ describe("backend auth api", () => {
   }
 
   async function buildApp(): Promise<NestFastifyApplication> {
-    const dbPath = path.join(tempDir, "auth.sqlite");
-    assertDoesNotUseRuntimeDbPath(
-      dbPath,
-      dbTestRuntimeConfig,
-      "backend auth integration database",
-    );
     const config = buildBackendConfig({
       createDbIfMissing: true,
       dbPath,
@@ -104,7 +97,15 @@ describe("backend auth api", () => {
   }
 
   beforeAll(async () => {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-auth-"));
+    const sandbox = await createDbTestExecutionSandbox({
+      contextLabel: "backend auth integration database",
+      copyBaseDb: false,
+      dbFileName: "auth.sqlite",
+      runtimeConfig: dbTestRuntimeConfig,
+      tempDirPrefix: "giganttic-auth-",
+    });
+    dbPath = sandbox.dbPath;
+    tempDir = sandbox.tempDir;
     app = await buildApp();
     databaseService = app.get(DatabaseService);
   });

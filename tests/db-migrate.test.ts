@@ -2,7 +2,6 @@ import path from "node:path";
 import {
   copyFile,
   mkdir,
-  mkdtemp,
   readFile,
   rm,
   writeFile,
@@ -33,9 +32,9 @@ import {
   defaultProdSqliteDbPath,
 } from "../db/sqlite-db-paths.mjs";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-migrate-test-";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
@@ -58,7 +57,7 @@ VALUES ('${SCHEMA_NAME_METADATA_KEY}', '${fromSchemaName}');
 }
 
 async function createTempProjectRoot() {
-  tempProjectRoot = await mkdtemp(path.join("/tmp", TEMP_ROOT_PREFIX));
+  tempProjectRoot = await createDbTestTempDir(TEMP_ROOT_PREFIX);
 }
 
 async function createMigrationDeliverable(
@@ -92,14 +91,14 @@ async function createDbFile(projectRoot: string, relativePath: string, fromSchem
   const db = new SQL.Database();
 
   db.exec(createSqliteBufferSql(fromSchemaName));
-  const outputPath = path.join(projectRoot, relativePath);
-
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  assertDoesNotUseRuntimeDbPath(
-    outputPath,
+  const outputPath = createDbTestExecutionPath(
+    path.dirname(path.join(projectRoot, relativePath)),
+    path.basename(relativePath),
     dbTestRuntimeConfig,
     "db:migrate test database",
   );
+
+  await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, Buffer.from(db.export()));
   db.close();
 
@@ -203,9 +202,9 @@ describe("db migrate tooling", () => {
       drizzleSql: "CREATE TABLE `Widgets` (`id` integer primary key autoincrement not null);",
     });
     const prodDbPath = await createDbFile(tempProjectRoot, defaultProdSqliteDbPath, "foo");
-    const targetDbPath = path.join(tempProjectRoot, defaultProddevSqliteDbPath);
-    assertDoesNotUseRuntimeDbPath(
-      targetDbPath,
+    const targetDbPath = createDbTestExecutionPath(
+      path.dirname(path.join(tempProjectRoot, defaultProddevSqliteDbPath)),
+      path.basename(defaultProddevSqliteDbPath),
       dbTestRuntimeConfig,
       "db:migrate proddev sandbox",
     );

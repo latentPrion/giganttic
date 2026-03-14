@@ -1,8 +1,7 @@
 import "reflect-metadata";
 
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import os from "node:os";
 import path from "node:path";
 
 import initSqlJs from "sql.js";
@@ -23,9 +22,9 @@ import {
 } from "../db/sqlite-db-paths.mjs";
 import { seededTestAccounts } from "../backend/modules/auth/auth.seed-data.js";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
 
 const TEMP_DIR_PREFIX = "giganttic-db-lifecycle-";
 const ISSUE_STATUSES_TABLE_NAME = "IssueStatuses";
@@ -34,28 +33,23 @@ const NON_TEST_USERNAME = "realuser";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 function createTargetDbPath(projectRoot: string, dbTarget: "dev" | "prod") {
-  const targetPath = path.join(
-    projectRoot,
+  return createDbTestExecutionPath(
+    path.join(projectRoot, "run"),
+    path.basename(
     dbTarget === "dev" ? defaultDevSqliteDbPath : defaultProdSqliteDbPath,
-  );
-
-  assertDoesNotUseRuntimeDbPath(
-    targetPath,
+    ),
     dbTestRuntimeConfig,
     "db lifecycle test database",
   );
-
-  return targetPath;
 }
 
 function createProddevDbPath(projectRoot: string) {
-  const targetPath = path.join(projectRoot, defaultProddevSqliteDbPath);
-  assertDoesNotUseRuntimeDbPath(
-    targetPath,
+  return createDbTestExecutionPath(
+    path.join(projectRoot, "run"),
+    path.basename(defaultProddevSqliteDbPath),
     dbTestRuntimeConfig,
     "db lifecycle proddev sandbox",
   );
-  return targetPath;
 }
 
 async function querySingleNumber(dbPath: string, sql: string) {
@@ -233,7 +227,7 @@ describe("db lifecycle scripts", () => {
   });
 
   it("prepareDatabase in dev mode fails when the target DB is missing", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
 
     await expect(prepareDatabase({
@@ -243,7 +237,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("uses isolated temp DB paths instead of the runtime DB path", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
 
     expect(path.resolve(createTargetDbPath(tempDir, "dev"))).not.toBe(
@@ -255,7 +249,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("supports the explicit fresh dev flow of createfrom then prepare without ensuring test data", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -285,7 +279,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("supports the explicit historical dev flow of createfrom then migrate then prepare", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -318,7 +312,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("supports the proddev sandbox flow by copying prod and migrating the copy without mutating prod", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const prodDbPath = createTargetDbPath(tempDir, "prod");
     const proddevDbPath = createProddevDbPath(tempDir);
@@ -344,7 +338,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("prepareDatabase in prod mode fails when test data is present", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const devDbPath = createTargetDbPath(tempDir, "dev");
     const prodDbPath = createTargetDbPath(tempDir, "prod");
@@ -361,7 +355,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("manageTestData can report and purge seeded test data", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -395,7 +389,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("prepareDatabase in prod mode succeeds without modifying a cleaned DB", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const devDbPath = createTargetDbPath(tempDir, "dev");
     const prodDbPath = createTargetDbPath(tempDir, "prod");
@@ -425,7 +419,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("purges tracked test data even after a seeded row changes non-id fields", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -448,7 +442,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("purges tracked test data for renamed tracked projects and leaves non-test rows untouched", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -468,7 +462,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("purges tracked test data successfully even if some tracked rows were deleted beforehand", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -498,7 +492,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("manageTestData ensure is idempotent and repairs stale tracked IDs after manual deletion", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -528,7 +522,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("manageTestData purge is idempotent when run multiple times", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -554,7 +548,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("prepareDatabase in dev mode preserves non-test rows while keeping reference data stable without ensuring test data", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 
@@ -579,7 +573,7 @@ describe("db lifecycle scripts", () => {
   }, 20_000);
 
   it("prepareDatabase fails cleanly when the DB exists but has no schema metadata", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), TEMP_DIR_PREFIX));
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
 

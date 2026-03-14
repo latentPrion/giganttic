@@ -1,8 +1,6 @@
 import "reflect-metadata";
 
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { rm } from "node:fs/promises";
 
 import {
   FastifyAdapter,
@@ -14,9 +12,9 @@ import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
 import {
-  assertDoesNotUseRuntimeDbPath,
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
+import { createDbTestExecutionSandbox } from "./db-test-execution-db.js";
 
 export const MISSING_ENTITY_ID = 999_999;
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
@@ -43,6 +41,7 @@ interface CrudTestHarness {
 
 export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   let app: NestFastifyApplication | undefined;
+  let dbPath: string | undefined;
   let databaseService: DatabaseService | undefined;
   let tempDir: string | undefined;
   let userCounter = 0;
@@ -83,16 +82,10 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
     return JSON.parse(payload) as T;
   }
 
-  async function buildApp(tempDirectory: string): Promise<NestFastifyApplication> {
-    const dbPath = path.join(tempDirectory, dbFileName);
-    assertDoesNotUseRuntimeDbPath(
-      dbPath,
-      dbTestRuntimeConfig,
-      "CRUD integration database",
-    );
+  async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
     const config = buildBackendConfig({
       createDbIfMissing: true,
-      dbPath,
+      dbPath: databasePath,
       port: 0,
       seedTestAccounts: true,
     });
@@ -111,8 +104,16 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   }
 
   async function setup(): Promise<void> {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), "giganttic-crud-tests-"));
-    app = await buildApp(tempDir);
+    const sandbox = await createDbTestExecutionSandbox({
+      contextLabel: "CRUD integration database",
+      copyBaseDb: false,
+      dbFileName,
+      runtimeConfig: dbTestRuntimeConfig,
+      tempDirPrefix: "giganttic-crud-tests-",
+    });
+    dbPath = sandbox.dbPath;
+    tempDir = sandbox.tempDir;
+    app = await buildApp(dbPath);
     databaseService = assertApp().get(DatabaseService);
   }
 
