@@ -45,9 +45,22 @@ const teamMemberSchema = z.object({
   username: z.string(),
 });
 
+const scopedManagerSchema = z.object({
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
+
 const organizationMemberSchema = z.object({
   roleCodes: roleCodesSchema,
   userId: z.number().int().positive(),
+  username: z.string(),
+});
+
+const userProfileSchema = z.object({
+  createdAt: timestampSchema,
+  id: z.number().int().positive(),
+  isActive: z.boolean(),
+  updatedAt: timestampSchema,
   username: z.string(),
 });
 
@@ -98,7 +111,10 @@ export const createTeamResponseSchema = z.object({
 
 export const getTeamResponseSchema = z.object({
   members: z.array(teamMemberSchema),
+  projects: z.array(projectSchema),
   team: teamSchema,
+  teamManagers: z.array(scopedManagerSchema),
+  teamProjectManagers: z.array(scopedManagerSchema),
 });
 export const updateTeamRequestSchema = z.object({
   description: z.string().trim().min(1).nullable().optional(),
@@ -140,12 +156,40 @@ export const createOrganizationResponseSchema = z.object({
 export const getOrganizationResponseSchema = z.object({
   members: z.array(organizationMemberSchema),
   organization: organizationSchema,
-  projects: z.array(z.object({
-    projectId: z.number().int().positive(),
-  })),
-  teams: z.array(z.object({
-    teamId: z.number().int().positive(),
-  })),
+  organizationManagers: z.array(scopedManagerSchema),
+  organizationProjectManagers: z.array(scopedManagerSchema),
+  organizationTeamManagers: z.array(scopedManagerSchema),
+  projects: z.array(projectSchema),
+  teams: z.array(teamSchema),
+});
+
+export const getUserResponseSchema = z.object({
+  organizations: z.array(organizationSchema),
+  projects: z.array(projectSchema),
+  teams: z.array(teamSchema),
+  user: userProfileSchema,
+});
+
+export const listUsersResponseSchema = z.object({
+  users: z.array(userProfileSchema),
+});
+
+export const projectTeamAssociationRequestSchema = z.object({
+  teamId: z.number().int().positive(),
+});
+
+export const projectOrganizationAssociationRequestSchema = z.object({
+  organizationId: z.number().int().positive(),
+});
+
+export const updateProjectTeamsResponseSchema = z.object({
+  projectId: z.number().int().positive(),
+  teams: z.array(teamSchema),
+});
+
+export const updateProjectOrganizationsResponseSchema = z.object({
+  organizations: z.array(organizationSchema),
+  projectId: z.number().int().positive(),
 });
 export const updateOrganizationRequestSchema = z.object({
   description: z.string().trim().min(1).nullable().optional(),
@@ -172,6 +216,15 @@ export const replaceOrganizationUsersResponseSchema = z.object({
   organizationId: z.number().int().positive(),
 });
 
+export const assignOrganizationTeamRequestSchema = z.object({
+  teamId: z.number().int().positive(),
+});
+
+export const updateOrganizationTeamsResponseSchema = z.object({
+  organizationId: z.number().int().positive(),
+  teams: z.array(teamSchema),
+});
+
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type CreateProjectResponse = z.infer<typeof createProjectResponseSchema>;
 export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
@@ -181,29 +234,49 @@ export type CreateOrganizationResponse = z.infer<typeof createOrganizationRespon
 export type DeleteOrganizationResponse = z.infer<typeof deleteOrganizationResponseSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type DeleteTeamResponse = z.infer<typeof deleteTeamResponseSchema>;
+export type AssignOrganizationTeamRequest = z.infer<typeof assignOrganizationTeamRequestSchema>;
 export type GetOrganizationResponse = z.infer<typeof getOrganizationResponseSchema>;
 export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
 export type GetTeamResponse = z.infer<typeof getTeamResponseSchema>;
+export type GetUserResponse = z.infer<typeof getUserResponseSchema>;
+export type ListUsersResponse = z.infer<typeof listUsersResponseSchema>;
 export type ListOrganizationsResponse = z.infer<typeof listOrganizationsResponseSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ListTeamsResponse = z.infer<typeof listTeamsResponseSchema>;
 export type LobbyOrganization = z.infer<typeof organizationSchema>;
 export type LobbyProject = z.infer<typeof projectSchema>;
 export type LobbyTeam = z.infer<typeof teamSchema>;
+export type LobbyUser = z.infer<typeof userProfileSchema>;
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
 export type ProjectManager = z.infer<typeof projectManagerSchema>;
 export type ProjectManagerSource = z.infer<typeof projectManagerSourceSchema>;
+export type ProjectOrganizationAssociationRequest = z.infer<
+  typeof projectOrganizationAssociationRequestSchema
+>;
+export type ProjectTeamAssociationRequest = z.infer<
+  typeof projectTeamAssociationRequestSchema
+>;
 export type ReplaceOrganizationUsersRequest = z.infer<
   typeof replaceOrganizationUsersRequestSchema
 >;
 export type ReplaceOrganizationUsersResponse = z.infer<
   typeof replaceOrganizationUsersResponseSchema
 >;
+export type UpdateOrganizationTeamsResponse = z.infer<
+  typeof updateOrganizationTeamsResponseSchema
+>;
 export type ReplaceTeamMembersRequest = z.infer<
   typeof replaceTeamMembersRequestSchema
 >;
 export type ReplaceTeamMembersResponse = z.infer<
   typeof replaceTeamMembersResponseSchema
+>;
+export type ScopedManager = z.infer<typeof scopedManagerSchema>;
+export type UpdateProjectOrganizationsResponse = z.infer<
+  typeof updateProjectOrganizationsResponseSchema
+>;
+export type UpdateProjectTeamsResponse = z.infer<
+  typeof updateProjectTeamsResponseSchema
 >;
 export type UpdateOrganizationRequest = z.infer<typeof updateOrganizationRequestSchema>;
 export type UpdateOrganizationResponse = z.infer<typeof updateOrganizationResponseSchema>;

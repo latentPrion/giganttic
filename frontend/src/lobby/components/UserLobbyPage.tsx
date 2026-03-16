@@ -49,6 +49,10 @@ import { ProjectSummaryModal } from "./project/ProjectSummaryModal.js";
 import { TeamCreateModal } from "./team/TeamCreateModal.js";
 import { TeamEditModal } from "./team/TeamEditModal.js";
 import { TeamSummaryModal } from "./team/TeamSummaryModal.js";
+import {
+  createProjectManagerOrganizationRoute,
+  createProjectManagerTeamRoute,
+} from "../../spas/project-manager/routes/project-route-paths.js";
 
 interface UserLobbyPageProps {
   currentUserId: number;
@@ -138,6 +142,7 @@ interface TeamSectionContentProps {
   busyKey: string | null;
   onDeleteTeam(teamId: number): void;
   onEditTeam(teamId: number): void;
+  onNavigate(teamId: number): void;
   onOpenSummary(teamId: number): void;
   teams: LobbyTeam[];
   viewMode: EntityListItemViewMode;
@@ -173,6 +178,7 @@ function TeamSectionContent(props: TeamSectionContentProps) {
             </>
           )}
           key={team.id}
+          onNavigate={() => props.onNavigate(team.id)}
           team={team}
           viewMode={props.viewMode}
         />
@@ -185,6 +191,7 @@ interface OrganizationSectionContentProps {
   busyKey: string | null;
   onDeleteOrganization(organizationId: number): void;
   onEditOrganization(organizationId: number): void;
+  onNavigate(organizationId: number): void;
   onOpenSummary(organizationId: number): void;
   organizations: LobbyOrganization[];
   viewMode: EntityListItemViewMode;
@@ -220,6 +227,7 @@ function OrganizationSectionContent(props: OrganizationSectionContentProps) {
             </>
           )}
           key={organization.id}
+          onNavigate={() => props.onNavigate(organization.id)}
           organization={organization}
           viewMode={props.viewMode}
         />
@@ -373,6 +381,14 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
 
   function navigateToProject(projectId: number): void {
     navigate(`/pm/project?projectId=${projectId}`);
+  }
+
+  function navigateToTeam(teamId: number): void {
+    navigate(createProjectManagerTeamRoute(teamId));
+  }
+
+  function navigateToOrganization(organizationId: number): void {
+    navigate(createProjectManagerOrganizationRoute(organizationId));
   }
 
   function openTeamSummaryModal(teamId: number): void {
@@ -629,6 +645,7 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
                 busyKey={busyKey}
                 onDeleteTeam={(teamId) => void deleteTeam(teamId)}
                 onEditTeam={openTeamEditModal}
+                onNavigate={navigateToTeam}
                 onOpenSummary={openTeamSummaryModal}
                 teams={lobbyData.teams}
                 viewMode={LIST_ITEM_VIEW_MODE}
@@ -649,6 +666,7 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
                 busyKey={busyKey}
                 onDeleteOrganization={(organizationId) => void deleteOrganization(organizationId)}
                 onEditOrganization={openOrganizationEditModal}
+                onNavigate={navigateToOrganization}
                 onOpenSummary={openOrganizationSummaryModal}
                 organizations={lobbyData.organizations}
                 viewMode={LIST_ITEM_VIEW_MODE}

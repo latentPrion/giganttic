@@ -18,8 +18,14 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("../../../lobby/api/lobby-api.js", () => ({
   lobbyApi: {
+    associateProjectOrganization: vi.fn(),
+    associateProjectTeam: vi.fn(),
+    createOrganization: vi.fn(),
+    createTeam: vi.fn(),
     deleteProject: vi.fn(),
     getProject: vi.fn(),
+    listOrganizations: vi.fn(),
+    listTeams: vi.fn(),
     updateProject: vi.fn(),
   },
 }));
@@ -75,10 +81,60 @@ function createProjectResponse() {
 describe("ProjectManagerProjectPage", () => {
   beforeEach(async () => {
     navigateMock.mockReset();
+    lobbyApiMock.associateProjectOrganization.mockReset();
+    lobbyApiMock.associateProjectTeam.mockReset();
+    lobbyApiMock.createOrganization.mockReset();
+    lobbyApiMock.createTeam.mockReset();
     lobbyApiMock.deleteProject.mockReset();
     lobbyApiMock.getProject.mockReset();
+    lobbyApiMock.listOrganizations.mockReset();
+    lobbyApiMock.listTeams.mockReset();
     lobbyApiMock.updateProject.mockReset();
     lobbyApiMock.getProject.mockResolvedValue(createProjectResponse());
+    lobbyApiMock.listOrganizations.mockResolvedValue({
+      organizations: [{
+        createdAt: DEFAULT_TIMESTAMP,
+        description: "Available Org",
+        id: 12,
+        name: "Org 12",
+        updatedAt: DEFAULT_TIMESTAMP,
+      }],
+    });
+    lobbyApiMock.listTeams.mockResolvedValue({
+      teams: [{
+        createdAt: DEFAULT_TIMESTAMP,
+        description: "Available Team",
+        id: 8,
+        name: "Team 8",
+        updatedAt: DEFAULT_TIMESTAMP,
+      }],
+    });
+    lobbyApiMock.associateProjectTeam.mockResolvedValue({
+      projectId: 42,
+      teams: [
+        ...createProjectResponse().teams,
+        {
+          createdAt: DEFAULT_TIMESTAMP,
+          description: "Available Team",
+          id: 8,
+          name: "Team 8",
+          updatedAt: DEFAULT_TIMESTAMP,
+        },
+      ],
+    });
+    lobbyApiMock.associateProjectOrganization.mockResolvedValue({
+      organizations: [
+        ...createProjectResponse().organizations,
+        {
+          createdAt: DEFAULT_TIMESTAMP,
+          description: "Available Org",
+          id: 12,
+          name: "Org 12",
+          updatedAt: DEFAULT_TIMESTAMP,
+        },
+      ],
+      projectId: 42,
+    });
     lobbyApiMock.updateProject.mockResolvedValue({
       project: {
         ...createProjectResponse().project,
@@ -254,6 +310,66 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByRole("heading", { name: "Organization Summary" })).toBeVisible();
   });
 
+  it("navigates to PM team and organization routes from local rows", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Teams" }));
+    await user.click(screen.getByText("Team 7"));
+    expect(navigateMock).toHaveBeenCalledWith("/pm/team?teamId=7");
+
+    await user.click(screen.getByRole("tab", { name: "Organizations" }));
+    await user.click(screen.getByText("Org 9"));
+    expect(navigateMock).toHaveBeenCalledWith("/pm/organization?organizationId=9");
+  });
+
+  it("navigates to the PM user route from project owner and manager rows", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    const userButtons = await screen.findAllByRole("button", { name: /demo-user/i });
+    await user.click(userButtons[0]!);
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/user?userId=101");
+  });
+
+  it("associates an existing team from the teams tab", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Teams" }));
+    await user.click(screen.getByRole("button", { name: "Associate Existing Team" }));
+    await user.click(await screen.findByRole("button", { name: "Associate Team" }));
+
+    await waitFor(() => {
+      expect(lobbyApiMock.associateProjectTeam).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, {
+        teamId: 8,
+      });
+    });
+    expect(await screen.findByText("Team 8")).toBeVisible();
+  });
+
   it("does not load project data when projectId is missing and shows the route fallback", async () => {
     renderWithTheme(
       <ProjectManagerProjectPage
@@ -322,5 +438,8 @@ describe("ProjectManagerProjectPage", () => {
 
     expect(await screen.findByRole("button", { name: "Edit" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Teams" }));
+    expect(screen.queryByRole("button", { name: "Associate Existing Team" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create Team" })).not.toBeInTheDocument();
   });
 });

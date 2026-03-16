@@ -52,6 +52,14 @@ describe("teams crud api", () => {
     });
   }
 
+  function getTeam(accessToken: string, teamId: number) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/teams/${teamId}`,
+    });
+  }
+
   beforeAll(async () => {
     await harness.setup();
   });
@@ -227,6 +235,56 @@ describe("teams crud api", () => {
 
     expect(grantResponse.statusCode).toBe(200);
     expect(getResponse.statusCode).toBe(200);
+  });
+
+  it("returns linked projects together with current team and team-project managers", async () => {
+    const creator = await harness.registerUser("team-detail-creator");
+    const teamProjectManager = await harness.registerUser("team-detail-project-manager");
+    const projectOwner = await harness.registerUser("team-detail-project-owner");
+    const teamCreateResponse = await createTeam(creator.accessToken, { name: "Detail Team" });
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamCreateResponse.payload);
+    const projectCreateResponse = await createProject(projectOwner.accessToken, {
+      name: "Detail Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectCreateResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: ["GGTC_TEAMROLE_PROJECT_MANAGER"],
+            userId: teamProjectManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/teams`,
+    });
+
+    const response = await getTeam(creator.accessToken, team.id);
+    const payload = harness.parseJson<{
+      projects: Array<{ id: number }>;
+      teamManagers: Array<{ userId: number }>;
+      teamProjectManagers: Array<{ userId: number }>;
+    }>(response.payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(payload.projects.map((entry) => entry.id)).toEqual([project.id]);
+    expect(payload.teamManagers.map((entry) => entry.userId)).toEqual([creator.user.id]);
+    expect(payload.teamProjectManagers.map((entry) => entry.userId)).toEqual([
+      teamProjectManager.user.id,
+    ]);
   });
 
   it("includes a privileged non-member team project manager in team listings without granting write access", async () => {

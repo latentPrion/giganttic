@@ -9,7 +9,10 @@ import { eq } from "drizzle-orm";
 
 import {
   organizationsTeams,
+  organizations,
+  projects,
   projectsUsers,
+  teams,
   teamsUsers,
   users,
   usersCredentialTypes,
@@ -43,7 +46,11 @@ import {
   BLOCKING_OBJECT_REASON_LAST_OWNER,
   createBlockingConflictException,
 } from "../access-control/blocking-conflicts.js";
-import type { DeleteUserResponse } from "./users.contracts.js";
+import type {
+  DeleteUserResponse,
+  GetUserResponse,
+  ListUsersResponse,
+} from "./users.contracts.js";
 
 const LAST_OWNER_DELETE_MESSAGE = "User delete would remove the last owner";
 const LAST_PROJECT_MANAGER_DELETE_MESSAGE =
@@ -57,6 +64,66 @@ export class UsersService {
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
   ) {}
+
+  async getUser(
+    authContext: AuthContext,
+    userId: number,
+  ): Promise<GetUserResponse> {
+    this.assertCanViewUser(authContext);
+
+    const userRecord = this.databaseService.db
+      .select({
+        createdAt: users.createdAt,
+        id: users.id,
+        isActive: users.isActive,
+        updatedAt: users.updatedAt,
+        username: users.username,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+
+    if (!userRecord) {
+      throw new NotFoundException("User not found");
+    }
+
+    return {
+      organizations: this.listUserOrganizations(userId),
+      projects: this.listUserProjects(userId),
+      teams: this.listUserTeams(userId),
+      user: {
+        createdAt: userRecord.createdAt.toISOString(),
+        id: userRecord.id,
+        isActive: userRecord.isActive,
+        updatedAt: userRecord.updatedAt.toISOString(),
+        username: userRecord.username,
+      },
+    };
+  }
+
+  async listUsers(authContext: AuthContext): Promise<ListUsersResponse> {
+    this.assertCanViewUser(authContext);
+
+    return {
+      users: this.databaseService.db
+        .select({
+          createdAt: users.createdAt,
+          id: users.id,
+          isActive: users.isActive,
+          updatedAt: users.updatedAt,
+          username: users.username,
+        })
+        .from(users)
+        .all()
+        .map((userRecord) => ({
+          createdAt: userRecord.createdAt.toISOString(),
+          id: userRecord.id,
+          isActive: userRecord.isActive,
+          updatedAt: userRecord.updatedAt.toISOString(),
+          username: userRecord.username,
+        })),
+    };
+  }
 
   async deleteUser(
     authContext: AuthContext,
@@ -106,6 +173,14 @@ export class UsersService {
     }
 
     throw new ForbiddenException("Not permitted to delete that user");
+  }
+
+  private assertCanViewUser(authContext: AuthContext): void {
+    if (authContext.userId > 0) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to view that user");
   }
 
   private assertUserDeletionPreservesProjectOwners(userId: number): void {
@@ -175,6 +250,72 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException("User not found");
     }
+  }
+
+  private listUserProjects(userId: number): GetUserResponse["projects"] {
+    return this.databaseService.db
+      .select({
+        createdAt: projects.createdAt,
+        description: projects.description,
+        id: projects.id,
+        name: projects.name,
+        updatedAt: projects.updatedAt,
+      })
+      .from(projectsUsers)
+      .innerJoin(projects, eq(projects.id, projectsUsers.projectId))
+      .where(eq(projectsUsers.userId, userId))
+      .all()
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+  }
+
+  private listUserTeams(userId: number): GetUserResponse["teams"] {
+    return this.databaseService.db
+      .select({
+        createdAt: teams.createdAt,
+        description: teams.description,
+        id: teams.id,
+        name: teams.name,
+        updatedAt: teams.updatedAt,
+      })
+      .from(teamsUsers)
+      .innerJoin(teams, eq(teams.id, teamsUsers.teamId))
+      .where(eq(teamsUsers.userId, userId))
+      .all()
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+  }
+
+  private listUserOrganizations(userId: number): GetUserResponse["organizations"] {
+    return this.databaseService.db
+      .select({
+        createdAt: organizations.createdAt,
+        description: organizations.description,
+        id: organizations.id,
+        name: organizations.name,
+        updatedAt: organizations.updatedAt,
+      })
+      .from(usersOrganizations)
+      .innerJoin(organizations, eq(organizations.id, usersOrganizations.organizationId))
+      .where(eq(usersOrganizations.userId, userId))
+      .all()
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
   }
 
   private listAffectedProjectIds(userId: number): number[] {

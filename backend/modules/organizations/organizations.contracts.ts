@@ -91,12 +91,25 @@ export const organizationMemberSchema = z.object({
   username: z.string(),
 });
 
+export const organizationManagerSchema = z.object({
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
+
 export const organizationProjectSchema = z.object({
-  projectId: z.number().int().positive(),
+  createdAt: z.string(),
+  description: z.string().nullable(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  updatedAt: z.string(),
 });
 
 export const organizationTeamSchema = z.object({
-  teamId: z.number().int().positive(),
+  createdAt: z.string(),
+  description: z.string().nullable(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  updatedAt: z.string(),
 });
 
 export const createOrganizationResponseSchema = z.object({
@@ -110,6 +123,9 @@ export const listOrganizationsResponseSchema = z.object({
 export const getOrganizationResponseSchema = z.object({
   members: z.array(organizationMemberSchema),
   organization: organizationSchema,
+  organizationManagers: z.array(organizationManagerSchema),
+  organizationProjectManagers: z.array(organizationManagerSchema),
+  organizationTeamManagers: z.array(organizationManagerSchema),
   projects: z.array(organizationProjectSchema),
   teams: z.array(organizationTeamSchema),
 });
@@ -157,6 +173,7 @@ export type GetOrganizationResponse = z.infer<
 export type ListOrganizationsResponse = z.infer<
   typeof listOrganizationsResponseSchema
 >;
+export type OrganizationManager = z.infer<typeof organizationManagerSchema>;
 export type OrganizationMember = z.infer<typeof organizationMemberSchema>;
 export type OrganizationProject = z.infer<typeof organizationProjectSchema>;
 export type OrganizationResponse = z.infer<typeof organizationSchema>;

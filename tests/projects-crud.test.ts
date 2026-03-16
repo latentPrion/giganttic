@@ -2342,22 +2342,58 @@ describe("projects crud api", () => {
     ).toHaveLength(1);
   });
 
-  it("returns 404 for unimplemented project-team mutation routes", async () => {
-    const creator = await harness.registerUser("project-no-team-links");
+  it("allows a project owner to associate teams and organizations to a project", async () => {
+    const creator = await harness.registerUser("project-association-owner");
+    const teamCreator = await harness.registerUser("project-association-team-owner");
+    const organizationCreator = await harness.registerUser("project-association-org-owner");
     const createResponse = await createProject(creator.accessToken, {
-      name: "No Team Links Project",
+      name: "Association Project",
     });
     const { project } = harness.parseJson<{ project: { id: number } }>(
       createResponse.payload,
     );
-    const response = await harness.app.inject({
+    const teamCreateResponse = await createTeam(teamCreator.accessToken, {
+      name: "Association Team",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamCreateResponse.payload);
+    const organizationCreateResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(organizationCreator.accessToken),
+      method: "POST",
+      payload: { name: "Association Organization" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      organizationCreateResponse.payload,
+    );
+    const teamAssociationResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
-      payload: { teamId: 1 },
+      payload: { teamId: team.id },
       url: `/stc-proj-mgmt/api/projects/${project.id}/teams`,
     });
+    const organizationAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { organizationId: organization.id },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/organizations`,
+    });
 
-    expect(response.statusCode).toBe(404);
+    expect(teamAssociationResponse.statusCode).toBe(200);
+    expect(organizationAssociationResponse.statusCode).toBe(200);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projectsTeams)
+        .where(eq(projectsTeams.projectId, project.id))
+        .all(),
+    ).toHaveLength(1);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projectsOrganizations)
+        .where(eq(projectsOrganizations.projectId, project.id))
+        .all(),
+    ).toHaveLength(1);
   });
 
   it("deleting a project cascades its memberships, role assignments, and team links", async () => {

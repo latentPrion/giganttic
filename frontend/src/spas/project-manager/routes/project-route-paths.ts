@@ -6,6 +6,18 @@ export function createProjectDetailRoute(projectId: number): string {
   return `/pm/project?projectId=${projectId}`;
 }
 
+export function createProjectManagerTeamRoute(teamId: number): string {
+  return `/pm/team?teamId=${teamId}`;
+}
+
+export function createProjectManagerOrganizationRoute(organizationId: number): string {
+  return `/pm/organization?organizationId=${organizationId}`;
+}
+
+export function createProjectManagerUserRoute(userId: number): string {
+  return `/pm/user?userId=${userId}`;
+}
+
 export function createProjectGanttRoute(projectId: number): string {
   return `/pm/project/gantt?projectId=${projectId}`;
 }

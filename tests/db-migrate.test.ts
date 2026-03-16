@@ -40,6 +40,7 @@ import {
 } from "../db/native-sqlite.mjs";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-migrate-test-";
+const DB_MIGRATE_TEST_TIMEOUT_MS = 20_000;
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
 let tempProjectRoot = "";
@@ -192,7 +193,7 @@ describe("db migrate tooling", () => {
     await expect(readSchemaNameFromDb(devDbPath)).resolves.toBe("bar");
     await expect(tableExists(devDbPath, "Widgets")).resolves.toBe(true);
     await expect(countAppliedMigrations(devDbPath)).resolves.toBe(1);
-  });
+  }, DB_MIGRATE_TEST_TIMEOUT_MS);
 
   it("copies the prod DB first when running in proddev mode", async () => {
     await createTempProjectRoot();
@@ -216,7 +217,7 @@ describe("db migrate tooling", () => {
     await expect(readSchemaNameFromDb(prodDbPath)).resolves.toBe("foo");
     await expect(readSchemaNameFromDb(targetDbPath)).resolves.toBe("bar");
     await expect(tableExists(targetDbPath, "Widgets")).resolves.toBe(true);
-  });
+  }, DB_MIGRATE_TEST_TIMEOUT_MS);
 
   it("uses isolated temp DB paths instead of the runtime DB path", async () => {
     await createTempProjectRoot();

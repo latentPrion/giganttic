@@ -60,9 +60,12 @@ vi.mock("./lobby/api/lobby-api.js", () => ({
     getOrganization: vi.fn(),
     getProject: vi.fn(),
     getTeam: vi.fn(),
+    getUser: vi.fn(),
     listOrganizations: vi.fn(),
     listProjects: vi.fn(),
     listTeams: vi.fn(),
+    associateProjectOrganization: vi.fn(),
+    associateProjectTeam: vi.fn(),
     replaceOrganizationUsers: vi.fn(),
     replaceTeamMembers: vi.fn(),
     updateOrganization: vi.fn(),
@@ -181,6 +184,54 @@ describe("app routing", () => {
       }],
       teams: [],
     });
+    lobbyApiMock.getTeam.mockResolvedValue({
+      members: [{
+        roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+        userId: 101,
+        username: "demo-user",
+      }],
+      projects: [],
+      team: {
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Team description",
+        id: 7,
+        name: "Team 7",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      },
+      teamManagers: [{ userId: 101, username: "demo-user" }],
+      teamProjectManagers: [],
+    });
+    lobbyApiMock.getOrganization.mockResolvedValue({
+      members: [{
+        roleCodes: ["GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER"],
+        userId: 101,
+        username: "demo-user",
+      }],
+      organization: {
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Organization description",
+        id: 9,
+        name: "Org 9",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      },
+      organizationManagers: [{ userId: 101, username: "demo-user" }],
+      organizationProjectManagers: [],
+      organizationTeamManagers: [],
+      projects: [],
+      teams: [],
+    });
+    lobbyApiMock.getUser.mockResolvedValue({
+      organizations: [],
+      projects: [],
+      teams: [],
+      user: {
+        createdAt: "2026-03-08T00:00:00.000Z",
+        id: 101,
+        isActive: true,
+        updatedAt: "2026-03-08T00:00:00.000Z",
+        username: "demo-user",
+      },
+    });
   });
 
   afterEach(() => {
@@ -276,6 +327,42 @@ describe("app routing", () => {
     expect(await screen.findByText("Project")).toBeVisible();
     expect(screen.getByText("Selected project: 1")).toBeVisible();
     expect(await screen.findByText("Detailed Project View")).toBeVisible();
+  });
+
+  it("renders the PM team SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/team?teamId=7"],
+    });
+
+    expect(await screen.findByText("Team")).toBeVisible();
+    expect(await screen.findByText("Selected team: 7")).toBeVisible();
+  });
+
+  it("renders the PM organization SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/organization?organizationId=9"],
+    });
+
+    expect(await screen.findByText("Organization")).toBeVisible();
+    expect(await screen.findByText("Selected organization: 9")).toBeVisible();
+  });
+
+  it("renders the PM user SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/user?userId=101"],
+    });
+
+    expect(await screen.findByText("User Profile")).toBeVisible();
+    expect(await screen.findByText("Selected user: 101")).toBeVisible();
   });
 
   it("renders the PM project gantt SPA for authenticated users", async () => {

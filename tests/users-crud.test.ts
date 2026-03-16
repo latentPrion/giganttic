@@ -59,12 +59,67 @@ describe("users delete api", () => {
     });
   }
 
+  function createOrganization(
+    accessToken: string,
+    payload: {
+      description?: string | null;
+      name: string;
+    },
+  ) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "POST",
+      payload,
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+  }
+
   beforeAll(async () => {
     await harness.setup();
   });
 
   afterAll(async () => {
     await harness.cleanup();
+  });
+
+  it("returns a direct user profile with projects teams and organizations", async () => {
+    const creator = await harness.registerUser("users-profile");
+    const projectCreateResponse = await createProject(creator.accessToken, {
+      name: "Profile Project",
+    });
+    const teamCreateResponse = await createTeam(creator.accessToken, {
+      name: "Profile Team",
+    });
+    const organizationCreateResponse = await createOrganization(creator.accessToken, {
+      name: "Profile Organization",
+    });
+
+    expect(projectCreateResponse.statusCode).toBe(201);
+    expect(teamCreateResponse.statusCode).toBe(201);
+    expect(organizationCreateResponse.statusCode).toBe(201);
+
+    const getUserResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/users/${creator.user.id}`,
+    });
+    const payload = harness.parseJson<{
+      organizations: Array<{ id: number; name: string }>;
+      projects: Array<{ id: number; name: string }>;
+      teams: Array<{ id: number; name: string }>;
+      user: { id: number; isActive: boolean; username: string };
+    }>(getUserResponse.payload);
+
+    expect(getUserResponse.statusCode).toBe(200);
+    expect(payload.user).toEqual(expect.objectContaining({
+      id: creator.user.id,
+      isActive: true,
+      username: creator.user.username,
+    }));
+    expect(payload.projects.map((project) => project.name)).toContain("Profile Project");
+    expect(payload.teams.map((team) => team.name)).toContain("Profile Team");
+    expect(payload.organizations.map((organization) => organization.name))
+      .toContain("Profile Organization");
   });
 
   it("allows deleting a user after project and team management have been transferred", async () => {

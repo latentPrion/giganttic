@@ -5,7 +5,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import type { SxProps, Theme } from "@mui/material/styles";
+import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 
 import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
@@ -22,6 +22,18 @@ interface EntityListItemCardProps {
 const CARD_PADDING = "1rem 1.25rem";
 const CONTENT_GAP = 2;
 const DETAILS_GAP = 0.5;
+const LIGHT_MODE_CARD_BACKGROUND_OPACITY = 0.7;
+const DARK_MODE_CARD_BACKGROUND_OPACITY = 0.14;
+
+function createListItemCardSurface(theme: Theme) {
+  return {
+    backgroundColor: theme.palette.mode === "light"
+      ? alpha(theme.palette.common.white, LIGHT_MODE_CARD_BACKGROUND_OPACITY)
+      : alpha(theme.palette.common.white, DARK_MODE_CARD_BACKGROUND_OPACITY),
+    border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+    borderRadius: 2,
+  };
+}
 
 function shouldRenderActions(viewMode: EntityListItemViewMode): boolean {
   return viewMode === "main-listing-view";
@@ -39,9 +51,10 @@ export function EntityListItemCard(props: EntityListItemCardProps) {
     <Paper
       elevation={0}
       sx={[
-        {
+        (theme) => ({
+          ...createListItemCardSurface(theme),
           padding: CARD_PADDING,
-        },
+        }),
         ...(Array.isArray(props.paperSx) ? props.paperSx : [props.paperSx]),
       ]}
     >

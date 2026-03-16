@@ -1,19 +1,20 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import { parseProjectIdFromSearchParameters } from "../contracts/route-query.contracts.js";
-import { ProjectManagerProjectPage } from "../pages/ProjectManagerProjectPage.js";
+
+import { parseTeamIdFromSearchParameters } from "../contracts/route-query.contracts.js";
+import { ProjectManagerTeamPage } from "../pages/ProjectManagerTeamPage.js";
 import { ProjectManagerAuthenticatedRoute } from "./ProjectManagerAuthenticatedRoute.js";
 
-export function ProjectRoute() {
+export function TeamRoute() {
   const [searchParameters] = useSearchParams();
 
   return (
     <ProjectManagerAuthenticatedRoute>
       {(token, currentUserId, currentUserRoles) => (
-        <ProjectManagerProjectPage
+        <ProjectManagerTeamPage
           currentUserId={currentUserId}
           currentUserRoles={currentUserRoles}
-          projectId={parseProjectIdFromSearchParameters(searchParameters)}
+          teamId={parseTeamIdFromSearchParameters(searchParameters)}
           token={token}
         />
       )}

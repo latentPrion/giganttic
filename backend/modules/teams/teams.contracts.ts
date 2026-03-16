@@ -76,6 +76,19 @@ export const teamMemberSchema = z.object({
   username: z.string(),
 });
 
+export const teamManagerSchema = z.object({
+  userId: z.number().int().positive(),
+  username: z.string(),
+});
+
+export const teamProjectSchema = z.object({
+  createdAt: z.string(),
+  description: z.string().nullable(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  updatedAt: z.string(),
+});
+
 export const createTeamResponseSchema = z.object({
   team: teamSchema,
 });
@@ -87,6 +100,9 @@ export const listTeamsResponseSchema = z.object({
 export const getTeamResponseSchema = z.object({
   members: z.array(teamMemberSchema),
   team: teamSchema,
+  teamManagers: z.array(teamManagerSchema),
+  teamProjectManagers: z.array(teamManagerSchema),
+  projects: z.array(teamProjectSchema),
 });
 
 export const updateTeamResponseSchema = z.object({
@@ -112,6 +128,8 @@ export type DeleteTeamResponse = z.infer<typeof deleteTeamResponseSchema>;
 export type GetTeamResponse = z.infer<typeof getTeamResponseSchema>;
 export type ListTeamsResponse = z.infer<typeof listTeamsResponseSchema>;
 export type TeamMember = z.infer<typeof teamMemberSchema>;
+export type TeamManager = z.infer<typeof teamManagerSchema>;
+export type TeamProject = z.infer<typeof teamProjectSchema>;
 export type TeamRoleAssignmentRequest = z.infer<
   typeof teamRoleAssignmentRequestSchema
 >;

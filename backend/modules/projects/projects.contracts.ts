@@ -15,6 +15,9 @@ const PROJECT_DUPLICATE_ROLE_CODES_MESSAGE =
   "Role codes must be unique per member";
 const PROJECT_ROLE_ASSIGNMENT_REQUIRED_MESSAGE =
   "A project role assignment requires userId and roleCode";
+const PROJECT_DUPLICATE_TEAMS_MESSAGE = "Each associated team must be unique";
+const PROJECT_DUPLICATE_ORGANIZATIONS_MESSAGE =
+  "Each associated organization must be unique";
 
 function createOptionalDescriptionSchema() {
   return z.string().trim().min(1).nullable().optional();
@@ -36,6 +39,19 @@ function hasUniqueUserIds(
   members: ReadonlyArray<{ userId: number }>,
 ): boolean {
   return new Set(members.map((member) => member.userId)).size === members.length;
+}
+
+function hasUniqueTeamIds(
+  teams: ReadonlyArray<{ teamId: number }>,
+): boolean {
+  return new Set(teams.map((team) => team.teamId)).size === teams.length;
+}
+
+function hasUniqueOrganizationIds(
+  organizations: ReadonlyArray<{ organizationId: number }>,
+): boolean {
+  return new Set(organizations.map((organization) => organization.organizationId)).size ===
+    organizations.length;
 }
 
 export const projectIdParamSchema = z.object({
@@ -71,6 +87,30 @@ export const projectRoleAssignmentRequestSchema = z.object({
   roleCode: PROJECT_ROLE_ENUM,
   userId: z.number().int().positive(),
 }, PROJECT_ROLE_ASSIGNMENT_REQUIRED_MESSAGE);
+
+export const projectTeamAssociationRequestSchema = z.object({
+  teamId: z.number().int().positive(),
+});
+
+export const projectOrganizationAssociationRequestSchema = z.object({
+  organizationId: z.number().int().positive(),
+});
+
+export const updateProjectTeamsRequestSchema = z.object({
+  teams: z.array(
+    z.object({
+      teamId: z.number().int().positive(),
+    }),
+  ).refine(hasUniqueTeamIds, PROJECT_DUPLICATE_TEAMS_MESSAGE),
+});
+
+export const updateProjectOrganizationsRequestSchema = z.object({
+  organizations: z.array(
+    z.object({
+      organizationId: z.number().int().positive(),
+    }),
+  ).refine(hasUniqueOrganizationIds, PROJECT_DUPLICATE_ORGANIZATIONS_MESSAGE),
+});
 
 export const projectSchema = z.object({
   createdAt: z.string(),
@@ -145,6 +185,16 @@ export const updateProjectRoleAssignmentResponseSchema = z.object({
   projectId: z.number().int().positive(),
 });
 
+export const updateProjectTeamsResponseSchema = z.object({
+  projectId: z.number().int().positive(),
+  teams: z.array(projectTeamSchema),
+});
+
+export const updateProjectOrganizationsResponseSchema = z.object({
+  organizations: z.array(projectOrganizationSchema),
+  projectId: z.number().int().positive(),
+});
+
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
@@ -158,13 +208,31 @@ export type ProjectTeam = z.infer<typeof projectTeamSchema>;
 export type ProjectRoleAssignmentRequest = z.infer<
   typeof projectRoleAssignmentRequestSchema
 >;
+export type ProjectOrganizationAssociationRequest = z.infer<
+  typeof projectOrganizationAssociationRequestSchema
+>;
 export type UpdateProjectMembershipRequest = z.infer<
   typeof updateProjectMembershipRequestSchema
 >;
 export type UpdateProjectMembershipResponse = z.infer<
   typeof updateProjectMembershipResponseSchema
 >;
+export type UpdateProjectOrganizationsRequest = z.infer<
+  typeof updateProjectOrganizationsRequestSchema
+>;
+export type UpdateProjectOrganizationsResponse = z.infer<
+  typeof updateProjectOrganizationsResponseSchema
+>;
 export type UpdateProjectRoleAssignmentResponse = z.infer<
   typeof updateProjectRoleAssignmentResponseSchema
 >;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+export type ProjectTeamAssociationRequest = z.infer<
+  typeof projectTeamAssociationRequestSchema
+>;
+export type UpdateProjectTeamsRequest = z.infer<
+  typeof updateProjectTeamsRequestSchema
+>;
+export type UpdateProjectTeamsResponse = z.infer<
+  typeof updateProjectTeamsResponseSchema
+>;

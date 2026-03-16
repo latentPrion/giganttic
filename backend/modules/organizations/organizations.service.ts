@@ -53,6 +53,7 @@ import type {
   DeleteOrganizationResponse,
   GetOrganizationResponse,
   ListOrganizationsResponse,
+  OrganizationManager,
   OrganizationMember,
   OrganizationResponse,
   OrganizationRoleAssignmentRequest,
@@ -99,6 +100,26 @@ function toOrganizationResponse(
     id: organization.id,
     name: organization.name,
     updatedAt: organization.updatedAt.toISOString(),
+  };
+}
+
+function toOrganizationProjectResponse(project: typeof projects.$inferSelect) {
+  return {
+    createdAt: project.createdAt.toISOString(),
+    description: project.description ?? null,
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt.toISOString(),
+  };
+}
+
+function toOrganizationTeamResponse(team: typeof teams.$inferSelect) {
+  return {
+    createdAt: team.createdAt.toISOString(),
+    description: team.description ?? null,
+    id: team.id,
+    name: team.name,
+    updatedAt: team.updatedAt.toISOString(),
   };
 }
 
@@ -194,6 +215,18 @@ export class OrganizationsService {
     return {
       members: this.listOrganizationMembers(organizationId),
       organization: this.getOrganizationRecordByIdOrThrow(organizationId),
+      organizationManagers: this.listOrganizationRoleUsers(
+        organizationId,
+        ORGANIZATION_MANAGER_ROLE_CODE,
+      ),
+      organizationProjectManagers: this.listOrganizationRoleUsers(
+        organizationId,
+        ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
+      ),
+      organizationTeamManagers: this.listOrganizationRoleUsers(
+        organizationId,
+        ORGANIZATION_TEAM_MANAGER_ROLE_CODE,
+      ),
       projects: this.listOrganizationProjects(organizationId),
       teams: this.listOrganizationTeams(organizationId),
     };
@@ -481,7 +514,7 @@ export class OrganizationsService {
       organizationId,
     );
     const directlyAssociatedProjectIds = this.listOrganizationProjects(organizationId)
-      .map((project) => project.projectId);
+      .map((project) => project.id);
 
     if (associatedTeamIds.length > 0) {
       throw createBlockingConflictException(LAST_TEAM_MANAGER_MESSAGE, [
@@ -783,20 +816,65 @@ export class OrganizationsService {
   }
 
   private listOrganizationProjects(organizationId: number) {
-    return this.databaseService.db
+    const projectIds = this.databaseService.db
       .select({ projectId: projectsOrganizations.projectId })
       .from(projectsOrganizations)
       .where(eq(projectsOrganizations.organizationId, organizationId))
       .orderBy(asc(projectsOrganizations.projectId))
-      .all();
+      .all()
+      .map((row) => row.projectId);
+
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select()
+      .from(projects)
+      .where(inArray(projects.id, projectIds))
+      .orderBy(asc(projects.id))
+      .all()
+      .map(toOrganizationProjectResponse);
   }
 
   private listOrganizationTeams(organizationId: number) {
-    return this.databaseService.db
+    const teamIds = this.databaseService.db
       .select({ teamId: organizationsTeams.teamId })
       .from(organizationsTeams)
       .where(eq(organizationsTeams.organizationId, organizationId))
       .orderBy(asc(organizationsTeams.teamId))
+      .all()
+      .map((row) => row.teamId);
+
+    if (teamIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select()
+      .from(teams)
+      .where(inArray(teams.id, teamIds))
+      .orderBy(asc(teams.id))
+      .all()
+      .map(toOrganizationTeamResponse);
+  }
+
+  private listOrganizationRoleUsers(
+    organizationId: number,
+    roleCode: string,
+  ): OrganizationManager[] {
+    return this.databaseService.db
+      .select({
+        userId: users.id,
+        username: users.username,
+      })
+      .from(usersOrganizationsOrganizationRoles)
+      .innerJoin(users, eq(users.id, usersOrganizationsOrganizationRoles.userId))
+      .where(and(
+        eq(usersOrganizationsOrganizationRoles.organizationId, organizationId),
+        eq(usersOrganizationsOrganizationRoles.roleCode, roleCode),
+      ))
+      .orderBy(asc(users.id))
       .all();
   }
 

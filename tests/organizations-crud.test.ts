@@ -742,6 +742,69 @@ describe("organizations crud api", () => {
     expect(patchResponse.statusCode).toBe(403);
   });
 
+  it("returns linked projects, linked teams, and current organization managers by role", async () => {
+    const creator = await harness.registerUser("org-detail-creator");
+    const orgProjectManager = await harness.registerUser("org-detail-project-manager");
+    const orgTeamManager = await harness.registerUser("org-detail-team-manager");
+    const projectOwner = await harness.registerUser("org-detail-project-owner");
+    const teamCreator = await harness.registerUser("org-detail-team-creator");
+    const organizationCreateResponse = await createOrganization(creator.accessToken, {
+      name: "Detail Organization",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      organizationCreateResponse.payload,
+    );
+    const projectCreateResponse = await createProject(projectOwner.accessToken, {
+      name: "Detail Organization Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(projectCreateResponse.payload);
+    const teamCreateResponse = await createTeam(teamCreator.accessToken, {
+      name: "Detail Organization Team",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamCreateResponse.payload);
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { projects: [{ projectId: project.id }] },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/projects`,
+    });
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: orgProjectManager.user.id,
+    });
+    await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
+      userId: orgTeamManager.user.id,
+    });
+
+    const response = await getOrganization(creator.accessToken, organization.id);
+    const payload = harness.parseJson<{
+      organizationManagers: Array<{ userId: number }>;
+      organizationProjectManagers: Array<{ userId: number }>;
+      organizationTeamManagers: Array<{ userId: number }>;
+      projects: Array<{ id: number }>;
+      teams: Array<{ id: number }>;
+    }>(response.payload);
+
+    expect(response.statusCode).toBe(200);
+    expect(payload.organizationManagers.map((entry) => entry.userId)).toEqual([creator.user.id]);
+    expect(payload.organizationProjectManagers.map((entry) => entry.userId)).toEqual([
+      orgProjectManager.user.id,
+    ]);
+    expect(payload.organizationTeamManagers.map((entry) => entry.userId)).toEqual([
+      orgTeamManager.user.id,
+    ]);
+    expect(payload.projects.map((entry) => entry.id)).toEqual([project.id]);
+    expect(payload.teams.map((entry) => entry.id)).toEqual([team.id]);
+  });
+
   it("allows targeting org roles at indirect org members on org-owned teams", async () => {
     const creator = await harness.registerUser("org-indirect-role-creator");
     const teamOwner = await harness.registerUser("org-indirect-role-owner");

@@ -23,11 +23,15 @@ import {
   deleteProjectResponseSchema,
   getProjectResponseSchema,
   listProjectsResponseSchema,
+  projectOrganizationAssociationRequestSchema,
   projectRoleAssignmentRequestSchema,
+  projectTeamAssociationRequestSchema,
   projectIdParamSchema,
+  updateProjectOrganizationsResponseSchema,
   updateProjectMembershipRequestSchema,
   updateProjectMembershipResponseSchema,
   updateProjectRoleAssignmentResponseSchema,
+  updateProjectTeamsResponseSchema,
   updateProjectRequestSchema,
   updateProjectResponseSchema,
 } from "./projects.contracts.js";
@@ -114,6 +118,42 @@ export class ProjectsController {
 
     return updateProjectMembershipResponseSchema.parse(
       await this.projectsService.replaceProjectMembers(
+        request.authContext!,
+        projectId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":projectId/teams")
+  @HttpCode(200)
+  async associateProjectTeam(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(projectTeamAssociationRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return updateProjectTeamsResponseSchema.parse(
+      await this.projectsService.associateProjectTeam(
+        request.authContext!,
+        projectId,
+        body as never,
+      ),
+    );
+  }
+
+  @Post(":projectId/organizations")
+  @HttpCode(200)
+  async associateProjectOrganization(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(projectOrganizationAssociationRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return updateProjectOrganizationsResponseSchema.parse(
+      await this.projectsService.associateProjectOrganization(
         request.authContext!,
         projectId,
         body as never,

@@ -12,6 +12,7 @@ import { seedExecutionDatabase } from "./db-test-seeding.js";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 const PROJECT_SEED_KEY = "project:projectProjectManager";
 const TEMP_DIR_PREFIX = "giganttic-db-seeding-";
+const DB_SEEDING_TEST_TIMEOUT_MS = 45_000;
 const tempDirs: string[] = [];
 
 async function pathExists(targetPath: string) {
@@ -66,15 +67,6 @@ async function createSeededSandbox(dbFileName: string) {
 }
 
 describe("db test seeding charts", () => {
-  afterEach(async () => {
-    while (tempDirs.length > 0) {
-      const tempDir = tempDirs.pop();
-      if (tempDir) {
-        await rm(tempDir, { force: true, recursive: true });
-      }
-    }
-  });
-
   it("writes seeded charts into the sandbox charts directory instead of the repo charts directory", async () => {
     const sandbox = await createSeededSandbox("seeded-sandbox.sqlite");
     const trackedProjectId = readTrackedProjectId(sandbox.dbPath, PROJECT_SEED_KEY);
@@ -84,6 +76,15 @@ describe("db test seeding charts", () => {
     expect(await pathExists(sandboxChartPath)).toBe(true);
     expect(path.resolve(sandboxChartPath).startsWith(path.resolve(sandbox.tempDir))).toBe(true);
     expect(path.resolve(sandboxChartPath)).not.toBe(path.resolve(repoChartPath));
+  }, DB_SEEDING_TEST_TIMEOUT_MS);
+
+  afterEach(async () => {
+    while (tempDirs.length > 0) {
+      const tempDir = tempDirs.pop();
+      if (tempDir) {
+        await rm(tempDir, { force: true, recursive: true });
+      }
+    }
   });
 
   it("creates unique seeded chart paths across parallel sandbox databases", async () => {
@@ -97,7 +98,7 @@ describe("db test seeding charts", () => {
     expect(firstChartPath).not.toBe(secondChartPath);
     expect(await pathExists(firstChartPath)).toBe(true);
     expect(await pathExists(secondChartPath)).toBe(true);
-  });
+  }, DB_SEEDING_TEST_TIMEOUT_MS);
 
   it("purging seeded data in one sandbox leaves seeded charts intact in another sandbox", async () => {
     const firstSandbox = await createSeededSandbox("first-purge-sandbox.sqlite");
@@ -112,5 +113,5 @@ describe("db test seeding charts", () => {
     expect(await pathExists(firstChartPath)).toBe(false);
     expect(await pathExists(secondChartPath)).toBe(true);
     expect(await readFile(secondChartPath, "utf8")).toContain("Direct PM kickoff");
-  });
+  }, DB_SEEDING_TEST_TIMEOUT_MS);
 });

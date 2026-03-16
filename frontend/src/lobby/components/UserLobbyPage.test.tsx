@@ -168,7 +168,10 @@ function createTeamDetailResponse(overrides: Partial<{
     userId: number;
     username: string;
   }>;
+  projects: ReturnType<typeof createProject>[];
   team: ReturnType<typeof createTeam>;
+  teamManagers: Array<{ userId: number; username: string }>;
+  teamProjectManagers: Array<{ userId: number; username: string }>;
 }> = {}) {
   return {
     members: [
@@ -181,7 +184,10 @@ function createTeamDetailResponse(overrides: Partial<{
         username: "ops-user",
       }),
     ],
+    projects: [createProject()],
     team: createTeam(),
+    teamManagers: [{ userId: CURRENT_USER_ID, username: "demo-user" }],
+    teamProjectManagers: [],
     ...overrides,
   };
 }
@@ -206,8 +212,11 @@ function createOrganizationDetailResponse(overrides: Partial<{
     username: string;
   }>;
   organization: ReturnType<typeof createOrganization>;
-  projects: Array<{ projectId: number }>;
-  teams: Array<{ teamId: number }>;
+  organizationManagers: Array<{ userId: number; username: string }>;
+  organizationProjectManagers: Array<{ userId: number; username: string }>;
+  organizationTeamManagers: Array<{ userId: number; username: string }>;
+  projects: ReturnType<typeof createProject>[];
+  teams: ReturnType<typeof createTeam>[];
 }> = {}) {
   return {
     members: [
@@ -221,8 +230,11 @@ function createOrganizationDetailResponse(overrides: Partial<{
       }),
     ],
     organization: createOrganization(),
-    projects: [{ projectId: 1 }],
-    teams: [{ teamId: 11 }],
+    organizationManagers: [{ userId: CURRENT_USER_ID, username: "demo-user" }],
+    organizationProjectManagers: [],
+    organizationTeamManagers: [],
+    projects: [createProject()],
+    teams: [createTeam()],
     ...overrides,
   };
 }

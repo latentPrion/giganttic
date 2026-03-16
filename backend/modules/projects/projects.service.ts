@@ -12,6 +12,7 @@ import {
   issues,
   organizations,
   projects,
+  projectsOrganizations,
   projectsTeams,
   projectsUsers,
   teams,
@@ -55,13 +56,17 @@ import type {
   ProjectMember,
   ProjectManager,
   ProjectManagerSource,
+  ProjectOrganizationAssociationRequest,
   ProjectOrganization,
   ProjectResponse,
+  ProjectTeamAssociationRequest,
   ProjectRoleAssignmentRequest,
   ProjectTeam,
   UpdateProjectMembershipRequest,
   UpdateProjectMembershipResponse,
+  UpdateProjectOrganizationsResponse,
   UpdateProjectRequest,
+  UpdateProjectTeamsResponse,
   UpdateProjectRoleAssignmentResponse,
 } from "./projects.contracts.js";
 
@@ -75,6 +80,10 @@ const LAST_PROJECT_OWNER_ROLE_REVOKE_MESSAGE =
   "Project role revoke would remove the last owner";
 const PROJECT_ROLE_ALREADY_ASSIGNED_MESSAGE = "That project role is already assigned";
 const PROJECT_ROLE_NOT_ASSIGNED_MESSAGE = "That project role assignment was not found";
+const PROJECT_TEAM_ALREADY_ASSOCIATED_MESSAGE =
+  "That team is already associated with the project";
+const PROJECT_ORGANIZATION_ALREADY_ASSOCIATED_MESSAGE =
+  "That organization is already associated with the project";
 
 function normalizeDescription(
   description: string | null | undefined,
@@ -360,6 +369,56 @@ export class ProjectsService {
     return { deletedProjectId: projectId };
   }
 
+  async associateProjectTeam(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectTeamAssociationRequest,
+  ): Promise<UpdateProjectTeamsResponse> {
+    this.assertProjectExists(projectId);
+    this.assertTeamExists(payload.teamId);
+    this.assertCanManageProjectMembership(authContext, projectId);
+    this.assertProjectTeamAssociationAbsent(projectId, payload.teamId);
+
+    this.databaseService.db.transaction((tx) => {
+      tx.insert(projectsTeams)
+        .values({
+          projectId,
+          teamId: payload.teamId,
+        })
+        .run();
+    });
+
+    return {
+      projectId,
+      teams: this.listProjectTeams(projectId),
+    };
+  }
+
+  async associateProjectOrganization(
+    authContext: AuthContext,
+    projectId: number,
+    payload: ProjectOrganizationAssociationRequest,
+  ): Promise<UpdateProjectOrganizationsResponse> {
+    this.assertProjectExists(projectId);
+    this.assertOrganizationExists(payload.organizationId);
+    this.assertCanManageProjectMembership(authContext, projectId);
+    this.assertProjectOrganizationAssociationAbsent(projectId, payload.organizationId);
+
+    this.databaseService.db.transaction((tx) => {
+      tx.insert(projectsOrganizations)
+        .values({
+          organizationId: payload.organizationId,
+          projectId,
+        })
+        .run();
+    });
+
+    return {
+      organizations: this.listProjectOrganizations(projectId),
+      projectId,
+    };
+  }
+
   private cleanupProjectAfterChartCreationFailure(projectId: number): void {
     try {
       this.projectChartsService.deleteProjectChart(projectId);
@@ -431,6 +490,9 @@ export class ProjectsService {
       .run();
     tx.delete(projectsTeams)
       .where(eq(projectsTeams.projectId, projectId))
+      .run();
+    tx.delete(projectsOrganizations)
+      .where(eq(projectsOrganizations.projectId, projectId))
       .run();
     tx.delete(projects)
       .where(eq(projects.id, projectId))
@@ -691,6 +753,63 @@ export class ProjectsService {
   private assertUsersExist(userIds: number[]): void {
     if (!assertUsersExistOrThrow(this.databaseService.db, userIds)) {
       throw new NotFoundException("One or more users were not found");
+    }
+  }
+
+  private assertTeamExists(teamId: number): void {
+    const team = this.databaseService.db
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .get();
+
+    if (!team) {
+      throw new NotFoundException("Team not found");
+    }
+  }
+
+  private assertOrganizationExists(organizationId: number): void {
+    const organization = this.databaseService.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .get();
+
+    if (!organization) {
+      throw new NotFoundException("Organization not found");
+    }
+  }
+
+  private assertProjectTeamAssociationAbsent(projectId: number, teamId: number): void {
+    const existingAssociation = this.databaseService.db
+      .select({ projectId: projectsTeams.projectId })
+      .from(projectsTeams)
+      .where(and(
+        eq(projectsTeams.projectId, projectId),
+        eq(projectsTeams.teamId, teamId),
+      ))
+      .get();
+
+    if (existingAssociation) {
+      throw new ConflictException(PROJECT_TEAM_ALREADY_ASSOCIATED_MESSAGE);
+    }
+  }
+
+  private assertProjectOrganizationAssociationAbsent(
+    projectId: number,
+    organizationId: number,
+  ): void {
+    const existingAssociation = this.databaseService.db
+      .select({ projectId: projectsOrganizations.projectId })
+      .from(projectsOrganizations)
+      .where(and(
+        eq(projectsOrganizations.projectId, projectId),
+        eq(projectsOrganizations.organizationId, organizationId),
+      ))
+      .get();
+
+    if (existingAssociation) {
+      throw new ConflictException(PROJECT_ORGANIZATION_ALREADY_ASSOCIATED_MESSAGE);
     }
   }
 

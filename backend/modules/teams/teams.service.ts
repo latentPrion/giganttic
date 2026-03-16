@@ -8,6 +8,7 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  projects,
   projectsOrganizations,
   projectsTeams,
   teams,
@@ -51,6 +52,8 @@ import type {
   GetTeamResponse,
   ListTeamsResponse,
   TeamMember,
+  TeamManager,
+  TeamProject,
   TeamResponse,
   TeamRoleAssignmentRequest,
   UpdateTeamMembershipRequest,
@@ -86,6 +89,16 @@ function toTeamResponse(team: typeof teams.$inferSelect): TeamResponse {
     id: team.id,
     name: team.name,
     updatedAt: team.updatedAt.toISOString(),
+  };
+}
+
+function toTeamProjectResponse(project: typeof projects.$inferSelect): TeamProject {
+  return {
+    createdAt: project.createdAt.toISOString(),
+    description: project.description ?? null,
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt.toISOString(),
   };
 }
 
@@ -199,7 +212,10 @@ export class TeamsService {
 
     return {
       members: this.listTeamMembers(teamId),
+      projects: this.listTeamProjects(teamId),
       team: this.getTeamRecordByIdOrThrow(teamId),
+      teamManagers: this.listTeamRoleUsers(teamId, TEAM_MANAGER_ROLE_CODE),
+      teamProjectManagers: this.listTeamRoleUsers(teamId, TEAM_PROJECT_MANAGER_ROLE_CODE),
     };
   }
 
@@ -791,5 +807,36 @@ export class TeamsService {
       userId: member.userId,
       username: member.username,
     }));
+  }
+
+  private listTeamRoleUsers(teamId: number, roleCode: string): TeamManager[] {
+    return this.databaseService.db
+      .select({
+        userId: users.id,
+        username: users.username,
+      })
+      .from(usersTeamsTeamRoles)
+      .innerJoin(users, eq(users.id, usersTeamsTeamRoles.userId))
+      .where(and(
+        eq(usersTeamsTeamRoles.teamId, teamId),
+        eq(usersTeamsTeamRoles.roleCode, roleCode),
+      ))
+      .orderBy(asc(users.id))
+      .all();
+  }
+
+  private listTeamProjects(teamId: number): TeamProject[] {
+    const projectIds = listProjectIdsForTeam(this.databaseService.db, teamId);
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select()
+      .from(projects)
+      .where(inArray(projects.id, projectIds))
+      .orderBy(asc(projects.id))
+      .all()
+      .map(toTeamProjectResponse);
   }
 }

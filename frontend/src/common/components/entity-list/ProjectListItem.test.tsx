@@ -111,4 +111,19 @@ describe("ProjectListItem", () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onNavigate).not.toHaveBeenCalled();
   });
+
+  it("renders the project row inside a contrasted card surface", () => {
+    renderWithTheme(
+      <ProjectListItem
+        onNavigate={vi.fn()}
+        project={createProject()}
+        viewMode="main-listing-view"
+      />,
+    );
+
+    const paper = screen.getByRole("button", { name: /Apollo/i }).closest(".MuiPaper-root");
+
+    expect(paper).not.toBeNull();
+    expect(window.getComputedStyle(paper as HTMLElement).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  });
 });

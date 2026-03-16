@@ -22,6 +22,24 @@ export function parseProjectIdFromSearchParameters(
   return parsePositiveIntegerSearchParameter(searchParameters, "projectId");
 }
 
+export function parseTeamIdFromSearchParameters(
+  searchParameters: URLSearchParams,
+): number | null {
+  return parsePositiveIntegerSearchParameter(searchParameters, "teamId");
+}
+
+export function parseOrganizationIdFromSearchParameters(
+  searchParameters: URLSearchParams,
+): number | null {
+  return parsePositiveIntegerSearchParameter(searchParameters, "organizationId");
+}
+
+export function parseUserIdFromSearchParameters(
+  searchParameters: URLSearchParams,
+): number | null {
+  return parsePositiveIntegerSearchParameter(searchParameters, "userId");
+}
+
 export function parseIssueIdFromSearchParameters(
   searchParameters: URLSearchParams,
 ): number | null {

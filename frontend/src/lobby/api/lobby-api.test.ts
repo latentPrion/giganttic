@@ -83,6 +83,35 @@ describe("lobbyApi", () => {
     );
   });
 
+  it("loads visible users for member association", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        users: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            id: 15,
+            isActive: true,
+            updatedAt: "2026-03-08T00:00:00.000Z",
+            username: "teammate",
+          },
+        ],
+      }),
+    );
+
+    const response = await lobbyApi.listUsers(TEST_TOKEN);
+
+    expect(response.users[0]?.username).toBe("teammate");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/users",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${TEST_TOKEN}`,
+        }),
+        method: "GET",
+      }),
+    );
+  });
+
   it("loads a project summary with members", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
@@ -207,6 +236,40 @@ describe("lobbyApi", () => {
     );
   });
 
+  it("assigns a team to an organization with typed payload validation", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        organizationId: 22,
+        teams: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Operators",
+            id: 7,
+            name: "Ops",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    await lobbyApi.assignOrganizationTeam(TEST_TOKEN, 22, {
+      teamId: 7,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/organizations/22/teams",
+      expect.objectContaining({
+        body: JSON.stringify({
+          teamId: 7,
+        }),
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${TEST_TOKEN}`,
+        }),
+        method: "POST",
+      }),
+    );
+  });
+
   it("creates a team with typed payload validation", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({
@@ -258,12 +321,36 @@ describe("lobbyApi", () => {
           name: "Ops",
           updatedAt: "2026-03-08T00:00:00.000Z",
         },
+        teamManagers: [
+          {
+            userId: 9,
+            username: "manager",
+          },
+        ],
+        teamProjectManagers: [
+          {
+            userId: 10,
+            username: "project-manager",
+          },
+        ],
+        projects: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Example project",
+            id: 11,
+            name: "Alpha",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
       }),
     );
 
     const response = await lobbyApi.getTeam(TEST_TOKEN, 22);
 
     expect(response.members).toHaveLength(1);
+    expect(response.teamManagers[0]?.username).toBe("manager");
+    expect(response.teamProjectManagers[0]?.username).toBe("project-manager");
+    expect(response.projects[0]?.id).toBe(11);
     expect(fetchSpy).toHaveBeenCalledWith(
       "/stc-proj-mgmt/api/teams/22",
       expect.objectContaining({
@@ -380,16 +467,105 @@ describe("lobbyApi", () => {
           name: "Platform Org",
           updatedAt: "2026-03-08T00:00:00.000Z",
         },
-        projects: [{ projectId: 11 }],
-        teams: [{ teamId: 22 }],
+        organizationManagers: [
+          {
+            userId: 9,
+            username: "manager",
+          },
+        ],
+        organizationProjectManagers: [
+          {
+            userId: 10,
+            username: "project-manager",
+          },
+        ],
+        organizationTeamManagers: [
+          {
+            userId: 11,
+            username: "team-manager",
+          },
+        ],
+        projects: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Example project",
+            id: 11,
+            name: "Alpha",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
+        teams: [
+          {
+            createdAt: "2026-03-08T00:00:00.000Z",
+            description: "Operators",
+            id: 22,
+            name: "Ops",
+            updatedAt: "2026-03-08T00:00:00.000Z",
+          },
+        ],
       }),
     );
 
     const response = await lobbyApi.getOrganization(TEST_TOKEN, 31);
 
     expect(response.projects).toHaveLength(1);
+    expect(response.teams[0]?.id).toBe(22);
+    expect(response.organizationManagers[0]?.username).toBe("manager");
+    expect(response.organizationProjectManagers[0]?.username).toBe("project-manager");
+    expect(response.organizationTeamManagers[0]?.username).toBe("team-manager");
     expect(fetchSpy).toHaveBeenCalledWith(
       "/stc-proj-mgmt/api/organizations/31",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${TEST_TOKEN}`,
+        }),
+        method: "GET",
+      }),
+    );
+  });
+
+  it("loads a user profile summary", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        organizations: [{
+          createdAt: "2026-03-08T00:00:00.000Z",
+          description: "Org description",
+          id: 31,
+          name: "Platform Org",
+          updatedAt: "2026-03-08T00:00:00.000Z",
+        }],
+        projects: [{
+          createdAt: "2026-03-08T00:00:00.000Z",
+          description: "Project description",
+          id: 11,
+          name: "Alpha",
+          updatedAt: "2026-03-08T00:00:00.000Z",
+        }],
+        teams: [{
+          createdAt: "2026-03-08T00:00:00.000Z",
+          description: "Team description",
+          id: 22,
+          name: "Ops",
+          updatedAt: "2026-03-08T00:00:00.000Z",
+        }],
+        user: {
+          createdAt: "2026-03-08T00:00:00.000Z",
+          id: 9,
+          isActive: true,
+          updatedAt: "2026-03-08T00:00:00.000Z",
+          username: "manager",
+        },
+      }),
+    );
+
+    const response = await lobbyApi.getUser(TEST_TOKEN, 9);
+
+    expect(response.user.username).toBe("manager");
+    expect(response.projects[0]?.id).toBe(11);
+    expect(response.teams[0]?.id).toBe(22);
+    expect(response.organizations[0]?.id).toBe(31);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/users/9",
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: `Bearer ${TEST_TOKEN}`,

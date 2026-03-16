@@ -11,7 +11,10 @@ import { GanttRoute } from "../spas/project-manager/routes/GanttRoute.js";
 import { IssueRoute } from "../spas/project-manager/routes/IssueRoute.js";
 import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
 import { KanbanRoute } from "../spas/project-manager/routes/KanbanRoute.js";
+import { OrganizationRoute } from "../spas/project-manager/routes/OrganizationRoute.js";
 import { ProjectRoute } from "../spas/project-manager/routes/ProjectRoute.js";
+import { TeamRoute } from "../spas/project-manager/routes/TeamRoute.js";
+import { UserRoute } from "../spas/project-manager/routes/UserRoute.js";
 import { PublicHomeLayout } from "../spas/public-home/layouts/PublicHomeLayout.js";
 import { LobbyRoute } from "../spas/user-lobby/routes/LobbyRoute.js";
 
@@ -25,6 +28,9 @@ export function AppRoutes() {
       </Route>
       <Route element={<LobbyRoute />} path="/lobby" />
       <Route element={<ProjectRoute />} path="/pm/project" />
+      <Route element={<TeamRoute />} path="/pm/team" />
+      <Route element={<OrganizationRoute />} path="/pm/organization" />
+      <Route element={<UserRoute />} path="/pm/user" />
       <Route element={<GanttRoute />} path="/pm/project/gantt" />
       <Route element={<KanbanRoute />} path="/pm/project/kanban" />
       <Route element={<IssuesRoute />} path="/pm/project/issues" />

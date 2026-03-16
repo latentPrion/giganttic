@@ -12,13 +12,21 @@ import {
   getOrganizationResponseSchema,
   getProjectResponseSchema,
   getTeamResponseSchema,
+  getUserResponseSchema,
+  assignOrganizationTeamRequestSchema,
+  listUsersResponseSchema,
   listOrganizationsResponseSchema,
   listProjectsResponseSchema,
   listTeamsResponseSchema,
+  projectOrganizationAssociationRequestSchema,
+  projectTeamAssociationRequestSchema,
   replaceOrganizationUsersRequestSchema,
   replaceOrganizationUsersResponseSchema,
   replaceTeamMembersRequestSchema,
   replaceTeamMembersResponseSchema,
+  updateOrganizationTeamsResponseSchema,
+  updateProjectOrganizationsResponseSchema,
+  updateProjectTeamsResponseSchema,
   updateOrganizationRequestSchema,
   updateOrganizationResponseSchema,
   updateProjectRequestSchema,
@@ -37,13 +45,21 @@ import {
   type GetOrganizationResponse,
   type GetProjectResponse,
   type GetTeamResponse,
+  type GetUserResponse,
+  type AssignOrganizationTeamRequest,
+  type ListUsersResponse,
   type ListOrganizationsResponse,
   type ListProjectsResponse,
   type ListTeamsResponse,
+  type ProjectOrganizationAssociationRequest,
+  type ProjectTeamAssociationRequest,
   type ReplaceOrganizationUsersRequest,
   type ReplaceOrganizationUsersResponse,
   type ReplaceTeamMembersRequest,
   type ReplaceTeamMembersResponse,
+  type UpdateProjectOrganizationsResponse,
+  type UpdateProjectTeamsResponse,
+  type UpdateOrganizationTeamsResponse,
   type UpdateOrganizationRequest,
   type UpdateOrganizationResponse,
   type UpdateProjectRequest,
@@ -64,6 +80,10 @@ function createOrganizationPath(organizationId?: number): string {
   return organizationId === undefined
     ? "/organizations"
     : `/organizations/${organizationId}`;
+}
+
+function createUserPath(userId?: number): string {
+  return userId === undefined ? "/users" : `/users/${userId}`;
 }
 
 export const lobbyApi = {
@@ -172,6 +192,24 @@ export const lobbyApi = {
     });
   },
 
+  async getUser(token: string, userId: number): Promise<GetUserResponse> {
+    return await requestJson({
+      method: "GET",
+      path: createUserPath(userId),
+      responseSchema: getUserResponseSchema,
+      token,
+    });
+  },
+
+  async listUsers(token: string): Promise<ListUsersResponse> {
+    return await requestJson({
+      method: "GET",
+      path: createUserPath(),
+      responseSchema: listUsersResponseSchema,
+      token,
+    });
+  },
+
   async listOrganizations(token: string): Promise<ListOrganizationsResponse> {
     return await requestJson({
       method: "GET",
@@ -270,6 +308,51 @@ export const lobbyApi = {
       path: createTeamPath(teamId),
       requestSchema: updateTeamRequestSchema,
       responseSchema: updateTeamResponseSchema,
+      token,
+    });
+  },
+
+  async associateProjectOrganization(
+    token: string,
+    projectId: number,
+    payload: ProjectOrganizationAssociationRequest,
+  ): Promise<UpdateProjectOrganizationsResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: `${createProjectPath(projectId)}/organizations`,
+      requestSchema: projectOrganizationAssociationRequestSchema,
+      responseSchema: updateProjectOrganizationsResponseSchema,
+      token,
+    });
+  },
+
+  async associateProjectTeam(
+    token: string,
+    projectId: number,
+    payload: ProjectTeamAssociationRequest,
+  ): Promise<UpdateProjectTeamsResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: `${createProjectPath(projectId)}/teams`,
+      requestSchema: projectTeamAssociationRequestSchema,
+      responseSchema: updateProjectTeamsResponseSchema,
+      token,
+    });
+  },
+
+  async assignOrganizationTeam(
+    token: string,
+    organizationId: number,
+    payload: AssignOrganizationTeamRequest,
+  ): Promise<UpdateOrganizationTeamsResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: `${createOrganizationPath(organizationId)}/teams`,
+      requestSchema: assignOrganizationTeamRequestSchema,
+      responseSchema: updateOrganizationTeamsResponseSchema,
       token,
     });
   },
