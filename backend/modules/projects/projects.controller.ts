@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   HttpCode,
+  Header,
   Get,
   Inject,
   Param,
@@ -57,6 +58,20 @@ export class ProjectsController {
   listProjects(@Req() request: AuthenticatedRequest) {
     return listProjectsResponseSchema.parse(
       this.projectsService.listProjects(request.authContext!),
+    );
+  }
+
+  @Get(":projectId/chart")
+  @Header("Content-Type", "application/xml; charset=utf-8")
+  async getProjectChart(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return await this.projectsService.getProjectChart(
+      request.authContext!,
+      projectId,
     );
   }
 

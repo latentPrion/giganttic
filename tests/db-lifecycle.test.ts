@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 
@@ -55,6 +55,19 @@ function createProddevDbPath(projectRoot: string) {
   );
 }
 
+function createProjectChartPath(projectRoot: string, projectId: number) {
+  return path.join(projectRoot, "charts", `${projectId}.xml`);
+}
+
+async function pathExists(targetPath: string) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function querySingleNumber(dbPath: string, sql: string) {
   const db = openDatabaseConnection(dbPath, { readonly: true });
   const result = querySingleValue(db, sql);
@@ -94,6 +107,13 @@ async function countRowsWhere(dbPath: string, tableName: string, whereClause: st
   return querySingleNumber(
     dbPath,
     `SELECT COUNT(*) FROM ${tableName} WHERE ${whereClause};`,
+  );
+}
+
+async function readTrackedProjectId(dbPath: string, seedKey: string) {
+  return querySingleNumber(
+    dbPath,
+    `SELECT entityId FROM ManagedTestDataRecords WHERE entityTable = 'Projects' AND seedKey = '${seedKey}';`,
   );
 }
 
@@ -158,10 +178,26 @@ async function insertNonTestUser(dbPath: string) {
   db.close();
 }
 
+async function insertNonTestProject(dbPath: string, name: string) {
+  const db = openDatabaseConnection(dbPath);
+  db.exec(
+    `INSERT INTO Projects (name, createdAt, updatedAt)
+     VALUES ('${name}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+  );
+  db.close();
+}
+
 async function countUserByUsername(dbPath: string, username: string) {
   return querySingleNumber(
     dbPath,
     `SELECT COUNT(*) FROM Users WHERE username = '${username}';`,
+  );
+}
+
+async function readLatestProjectId(dbPath: string) {
+  return querySingleNumber(
+    dbPath,
+    "SELECT MAX(id) FROM Projects;",
   );
 }
 
@@ -377,6 +413,11 @@ describe("db lifecycle scripts", () => {
     const dbPath = createTargetDbPath(tempDir, "dev");
 
     await prepareDevDbWithTestData(tempDir);
+    const trackedProjectId = await readTrackedProjectId(
+      dbPath,
+      "project:projectProjectManager",
+    );
+    const seededChartPath = createProjectChartPath(tempDir, trackedProjectId);
 
     await expect(manageTestData({
       dbTarget: "dev",
@@ -386,6 +427,7 @@ describe("db lifecycle scripts", () => {
       mode: "status",
       present: true,
     });
+    expect(await pathExists(seededChartPath)).toBe(true);
 
     await manageTestData({
       dbTarget: "dev",
@@ -403,6 +445,7 @@ describe("db lifecycle scripts", () => {
     });
 
     expect(await countSeededUsers(dbPath)).toBe(0);
+    expect(await pathExists(seededChartPath)).toBe(false);
   }, 20_000);
 
   it("prepareDatabase in prod mode succeeds without modifying a cleaned DB", async () => {
@@ -456,6 +499,92 @@ describe("db lifecycle scripts", () => {
 
     expect(await countAllUsers(dbPath)).toBe(0);
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
+  }, 20_000);
+
+  it("manageTestData status remains true even if a seeded chart file is manually removed", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await prepareDevDbWithTestData(tempDir);
+    const trackedProjectId = await readTrackedProjectId(
+      dbPath,
+      "project:projectProjectManager",
+    );
+    const seededChartPath = createProjectChartPath(tempDir, trackedProjectId);
+
+    await rm(seededChartPath, { force: true });
+
+    await expect(manageTestData({
+      dbTarget: "dev",
+      mode: "status",
+      projectRoot: tempDir,
+    })).resolves.toMatchObject({
+      mode: "status",
+      present: true,
+    });
+  }, 20_000);
+
+  it("recreates seeded charts against the current tracked project ids after purge and re-ensure", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await prepareDevDbWithTestData(tempDir);
+    const initialTrackedProjectId = await readTrackedProjectId(
+      dbPath,
+      "project:projectProjectManager",
+    );
+    const initialChartPath = createProjectChartPath(tempDir, initialTrackedProjectId);
+
+    await manageTestData({
+      dbTarget: "dev",
+      mode: "purge",
+      projectRoot: tempDir,
+    });
+    await insertNonTestProject(dbPath, "Intervening Manual Project");
+    await manageTestData({
+      dbTarget: "dev",
+      mode: "ensure",
+      projectRoot: tempDir,
+    });
+
+    const repairedTrackedProjectId = await readTrackedProjectId(
+      dbPath,
+      "project:projectProjectManager",
+    );
+    const repairedChartPath = createProjectChartPath(tempDir, repairedTrackedProjectId);
+
+    expect(repairedTrackedProjectId).not.toBe(initialTrackedProjectId);
+    expect(await pathExists(initialChartPath)).toBe(false);
+    expect(await pathExists(repairedChartPath)).toBe(true);
+    expect(await readFile(repairedChartPath, "utf8")).toContain("Direct PM kickoff");
+  }, 20_000);
+
+  it("purging seeded test data leaves non-seeded project charts intact", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await prepareDevDbWithTestData(tempDir);
+    await insertNonTestProject(dbPath, "Manual Project With Chart");
+    const manualProjectId = await readLatestProjectId(dbPath);
+    const manualChartPath = createProjectChartPath(tempDir, manualProjectId);
+
+    await writeFile(
+      manualChartPath,
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"7001\"><![CDATA[Manual chart]]></task></data>\n",
+      "utf8",
+    );
+
+    await manageTestData({
+      dbTarget: "dev",
+      mode: "purge",
+      projectRoot: tempDir,
+    });
+
+    expect(await pathExists(manualChartPath)).toBe(true);
+    expect(await readFile(manualChartPath, "utf8")).toContain("Manual chart");
   }, 20_000);
 
   it("purges tracked test data for renamed tracked projects and leaves non-test rows untouched", async () => {

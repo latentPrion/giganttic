@@ -9,9 +9,10 @@ export function GanttRoute() {
 
   return (
     <ProjectManagerAuthenticatedRoute>
-      {() => (
+      {(token) => (
         <ProjectManagerGanttPage
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
+          token={token}
         />
       )}
     </ProjectManagerAuthenticatedRoute>

@@ -1,22 +1,31 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Box,
+  CircularProgress,
   Stack,
   Typography,
 } from "@mui/material";
 
+import {
+  getApiErrorMessage,
+  isApiError,
+} from "../../../common/api/api-error.js";
 import { GanttChart } from "../components/GanttChart.js";
 import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js";
+import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
-import { getRepoGanttChartSource } from "../data/repo-gantt-chart-source.js";
+import type { GanttChartSource } from "../models/gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
 interface ProjectManagerGanttPageProps {
   projectId: number | null;
+  token: string;
 }
 
 const DEFAULT_DISPLAY_MODE: GanttDisplayMode = "both";
+const DEFAULT_ERROR_MESSAGE = "Unable to load that gantt chart right now.";
+const LOADING_MESSAGE = "Loading gantt chart...";
 const MISSING_CHART_MESSAGE = "No gantt chart file exists for this project yet.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Manager Gantt";
@@ -27,12 +36,27 @@ function createSelectedProjectLabel(projectId: number | null): string {
 }
 
 function renderGanttContainer(
-  chartSource: ReturnType<typeof getRepoGanttChartSource>,
+  chartSource: GanttChartSource | null,
+  errorMessage: string | null,
+  isLoading: boolean,
   displayMode: GanttDisplayMode,
   isControlPanelExpanded: boolean,
   onDisplayModeChange: (nextValue: GanttDisplayMode) => void,
   onToggleExpanded: () => void,
 ) {
+  if (isLoading) {
+    return (
+      <Stack alignItems="center" direction="row" spacing={1.5}>
+        <CircularProgress size={20} />
+        <Typography>{LOADING_MESSAGE}</Typography>
+      </Stack>
+    );
+  }
+
+  if (errorMessage) {
+    return <Alert severity="error">{errorMessage}</Alert>;
+  }
+
   if (chartSource === null) {
     return <Alert severity="info">{MISSING_CHART_MESSAGE}</Alert>;
   }
@@ -61,9 +85,63 @@ function renderGanttContainer(
 }
 
 export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
+  const [chartSource, setChartSource] = useState<GanttChartSource | null>(null);
   const [displayMode, setDisplayMode] = useState<GanttDisplayMode>(DEFAULT_DISPLAY_MODE);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true);
-  const chartSource = getRepoGanttChartSource(props.projectId);
+  const [isLoading, setIsLoading] = useState(props.projectId !== null);
+
+  useEffect(() => {
+    const { projectId, token } = props;
+
+    if (projectId === null) {
+      setChartSource(null);
+      setErrorMessage(null);
+      setIsLoading(false);
+      return;
+    }
+    const resolvedProjectId = projectId;
+
+    let isMounted = true;
+
+    async function loadChart(): Promise<void> {
+      setChartSource(null);
+      setErrorMessage(null);
+      setIsLoading(true);
+
+      try {
+        const nextChartSource = await ganttApi.getProjectChart(
+          token,
+          resolvedProjectId,
+        );
+
+        if (isMounted) {
+          setChartSource(nextChartSource);
+        }
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        if (isApiError(error) && error.kind === "http" && error.status === 404) {
+          setChartSource(null);
+          return;
+        }
+
+        setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadChart();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [props.projectId, props.token]);
 
   function toggleControlPanelExpanded(): void {
     setIsControlPanelExpanded((current) => !current);
@@ -94,6 +172,8 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
         </Stack>
         {renderGanttContainer(
           chartSource,
+          errorMessage,
+          isLoading,
           displayMode,
           isControlPanelExpanded,
           setDisplayMode,

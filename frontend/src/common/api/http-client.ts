@@ -15,6 +15,12 @@ interface JsonRequestOptions<TRequestSchema extends ZodType | undefined> {
   token?: string;
 }
 
+interface TextRequestOptions {
+  method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+  path: string;
+  token?: string;
+}
+
 function buildUrl(path: string): string {
   return `${frontendConfig.apiBaseUrl}${frontendConfig.routePrefix}${path}`;
 }
@@ -33,6 +39,25 @@ function buildHeaders(token: string | undefined): HeadersInit {
 
 async function readResponseBody(response: Response): Promise<string> {
   return await response.text();
+}
+
+async function performRequest(
+  path: string,
+  requestInit: RequestInit,
+): Promise<{ response: Response; responseBody: string }> {
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(path), requestInit);
+  } catch (error) {
+    throw new ApiError("network", "Network request failed", {
+      cause: error,
+    });
+  }
+
+  return {
+    response,
+    responseBody: await readResponseBody(response),
+  };
 }
 
 function parseRequestBody<TRequestSchema extends ZodType | undefined>(
@@ -97,16 +122,7 @@ export async function requestJson<TResponse, TRequestSchema extends ZodType | un
     };
   }
 
-  let response: Response;
-  try {
-    response = await fetch(buildUrl(options.path), requestInit);
-  } catch (error) {
-    throw new ApiError("network", "Network request failed", {
-      cause: error,
-    });
-  }
-
-  const responseBody = await readResponseBody(response);
+  const { response, responseBody } = await performRequest(options.path, requestInit);
   if (!response.ok) {
     throw new ApiError("http", `HTTP ${response.status}`, {
       responseBody,
@@ -115,4 +131,23 @@ export async function requestJson<TResponse, TRequestSchema extends ZodType | un
   }
 
   return parseResponseBody(options.responseSchema, responseBody);
+}
+
+export async function requestText(
+  options: TextRequestOptions,
+): Promise<string> {
+  const requestInit: RequestInit = {
+    headers: buildHeaders(options.token),
+    method: options.method,
+  };
+  const { response, responseBody } = await performRequest(options.path, requestInit);
+
+  if (!response.ok) {
+    throw new ApiError("http", `HTTP ${response.status}`, {
+      responseBody,
+      status: response.status,
+    });
+  }
+
+  return responseBody;
 }

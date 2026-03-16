@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { rm } from "node:fs/promises";
+import path from "node:path";
 
 import {
   FastifyAdapter,
@@ -32,6 +33,7 @@ export interface AuthSession {
 interface CrudTestHarness {
   cleanup(): Promise<void>;
   createAuthHeaders(accessToken: string): Record<string, string>;
+  createProjectChartPath(projectId: number): string;
   databaseService: DatabaseService;
   loginSeededAdmin(): Promise<AuthSession>;
   parseJson<T>(payload: string): T;
@@ -42,6 +44,7 @@ interface CrudTestHarness {
 
 export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   let app: NestFastifyApplication | undefined;
+  let chartsDir: string | undefined;
   let dbPath: string | undefined;
   let databaseService: DatabaseService | undefined;
   let tempDir: string | undefined;
@@ -63,6 +66,14 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
     return databaseService;
   }
 
+  function assertChartsDir(): string {
+    if (!chartsDir) {
+      throw new Error("Charts directory is not initialized");
+    }
+
+    return chartsDir;
+  }
+
   function buildUniqueUserSeed(prefix: string) {
     userCounter += 1;
 
@@ -79,12 +90,18 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
     };
   }
 
+  function createProjectChartPath(projectId: number): string {
+    return path.join(assertChartsDir(), `${projectId}.xml`);
+  }
+
   function parseJson<T>(payload: string): T {
     return JSON.parse(payload) as T;
   }
 
   async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
+    const resolvedChartsDir = path.join(path.dirname(databasePath), "charts");
     const config = buildBackendConfig({
+      chartsDir: resolvedChartsDir,
       createDbIfMissing: false,
       dbPath: databasePath,
       port: 0,
@@ -112,6 +129,7 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
       tempDirPrefix: "giganttic-crud-tests-",
     });
     dbPath = sandbox.dbPath;
+    chartsDir = path.join(path.dirname(dbPath), "charts");
     tempDir = sandbox.tempDir;
     await seedExecutionDatabase({
       dbPath,
@@ -180,6 +198,7 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   return {
     cleanup,
     createAuthHeaders,
+    createProjectChartPath,
     get app() {
       return assertApp();
     },

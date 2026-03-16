@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Inject,
+  InternalServerErrorException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -45,6 +46,7 @@ import {
 } from "../access-control/blocking-conflicts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import { ProjectChartsService } from "../project-charts/project-charts.service.js";
 import type {
   CreateProjectRequest,
   DeleteProjectResponse,
@@ -170,46 +172,41 @@ export class ProjectsService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(ProjectChartsService)
+    private readonly projectChartsService: ProjectChartsService,
   ) {}
 
   async createProject(
     authContext: AuthContext,
     payload: CreateProjectRequest,
   ): Promise<{ project: ProjectResponse }> {
-    const createdProjectId = this.databaseService.db.transaction((tx) => {
-      const [createdProject] = tx.insert(projects)
-        .values({
-          description: normalizeDescription(payload.description),
-          journal: normalizeJournal(payload.journal),
-          name: payload.name.trim(),
-        })
-        .returning({ id: projects.id })
-        .all();
+    const createdProjectId = this.createProjectRecord(authContext, payload);
 
-      tx.insert(projectsUsers)
-        .values({
-          projectId: createdProject.id,
-          userId: authContext.userId,
-        })
-        .run();
-      tx.insert(usersProjectsProjectRoles)
-        .values([
-          {
-            projectId: createdProject.id,
-            roleCode: PROJECT_MANAGER_ROLE_CODE,
-            userId: authContext.userId,
-          },
-          {
-            projectId: createdProject.id,
-            roleCode: PROJECT_OWNER_ROLE_CODE,
-            userId: authContext.userId,
-          },
-        ])
-        .run();
+    try {
+      this.projectChartsService.createDefaultProjectChart(createdProjectId);
+    } catch (error) {
+      this.cleanupProjectAfterChartCreationFailure(createdProjectId);
+      throw new InternalServerErrorException("Unable to create a chart for that project", {
+        cause: error,
+      });
+    }
 
-      return createdProject.id;
-    });
-    return { project: this.getProjectRecordByIdOrThrow(createdProjectId) };
+    return this.buildProjectResponse(createdProjectId);
+  }
+
+  async getProjectChart(
+    authContext: AuthContext,
+    projectId: number,
+  ): Promise<string> {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+
+    const chartXml = this.projectChartsService.readProjectChart(projectId);
+    if (chartXml === null) {
+      throw new NotFoundException("Project chart not found");
+    }
+
+    return chartXml;
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {
@@ -358,24 +355,86 @@ export class ProjectsService {
     this.assertProjectExists(projectId);
     this.assertCanDeleteProject(authContext, projectId);
 
-    this.databaseService.db.transaction((tx) => {
-      tx.delete(issues)
-        .where(eq(issues.projectId, projectId))
-        .run();
-      tx.delete(usersProjectsProjectRoles)
-        .where(eq(usersProjectsProjectRoles.projectId, projectId))
-        .run();
-      tx.delete(projectsUsers)
-        .where(eq(projectsUsers.projectId, projectId))
-        .run();
-      tx.delete(projectsTeams)
-        .where(eq(projectsTeams.projectId, projectId))
-        .run();
-      tx.delete(projects)
-        .where(eq(projects.id, projectId))
-        .run();
-    });
+    this.deleteProjectRecord(projectId);
+    this.projectChartsService.deleteProjectChart(projectId);
     return { deletedProjectId: projectId };
+  }
+
+  private cleanupProjectAfterChartCreationFailure(projectId: number): void {
+    try {
+      this.projectChartsService.deleteProjectChart(projectId);
+    } catch {
+      // Best-effort cleanup only; the project row must still be removed.
+    }
+    this.deleteProjectRecord(projectId);
+  }
+
+  private createProjectRecord(
+    authContext: AuthContext,
+    payload: CreateProjectRequest,
+  ): number {
+    return this.databaseService.db.transaction((tx) => {
+      const [createdProject] = tx.insert(projects)
+        .values({
+          description: normalizeDescription(payload.description),
+          journal: normalizeJournal(payload.journal),
+          name: payload.name.trim(),
+        })
+        .returning({ id: projects.id })
+        .all();
+
+      tx.insert(projectsUsers)
+        .values({
+          projectId: createdProject.id,
+          userId: authContext.userId,
+        })
+        .run();
+      tx.insert(usersProjectsProjectRoles)
+        .values([
+          {
+            projectId: createdProject.id,
+            roleCode: PROJECT_MANAGER_ROLE_CODE,
+            userId: authContext.userId,
+          },
+          {
+            projectId: createdProject.id,
+            roleCode: PROJECT_OWNER_ROLE_CODE,
+            userId: authContext.userId,
+          },
+        ])
+        .run();
+
+      return createdProject.id;
+    });
+  }
+
+  private deleteProjectRecord(projectId: number): void {
+    this.databaseService.db.transaction((tx) => {
+      this.deleteProjectRecordRows(tx, projectId);
+    });
+  }
+
+  private deleteProjectRecordRows(
+    tx: Parameters<DatabaseService["db"]["transaction"]>[0] extends (
+      arg: infer T,
+    ) => unknown ? T : never,
+    projectId: number,
+  ): void {
+    tx.delete(issues)
+      .where(eq(issues.projectId, projectId))
+      .run();
+    tx.delete(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, projectId))
+      .run();
+    tx.delete(projectsUsers)
+      .where(eq(projectsUsers.projectId, projectId))
+      .run();
+    tx.delete(projectsTeams)
+      .where(eq(projectsTeams.projectId, projectId))
+      .run();
+    tx.delete(projects)
+      .where(eq(projects.id, projectId))
+      .run();
   }
 
   private assertCanDeleteProject(
@@ -641,6 +700,12 @@ export class ProjectsService {
     return {
       members: this.listProjectMembers(projectId),
       projectId,
+    };
+  }
+
+  private buildProjectResponse(projectId: number): { project: ProjectResponse } {
+    return {
+      project: this.getProjectRecordByIdOrThrow(projectId),
     };
   }
 

@@ -3,6 +3,10 @@ import {
   TEST_DATA_PROFILE_APP,
 } from "./test-data-seed-data.mjs";
 import { ensureReferenceData } from "./sqlite-reference-data-manager.mjs";
+import {
+  deleteProjectChartXml,
+  writeProjectChartXml,
+} from "../backend/modules/project-charts/project-chart-files.js";
 
 const MANAGED_TEST_DATA_RECORDS_TABLE = "ManagedTestDataRecords";
 const TEST_DATA_ENTITY_TABLES = {
@@ -207,12 +211,27 @@ function purgeTrackedTopLevelEntities(db, trackedIds) {
   }
 }
 
-function purgeSeededTestData(db) {
+function purgeSeededProjectCharts(chartsDir, projectIds) {
+  if (!chartsDir) {
+    return;
+  }
+
+  for (const projectId of projectIds) {
+    deleteProjectChartXml(chartsDir, projectId);
+  }
+}
+
+/**
+ * @param {import("better-sqlite3").Database} db
+ * @param {string | null | undefined} [chartsDir]
+ */
+function purgeSeededTestData(db, chartsDir = null) {
   const trackedIds = readTrackedEntityIds(db);
 
   db.exec("BEGIN TRANSACTION;");
 
   try {
+    purgeSeededProjectCharts(chartsDir, trackedIds.projectIds);
     purgeSeededProjectChildren(db, trackedIds.projectIds);
     purgeSeededTeamChildren(db, trackedIds.teamIds);
     purgeSeededOrganizationChildren(db, trackedIds.organizationIds);
@@ -224,6 +243,28 @@ function purgeSeededTestData(db) {
     db.exec("ROLLBACK;");
     throw error;
   }
+}
+
+function writeSeededProjectCharts(chartsDir, projectIds, seededCharts) {
+  if (!chartsDir) {
+    return;
+  }
+
+  writeProjectChartXml(
+    chartsDir,
+    projectIds.orgProjectManager,
+    seededCharts.orgProjectManager,
+  );
+  writeProjectChartXml(
+    chartsDir,
+    projectIds.projectProjectManager,
+    seededCharts.projectProjectManager,
+  );
+  writeProjectChartXml(
+    chartsDir,
+    projectIds.teamProjectManager,
+    seededCharts.teamProjectManager,
+  );
 }
 
 function insertTrackedRecord(db, seedKey, entityTable, entityId) {
@@ -313,7 +354,7 @@ VALUES (
   }
 }
 
-function createV2StyleTestData(db, schemaName, profile) {
+function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
   const {
     seededScopedFixtures,
     seededTestAccounts,
@@ -467,30 +508,40 @@ function createV2StyleTestData(db, schemaName, profile) {
   insertSeedIssues(db, projectIds.orgProjectManager, seededScopedFixtures.issues.orgProjectManager);
   insertSeedIssues(db, projectIds.projectProjectManager, seededScopedFixtures.issues.projectProjectManager);
   insertSeedIssues(db, projectIds.teamProjectManager, seededScopedFixtures.issues.teamProjectManager);
+  writeSeededProjectCharts(chartsDir, projectIds, seededScopedFixtures.projects.charts);
 }
 
+/**
+ * @param {import("better-sqlite3").Database} db
+ * @param {string} schemaName
+ * @param {string | null | undefined} [profile]
+ * @param {string | null | undefined} [chartsDir]
+ */
 function ensureSeededTestData(
   db,
   schemaName,
   profile = TEST_DATA_PROFILE_APP,
+  chartsDir = null,
 ) {
   ensureReferenceData(db, schemaName);
 
   db.exec("BEGIN TRANSACTION;");
 
   try {
-    purgeSeededProjectChildren(db, readTrackedEntityIds(db).projectIds);
-    purgeSeededTeamChildren(db, readTrackedEntityIds(db).teamIds);
-    purgeSeededOrganizationChildren(db, readTrackedEntityIds(db).organizationIds);
-    purgeSeededUserChildren(db, readTrackedEntityIds(db).userIds);
-    purgeTrackedTopLevelEntities(db, readTrackedEntityIds(db));
+    const trackedIds = readTrackedEntityIds(db);
+    purgeSeededProjectCharts(chartsDir, trackedIds.projectIds);
+    purgeSeededProjectChildren(db, trackedIds.projectIds);
+    purgeSeededTeamChildren(db, trackedIds.teamIds);
+    purgeSeededOrganizationChildren(db, trackedIds.organizationIds);
+    purgeSeededUserChildren(db, trackedIds.userIds);
+    purgeTrackedTopLevelEntities(db, trackedIds);
     runDelete(db, `DELETE FROM ${MANAGED_TEST_DATA_RECORDS_TABLE};`);
 
     if (schemaName !== "v2" && schemaName !== "v3") {
       throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
     }
 
-    createV2StyleTestData(db, schemaName, profile);
+    createV2StyleTestData(db, schemaName, profile, chartsDir);
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");

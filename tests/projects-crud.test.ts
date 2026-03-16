@@ -1,3 +1,4 @@
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -27,6 +28,15 @@ const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 function sortRoleCodes(roleCodes: ReadonlyArray<string>) {
   return [...roleCodes].sort();
+}
+
+async function pathExists(targetPath: string) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 describe("projects crud api", () => {
@@ -153,6 +163,108 @@ describe("projects crud api", () => {
     expect(new Set(secondProjectRoles.map((row) => row.userId))).toEqual(
       new Set([secondCreator.user.id]),
     );
+  });
+
+  it("creates a runtime chart file and serves it from the project chart route", async () => {
+    const creator = await harness.registerUser("project-chart-create");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Charted Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+    const chartPath = harness.createProjectChartPath(createdProjectId);
+
+    expect(await pathExists(chartPath)).toBe(true);
+    expect(await readFile(chartPath, "utf8")).toContain("Edit your new Gantt chart");
+
+    const chartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(chartResponse.statusCode).toBe(200);
+    expect(chartResponse.headers["content-type"]).toContain("application/xml");
+    expect(chartResponse.payload).toContain("Edit your new Gantt chart");
+  });
+
+  it("returns 404 from the chart route when a project chart file is missing", async () => {
+    const creator = await harness.registerUser("project-chart-missing");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Chartless Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+    const chartPath = harness.createProjectChartPath(createdProjectId);
+
+    await rm(chartPath);
+
+    const chartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(chartResponse.statusCode).toBe(404);
+  });
+
+  it("forbids authenticated outsiders from fetching a project chart", async () => {
+    const creator = await harness.registerUser("project-chart-owner");
+    const outsider = await harness.registerUser("project-chart-outsider");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Protected Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const chartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(chartResponse.statusCode).toBe(403);
+  });
+
+  it("returns 404 when fetching a chart for a nonexistent project", async () => {
+    const creator = await harness.registerUser("project-chart-unknown");
+
+    const chartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+    });
+
+    expect(chartResponse.statusCode).toBe(404);
+  });
+
+  it("fails project creation when chart materialization cannot be completed", async () => {
+    const creator = await harness.registerUser("project-chart-failure");
+    const blockedChartsPath = harness.createProjectChartPath(999_999).replace(/\/[^/]+$/, "");
+
+    await rm(blockedChartsPath, { force: true, recursive: true });
+    await writeFile(blockedChartsPath, "not-a-directory", "utf8");
+
+    try {
+      const createResponse = await createProject(creator.accessToken, {
+        name: "Broken Chart Project",
+      });
+
+      expect(createResponse.statusCode).toBe(500);
+      expect(createResponse.payload).toContain("Unable to create a chart for that project");
+      const persistedProject = harness.databaseService.db
+        .select()
+        .from(projects)
+        .where(eq(projects.name, "Broken Chart Project"))
+        .get();
+
+      expect(persistedProject).toBeUndefined();
+    } finally {
+      await rm(blockedChartsPath, { force: true });
+    }
   });
 
   it("persists project journal through create, get, and update", async () => {
@@ -2100,6 +2212,55 @@ describe("projects crud api", () => {
     expect(deleteResponse.statusCode).toBe(200);
     expect(lingeringMembership).toHaveLength(0);
     expect(lingeringRoles).toHaveLength(0);
+  });
+
+  it("deletes the runtime chart file when a project is deleted and tolerates a missing chart file", async () => {
+    const creator = await harness.registerUser("project-chart-delete");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Delete Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+    const chartPath = harness.createProjectChartPath(createdProjectId);
+
+    expect(await pathExists(chartPath)).toBe(true);
+    await rm(chartPath);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(await pathExists(chartPath)).toBe(false);
+  });
+
+  it("deleting one project removes only its chart and leaves sibling project charts intact", async () => {
+    const creator = await harness.registerUser("project-chart-siblings");
+    const firstProjectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "First Chart Project" })).payload,
+    ).project.id;
+    const secondProjectId = harness.parseJson<{ project: { id: number } }>(
+      (await createProject(creator.accessToken, { name: "Second Chart Project" })).payload,
+    ).project.id;
+    const firstChartPath = harness.createProjectChartPath(firstProjectId);
+    const secondChartPath = harness.createProjectChartPath(secondProjectId);
+
+    expect(await pathExists(firstChartPath)).toBe(true);
+    expect(await pathExists(secondChartPath)).toBe(true);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${firstProjectId}`,
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(await pathExists(firstChartPath)).toBe(false);
+    expect(await pathExists(secondChartPath)).toBe(true);
+    expect(await readFile(secondChartPath, "utf8")).toContain("Edit your new Gantt chart");
   });
 
   it("forbids an organization project manager from granting direct project manager on an organization-associated project", async () => {

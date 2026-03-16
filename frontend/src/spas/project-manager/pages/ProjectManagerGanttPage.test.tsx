@@ -1,18 +1,25 @@
 import React, { StrictMode } from "react";
 import {
+  render,
   screen,
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { CssBaseline, ThemeProvider } from "@mui/material";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
+import { ApiError } from "../../../common/api/api-error.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
+import { appTheme } from "../../../theme/app-theme.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
-const mockRepoChartSource = {
+const TEST_TOKEN = "test-token";
+const mockChartSource = {
   content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Repo chart task]]></task></data>",
   type: "xml" as const,
 };
+const getProjectChartMock = vi.fn();
 
 const mockGantt = {
   clearAll: vi.fn(),
@@ -37,12 +44,27 @@ vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
   getDhtmlxGantt: () => mockGantt,
 }));
 
-vi.mock("../data/repo-gantt-chart-source.js", () => ({
-  getRepoGanttChartSource: () => mockRepoChartSource,
+vi.mock("../api/gantt-api.js", () => ({
+  ganttApi: {
+    getProjectChart: (...args: unknown[]) => getProjectChartMock(...args),
+  },
 }));
+
+function renderWithProjectRouter(projectId: number) {
+  return render(
+    <ThemeProvider theme={appTheme}>
+      <CssBaseline />
+      <MemoryRouter>
+        <ProjectManagerGanttPage projectId={projectId} token={TEST_TOKEN} />
+      </MemoryRouter>
+    </ThemeProvider>,
+  );
+}
 
 describe("ProjectManagerGanttPage", () => {
   beforeEach(() => {
+    getProjectChartMock.mockReset();
+    getProjectChartMock.mockResolvedValue(mockChartSource);
     mockGantt.clearAll.mockReset();
     mockGantt.config.columns = [];
     mockGantt.config.date_format = "";
@@ -60,34 +82,64 @@ describe("ProjectManagerGanttPage", () => {
   });
 
   it("renders the gantt container and bottom control panel", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} />);
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
 
     expect(screen.getByText("Project Manager Gantt")).toBeVisible();
     expect(screen.getByText("Selected project: 42")).toBeVisible();
-    expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
     });
+
+    expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
   });
 
-  it("loads gantt XML from the repo charts loader on first render", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={null} />);
+  it("loads gantt XML from the backend chart api on first render", async () => {
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
 
     await waitFor(() => {
       expect(mockGantt.parse).toHaveBeenCalledTimes(1);
     });
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
+    expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
     expect(mockGantt.parse.mock.calls[0]).toEqual([
-      mockRepoChartSource.content,
-      mockRepoChartSource.type,
+      mockChartSource.content,
+      mockChartSource.type,
     ]);
   });
 
+  it("shows the missing-chart message when the backend returns 404", async () => {
+    getProjectChartMock.mockRejectedValue(
+      new ApiError("http", "HTTP 404", {
+        responseBody: "",
+        status: 404,
+      }),
+    );
+
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    expect(await screen.findByText("No gantt chart file exists for this project yet.")).toBeVisible();
+    expect(mockGantt.parse).not.toHaveBeenCalled();
+  });
+
+  it("shows a generic error message when the backend returns a non-404 failure", async () => {
+    getProjectChartMock.mockRejectedValue(
+      new ApiError("http", "HTTP 500", {
+        responseBody: "{\"message\":\"Broken chart endpoint\"}",
+        status: 500,
+      }),
+    );
+
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    expect(await screen.findByText("Broken chart endpoint")).toBeVisible();
+    expect(mockGantt.parse).not.toHaveBeenCalled();
+  });
+
   it("cleans up the gantt instance on unmount", async () => {
-    const view = renderWithTheme(<ProjectManagerGanttPage projectId={42} />);
+    const view = renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -99,10 +151,46 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.destructor).not.toHaveBeenCalled();
   });
 
+  it("refetches the gantt chart when the selected project changes", async () => {
+    const secondChartSource = {
+      content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"2002\"><![CDATA[Second chart]]></task></data>",
+      type: "xml" as const,
+    };
+    getProjectChartMock
+      .mockResolvedValueOnce(mockChartSource)
+      .mockResolvedValueOnce(secondChartSource);
+
+    const view = renderWithProjectRouter(42);
+
+    await waitFor(() => {
+      expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+    });
+
+    view.rerender(
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <MemoryRouter>
+          <ProjectManagerGanttPage projectId={77} token={TEST_TOKEN} />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 77);
+    });
+
+    await waitFor(() => {
+      expect(mockGantt.parse).toHaveBeenCalledWith(
+        secondChartSource.content,
+        secondChartSource.type,
+      );
+    });
+  });
+
   it("survives React Strict Mode remounts without destructing the shared gantt instance", async () => {
     renderWithTheme(
       <StrictMode>
-        <ProjectManagerGanttPage projectId={42} />
+        <ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />
       </StrictMode>,
     );
 
@@ -117,7 +205,7 @@ describe("ProjectManagerGanttPage", () => {
   it("switches display modes from the bottom control panel tabs", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} />);
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -191,7 +279,11 @@ describe("ProjectManagerGanttPage", () => {
   it("can collapse and reopen the gantt control panel", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} />);
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
 
     await user.click(screen.getByRole("button", { name: "Hide Controls" }));
 

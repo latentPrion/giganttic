@@ -1,3 +1,4 @@
+import path from "node:path";
 import { access } from "node:fs/promises";
 import { resolveDbTargetPaths } from "./migrate.mjs";
 import {
@@ -80,7 +81,7 @@ async function pathExists(targetPath) {
   }
 }
 
-async function ensureManagedTestData(targetDbPath, profile) {
+async function ensureManagedTestData(targetDbPath, profile, chartsDir) {
   const db = await openDatabaseFromPath(targetDbPath);
 
   try {
@@ -90,7 +91,7 @@ async function ensureManagedTestData(targetDbPath, profile) {
       throw new Error(`DB at ${targetDbPath} has no recorded schema name.`);
     }
 
-    ensureSeededTestData(db, schemaName, profile);
+    ensureSeededTestData(db, schemaName, profile, chartsDir);
     return { present: true, profile };
   } finally {
     db.close();
@@ -107,11 +108,11 @@ async function readManagedTestDataStatus(targetDbPath) {
   }
 }
 
-async function purgeManagedTestData(targetDbPath) {
+async function purgeManagedTestData(targetDbPath, chartsDir) {
   const db = await openDatabaseFromPath(targetDbPath);
 
   try {
-    purgeSeededTestData(db);
+    purgeSeededTestData(db, chartsDir);
   } finally {
     db.close();
   }
@@ -133,6 +134,7 @@ async function manageTestData({
   const {
     targetDbPath,
   } = resolveDbTargetPaths(projectRoot, dbTarget, "test-data");
+  const chartsDir = path.join(projectRoot, "charts");
 
   if (!await pathExists(targetDbPath)) {
     throw new Error(`Missing DB for test-data target ${dbTarget}: ${targetDbPath}`);
@@ -143,7 +145,7 @@ async function manageTestData({
       mode,
       profile,
       targetDbPath,
-      ...(await ensureManagedTestData(targetDbPath, profile)),
+      ...(await ensureManagedTestData(targetDbPath, profile, chartsDir)),
     };
   }
 
@@ -152,7 +154,7 @@ async function manageTestData({
       mode,
       profile,
       targetDbPath,
-      ...(await purgeManagedTestData(targetDbPath)),
+      ...(await purgeManagedTestData(targetDbPath, chartsDir)),
     };
   }
 

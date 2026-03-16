@@ -4,6 +4,22 @@ const SUPPORTED_TEST_DATA_PROFILES = [
   TEST_DATA_PROFILE_APP,
   TEST_DATA_PROFILE_TESTSUITE,
 ];
+const SEEDED_CHART_DURATION_DAYS = 3;
+const SEEDED_CHART_PROGRESS = "0.35";
+const SEEDED_CHART_REVIEW_DURATION_DAYS = 2;
+const SEEDED_CHART_REVIEW_PROGRESS = "0.1";
+
+function createSeededChartXml(seed) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="${seed.rootTaskId}" open="1" parent="0" progress="${SEEDED_CHART_PROGRESS}" start_date="${seed.rootTaskStartDate}" duration="${SEEDED_CHART_DURATION_DAYS}"><![CDATA[${seed.rootTaskText}]]></task>
+  <task id="${seed.reviewTaskId}" open="1" parent="${seed.rootTaskId}" progress="${SEEDED_CHART_REVIEW_PROGRESS}" start_date="${seed.reviewTaskStartDate}" duration="${SEEDED_CHART_REVIEW_DURATION_DAYS}"><![CDATA[${seed.reviewTaskText}]]></task>
+  <coll_options for="links">
+    <item id="${seed.linkId}" source="${seed.rootTaskId}" target="${seed.reviewTaskId}" type="0" />
+  </coll_options>
+</data>
+`;
+}
 
 const SEEDED_TEST_ACCOUNTS = {
   admin: {
@@ -251,6 +267,35 @@ const SEEDED_SCOPED_FIXTURES = {
     },
   },
   projects: {
+    charts: {
+      orgProjectManager: createSeededChartXml({
+        linkId: 2101,
+        reviewTaskId: 202,
+        reviewTaskStartDate: "2026-03-03 11:00",
+        reviewTaskText: "Org-scoped access audit",
+        rootTaskId: 201,
+        rootTaskStartDate: "2026-03-02 10:00",
+        rootTaskText: "Org project planning",
+      }),
+      projectProjectManager: createSeededChartXml({
+        linkId: 1101,
+        reviewTaskId: 102,
+        reviewTaskStartDate: "2026-03-04 09:00",
+        reviewTaskText: "Issue workflow polish",
+        rootTaskId: 101,
+        rootTaskStartDate: "2026-03-03 09:00",
+        rootTaskText: "Direct PM kickoff",
+      }),
+      teamProjectManager: createSeededChartXml({
+        linkId: 3101,
+        reviewTaskId: 302,
+        reviewTaskStartDate: "2026-03-02 09:00",
+        reviewTaskText: "Team permissions verification",
+        rootTaskId: 301,
+        rootTaskStartDate: "2026-03-01 08:30",
+        rootTaskText: "Team-linked PM rollout",
+      }),
+    },
     orgProjectManager: {
       description: "Seeded project managed through organization-scoped project authority.",
       name: "Seed Fixture Organization Project Managed Project",

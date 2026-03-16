@@ -6,6 +6,7 @@ import {
 } from "../../db/config.js";
 
 export interface BackendConfig {
+  chartsDir: string;
   dbPath: string;
   host: string;
   port: number;
@@ -21,6 +22,7 @@ export function buildBackendConfig(
   overrides: Partial<BackendConfig> = {},
 ): BackendConfig {
   return {
+    chartsDir: path.resolve(process.cwd(), "charts"),
     dbPath: path.resolve(process.cwd(), resolveRuntimeTarget(process.env)),
     createDbIfMissing: false,
     host: "127.0.0.1",
@@ -37,6 +39,7 @@ export function buildBackendConfigFromEnv(
 ): BackendConfig {
   const overrides: Partial<BackendConfig> = {};
 
+  overrides.chartsDir = path.resolve(process.cwd(), "charts");
   overrides.dbPath = path.resolve(process.cwd(), resolveRuntimeTarget(env));
   overrides.runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(env);
 

@@ -10,5 +10,6 @@ run/*.sqlite
 run/*.sqlite-shm
 run/*.sqlite-wal
 run/*.sqlite3
+charts/[0-9]*.xml
 /docs/3rdParty
 *.pyc

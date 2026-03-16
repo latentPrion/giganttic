@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { applySqlDdl } from "../db/apply-sql-ddl.mjs";
 import {
   openDatabaseFromPath,
@@ -27,7 +29,12 @@ export async function seedExecutionDatabase({
     ensureReferenceData(db, schemaName);
 
     if (includeTestData) {
-      ensureSeededTestData(db, schemaName, TEST_DATA_PROFILE_TESTSUITE);
+      ensureSeededTestData(
+        db,
+        schemaName,
+        TEST_DATA_PROFILE_TESTSUITE,
+        path.join(path.dirname(dbPath), "charts"),
+      );
     }
   } finally {
     db.close();

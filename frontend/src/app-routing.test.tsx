@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authApi } from "./common/session/api/auth-api.js";
 import { authTokenStorage } from "./common/session/storage/auth-token-storage.js";
 import { lobbyApi } from "./lobby/api/lobby-api.js";
+import { ganttApi } from "./spas/project-manager/api/gantt-api.js";
 import { issuesApi } from "./spas/project-manager/api/issues-api.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
@@ -80,9 +81,16 @@ vi.mock("./spas/project-manager/api/issues-api.js", () => ({
   },
 }));
 
+vi.mock("./spas/project-manager/api/gantt-api.js", () => ({
+  ganttApi: {
+    getProjectChart: vi.fn(),
+  },
+}));
+
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
 const lobbyApiMock = vi.mocked(lobbyApi);
+const ganttApiMock = vi.mocked(ganttApi);
 const issuesApiMock = vi.mocked(issuesApi);
 
 function createAuthenticatedResponse() {
@@ -112,6 +120,10 @@ describe("app routing", () => {
     lobbyApiMock.listOrganizations.mockResolvedValue({ organizations: [] });
     lobbyApiMock.listProjects.mockResolvedValue({ projects: [] });
     lobbyApiMock.listTeams.mockResolvedValue({ teams: [] });
+    ganttApiMock.getProjectChart.mockResolvedValue({
+      content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Test chart]]></task></data>",
+      type: "xml",
+    });
     issuesApiMock.getIssue.mockResolvedValue({
       issue: {
         closedAt: null,
