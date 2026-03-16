@@ -183,8 +183,6 @@ export class IssuesService {
       .values(createIssueInsertValues(projectId, payload, now))
       .returning({ id: issues.id })
       .all();
-    await this.databaseService.persist();
-
     return { issue: this.getIssueRecordByIdOrThrow(projectId, createdIssue.id) };
   }
 
@@ -228,8 +226,6 @@ export class IssuesService {
       .set(createIssueUpdateValues(payload, currentIssue, new Date()))
       .where(eq(issues.id, issueId))
       .run();
-    await this.databaseService.persist();
-
     return { issue: this.getIssueRecordByIdOrThrow(projectId, issueId) };
   }
 
@@ -245,8 +241,6 @@ export class IssuesService {
     this.databaseService.db.delete(issues)
       .where(eq(issues.id, issueId))
       .run();
-    await this.databaseService.persist();
-
     return { deletedIssueId: issueId };
   }
 

@@ -2,7 +2,6 @@ import { access } from "node:fs/promises";
 import { resolveDbTargetPaths } from "./migrate.mjs";
 import {
   openDatabaseFromPath,
-  persistDatabaseToPath,
   readCurrentSchemaName,
 } from "./runtime-db-state.mjs";
 import {
@@ -92,7 +91,6 @@ async function ensureManagedTestData(targetDbPath, profile) {
     }
 
     ensureSeededTestData(db, schemaName, profile);
-    await persistDatabaseToPath(targetDbPath, db);
     return { present: true, profile };
   } finally {
     db.close();
@@ -114,7 +112,6 @@ async function purgeManagedTestData(targetDbPath) {
 
   try {
     purgeSeededTestData(db);
-    await persistDatabaseToPath(targetDbPath, db);
   } finally {
     db.close();
   }

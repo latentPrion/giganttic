@@ -209,8 +209,6 @@ export class ProjectsService {
 
       return createdProject.id;
     });
-    await this.databaseService.persist();
-
     return { project: this.getProjectRecordByIdOrThrow(createdProjectId) };
   }
 
@@ -267,8 +265,6 @@ export class ProjectsService {
         .where(eq(projects.id, projectId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { project: this.getProjectRecordByIdOrThrow(projectId) };
   }
 
@@ -302,8 +298,6 @@ export class ProjectsService {
         tx.insert(usersProjectsProjectRoles).values(roleRows).run();
       }
     });
-    await this.databaseService.persist();
-
     return this.buildProjectMembershipResponse(projectId);
   }
 
@@ -327,8 +321,6 @@ export class ProjectsService {
         })
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildProjectMembershipResponse(projectId);
   }
 
@@ -356,8 +348,6 @@ export class ProjectsService {
         ))
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildProjectMembershipResponse(projectId);
   }
 
@@ -385,8 +375,6 @@ export class ProjectsService {
         .where(eq(projects.id, projectId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { deletedProjectId: projectId };
   }
 

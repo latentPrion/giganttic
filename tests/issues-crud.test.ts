@@ -294,7 +294,6 @@ describe("issues crud api", () => {
       projectId,
       teamId,
     }).run();
-    await harness.databaseService.persist();
 
     const issueId = harness.parseJson<{ issue: { id: number } }>(
       (await createIssue(projectOwner.accessToken, projectId, { name: "Team visible issue" })).payload,
@@ -338,7 +337,6 @@ describe("issues crud api", () => {
       projectId,
       teamId,
     }).run();
-    await harness.databaseService.persist();
 
     const createResponse = await createIssue(teamProjectManager.accessToken, projectId, {
       name: "Team managed issue",

@@ -4,7 +4,6 @@ import path from "node:path";
 import { applySqlDdl } from "./apply-sql-ddl.mjs";
 import {
   openDatabaseFromPath,
-  persistDatabaseToPath,
   writeCurrentSchemaName,
 } from "./runtime-db-state.mjs";
 import {
@@ -156,9 +155,12 @@ async function createDatabaseFromSchema({
 
   await applySqlDdl(targetDbPath, schemaName, projectRoot);
   const db = await openDatabaseFromPath(targetDbPath);
-  writeCurrentSchemaName(db, schemaName);
-  await persistDatabaseToPath(targetDbPath, db);
-  db.close();
+
+  try {
+    writeCurrentSchemaName(db, schemaName);
+  } finally {
+    db.close();
+  }
 
   return {
     dbTarget,

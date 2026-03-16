@@ -4,7 +4,6 @@ import { resolveDbTargetPaths } from "./migrate.mjs";
 import {
   openDatabaseFromPath,
   readCurrentSchemaName,
-  persistDatabaseToPath,
 } from "./runtime-db-state.mjs";
 import { resolveRuntimeSchemaSnapshotSubdir } from "./runtime-config.mjs";
 import { ensureReferenceData } from "./sqlite-reference-data-manager.mjs";
@@ -97,7 +96,6 @@ async function prepareDatabase({
 
   try {
     ensureReferenceData(db, runtimeSchemaSnapshotSubdir);
-    await persistDatabaseToPath(targetDbPath, db);
   } finally {
     db.close();
   }

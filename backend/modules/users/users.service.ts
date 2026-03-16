@@ -97,8 +97,6 @@ export class UsersService {
         .where(eq(users.id, userId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { deletedUserId: userId };
   }
 

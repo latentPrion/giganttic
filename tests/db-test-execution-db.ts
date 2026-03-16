@@ -1,9 +1,8 @@
-import { access, copyFile, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import initSqlJs from "sql.js";
-
+import { openDatabaseConnection } from "../db/native-sqlite.mjs";
 import type { DbTestRuntimeConfig } from "./db-test-runtime-guard.js";
 import { assertDoesNotUseRuntimeDbPath } from "./db-test-runtime-guard.js";
 
@@ -22,11 +21,8 @@ async function pathExists(targetPath: string) {
 }
 
 async function createEmptySqliteDatabase(filePath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
-  const bytes = db.export();
+  const db = openDatabaseConnection(filePath);
   db.close();
-  await writeFile(filePath, Buffer.from(bytes));
 }
 
 export async function ensureDbTestBaseDatabase(

@@ -1,8 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
-import path from "node:path";
-
-import initSqlJs from "sql.js";
-import type { Database } from "sql.js";
+import { rm } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -18,25 +14,16 @@ import {
   createDbTestExecutionPath,
   createDbTestTempDir,
 } from "../../../tests/db-test-execution-db.js";
+import {
+  executeSqlStatements,
+  openDatabaseConnection,
+  openInMemoryDatabase,
+  querySingleValue,
+} from "../../native-sqlite.mjs";
 
 const SCHEMA_VERSION = "v1";
 const TEMP_DIR_PREFIX = "giganttic-v1-ddl-";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
-
-function querySingleValue(
-  db: Database,
-  sql: string,
-  params: (string | number | null)[] = [],
-): unknown {
-  const result = db.exec(sql, params);
-  const value = result[0]?.values[0]?.[0];
-
-  if (value === undefined) {
-    throw new Error(`No rows returned for query: ${sql}`);
-  }
-
-  return value;
-}
 
 describe("generated sqlite ddl", () => {
   const tempPaths: string[] = [];
@@ -77,8 +64,7 @@ describe("generated sqlite ddl", () => {
     );
     tempPaths.push(tempDir);
     const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
-    const SQL = await initSqlJs();
-    const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));
+    const db = openDatabaseConnection(appliedPath, { readonly: true });
 
     const tableCount = querySingleValue(
       db,
@@ -100,14 +86,10 @@ describe("generated sqlite ddl", () => {
   });
 
   it("enforces unique username and email constraints", async () => {
-    const SQL = await initSqlJs();
-    const db = new SQL.Database();
+    const db = openInMemoryDatabase();
     const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
-    db.exec("PRAGMA foreign_keys = ON;");
-    for (const statement of statements) {
-      db.exec(statement);
-    }
+    executeSqlStatements(db, statements);
 
     db.exec(
       "INSERT INTO Users (username, email) VALUES ('alice', 'alice@example.com');",
@@ -127,14 +109,10 @@ describe("generated sqlite ddl", () => {
   });
 
   it("enforces singleton password credentials and session timestamp checks", async () => {
-    const SQL = await initSqlJs();
-    const db = new SQL.Database();
+    const db = openInMemoryDatabase();
     const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
-    db.exec("PRAGMA foreign_keys = ON;");
-    for (const statement of statements) {
-      db.exec(statement);
-    }
+    executeSqlStatements(db, statements);
 
     db.exec(
       "INSERT INTO Users (id, username, email) VALUES (1, 'bob', 'bob@example.com');",

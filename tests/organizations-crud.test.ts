@@ -424,7 +424,6 @@ describe("organizations crud api", () => {
       organizationId: organization.id,
       projectId: project.id,
     }).run();
-    await harness.databaseService.persist();
 
     const teamUpdate = await harness.app.inject({
       headers: harness.createAuthHeaders(teamManager.accessToken),
@@ -886,7 +885,6 @@ describe("organizations crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const projectUpdate = await harness.app.inject({
       headers: harness.createAuthHeaders(orgProjectManager.accessToken),
@@ -945,7 +943,6 @@ describe("organizations crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const allowedGrant = await harness.app.inject({
       headers: harness.createAuthHeaders(orgTeamManager.accessToken),
@@ -1016,7 +1013,6 @@ describe("organizations crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const grantResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(orgTeamManager.accessToken),
@@ -1645,7 +1641,6 @@ describe("organizations crud api", () => {
     harness.databaseService.db.delete(organizationsTeams)
       .where(eq(organizationsTeams.organizationId, organization.id))
       .run();
-    await harness.databaseService.persist();
     await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "DELETE",

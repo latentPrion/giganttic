@@ -826,7 +826,6 @@ describe("backend auth api", () => {
       })
       .where(eq(usersSessions.id, expiringSession.session.id))
       .run();
-    await databaseService.persist();
 
     const ownSessionsResponse = await app.inject({
       headers: {
@@ -866,7 +865,6 @@ describe("backend auth api", () => {
       })
       .where(eq(usersSessions.id, loginBody.session.id))
       .run();
-    await databaseService.persist();
 
     const meResponse = await app.inject({
       headers: {
@@ -903,7 +901,6 @@ describe("backend auth api", () => {
       })
       .where(eq(users.id, registered.user.id))
       .run();
-    await databaseService.persist();
 
     const loginResponse = await app.inject({
       method: "POST",

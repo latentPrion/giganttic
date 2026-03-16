@@ -9,7 +9,6 @@ import {
 import { createHash } from "node:crypto";
 
 import { afterEach, describe, expect, it } from "vitest";
-import initSqlJs from "sql.js";
 
 import {
   DRIZZLE_MIGRATIONS_FILE_NAME,
@@ -35,6 +34,10 @@ import {
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
+import {
+  openDatabaseConnection,
+  querySingleValue,
+} from "../db/native-sqlite.mjs";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-migrate-test-";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
@@ -87,10 +90,6 @@ async function createMigrationDeliverable(
 }
 
 async function createDbFile(projectRoot: string, relativePath: string, fromSchemaName: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
-
-  db.exec(createSqliteBufferSql(fromSchemaName));
   const outputPath = createDbTestExecutionPath(
     path.dirname(path.join(projectRoot, relativePath)),
     path.basename(relativePath),
@@ -99,53 +98,52 @@ async function createDbFile(projectRoot: string, relativePath: string, fromSchem
   );
 
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, Buffer.from(db.export()));
+  const db = openDatabaseConnection(outputPath);
+  db.exec(createSqliteBufferSql(fromSchemaName));
   db.close();
 
   return outputPath;
 }
 
 async function readSchemaNameFromDb(dbPath: string) {
-  const SQL = await initSqlJs();
-  const buffer = await readFile(dbPath);
-  const db = new SQL.Database(buffer);
-  const rows = db.exec(
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const schemaName = querySingleValue(
+    db,
     `SELECT value FROM ${RUNTIME_METADATA_TABLE_NAME} WHERE key = '${SCHEMA_NAME_METADATA_KEY}';`,
   );
   db.close();
 
-  return String(rows[0].values[0][0]);
+  return String(schemaName);
 }
 
 async function tableExists(dbPath: string, tableName: string) {
-  const SQL = await initSqlJs();
-  const buffer = await readFile(dbPath);
-  const db = new SQL.Database(buffer);
-  const rows = db.exec(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${tableName}';`,
-  );
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const row = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+  ).get(tableName);
   db.close();
 
-  return rows.length > 0 && rows[0].values.length > 0;
+  return row !== undefined;
 }
 
 async function countAppliedMigrations(dbPath: string) {
-  const SQL = await initSqlJs();
-  const buffer = await readFile(dbPath);
-  const db = new SQL.Database(buffer);
-  const tableRows = db.exec(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${APPLIED_MIGRATIONS_TABLE_NAME}';`,
-  );
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const tableRow = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+  ).get(APPLIED_MIGRATIONS_TABLE_NAME);
 
-  if (tableRows.length === 0 || tableRows[0].values.length === 0) {
+  if (!tableRow) {
     db.close();
     return 0;
   }
 
-  const rows = db.exec(`SELECT COUNT(*) FROM ${APPLIED_MIGRATIONS_TABLE_NAME};`);
+  const rowCount = querySingleValue(
+    db,
+    `SELECT COUNT(*) FROM ${APPLIED_MIGRATIONS_TABLE_NAME};`,
+  );
   db.close();
 
-  return Number(rows[0].values[0][0]);
+  return Number(rowCount);
 }
 
 async function createFileHash(filePath: string) {

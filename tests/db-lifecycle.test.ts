@@ -4,7 +4,6 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createDatabaseFromSchema } from "../db/create-from-schema.mjs";
@@ -25,6 +24,10 @@ import {
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
+import {
+  openDatabaseConnection,
+  querySingleValue,
+} from "../db/native-sqlite.mjs";
 
 const TEMP_DIR_PREFIX = "giganttic-db-lifecycle-";
 const ISSUE_STATUSES_TABLE_NAME = "IssueStatuses";
@@ -53,12 +56,11 @@ function createProddevDbPath(projectRoot: string) {
 }
 
 async function querySingleNumber(dbPath: string, sql: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-  const result = db.exec(sql);
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const result = querySingleValue(db, sql);
   db.close();
 
-  return Number(result[0].values[0][0]);
+  return Number(result);
 }
 
 async function countSeededUsers(dbPath: string) {
@@ -96,57 +98,35 @@ async function countRowsWhere(dbPath: string, tableName: string, whereClause: st
 }
 
 async function renameSeededUser(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec(
     "UPDATE Users SET username = 'renamed-testadminuser' WHERE username = 'testadminuser';",
   );
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function renameSeededProject(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec(
     "UPDATE Projects SET name = 'renamed-seeded-project' WHERE id = 1;",
   );
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function deleteOneSeededUser(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec("DELETE FROM Users WHERE username = 'testadminuser';");
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function deleteProjectRoleCode(dbPath: string, roleCode: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec(`DELETE FROM ProjectRoles WHERE code = '${roleCode}';`);
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function seedV2ProjectManagerAssignment(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec(
     `INSERT INTO ProjectRoles (code, displayName)
      VALUES ('GGTC_PROJECTROLE_PROJECT_MANAGER', 'Project Manager');`,
@@ -166,24 +146,16 @@ async function seedV2ProjectManagerAssignment(dbPath: string) {
     `INSERT INTO Users_Projects_ProjectRoles (userId, projectId, roleCode)
      VALUES (101, 501, 'GGTC_PROJECTROLE_PROJECT_MANAGER');`,
   );
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function insertNonTestUser(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-
+  const db = openDatabaseConnection(dbPath);
   db.exec(
     `INSERT INTO Users (username, email, isActive, createdAt, updatedAt)
      VALUES ('${NON_TEST_USERNAME}', '${NON_TEST_EMAIL}', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
   );
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function countUserByUsername(dbPath: string, username: string) {
@@ -194,29 +166,22 @@ async function countUserByUsername(dbPath: string, username: string) {
 }
 
 async function deleteTrackedEntityBySeedKey(dbPath: string, seedKey: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-  const rows = db.exec(
-    `SELECT entityTable, entityId FROM ManagedTestDataRecords WHERE seedKey = '${seedKey}';`,
-  );
+  const db = openDatabaseConnection(dbPath);
+  const row = db.prepare(
+    "SELECT entityTable, entityId FROM ManagedTestDataRecords WHERE seedKey = ?;",
+  ).raw(true).get(seedKey) as [string, number] | undefined;
 
-  if (rows.length > 0 && rows[0].values.length > 0) {
-    const [entityTable, entityId] = rows[0].values[0];
+  if (row) {
+    const [entityTable, entityId] = row;
     db.exec(`DELETE FROM ${String(entityTable)} WHERE id = ${Number(entityId)};`);
   }
-
-  const bytes = db.export();
   db.close();
-  await writeFile(dbPath, Buffer.from(bytes));
 }
 
 async function createEmptyDbFile(dbPath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
-  const bytes = db.export();
-  db.close();
   await mkdir(path.dirname(dbPath), { recursive: true });
-  await writeFile(dbPath, Buffer.from(bytes));
+  const db = openDatabaseConnection(dbPath);
+  db.close();
 }
 
 async function createFileHash(filePath: string) {

@@ -160,8 +160,6 @@ export class TeamsService {
 
       return createdTeam.id;
     });
-    await this.databaseService.persist();
-
     return { team: this.getTeamRecordByIdOrThrow(createdTeamId) };
   }
 
@@ -225,8 +223,6 @@ export class TeamsService {
         .where(eq(teams.id, teamId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { team: this.getTeamRecordByIdOrThrow(teamId) };
   }
 
@@ -261,8 +257,6 @@ export class TeamsService {
         tx.insert(usersTeamsTeamRoles).values(roleRows).run();
       }
     });
-    await this.databaseService.persist();
-
     return this.buildTeamMembershipResponse(teamId);
   }
 
@@ -287,8 +281,6 @@ export class TeamsService {
         })
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildTeamMembershipResponse(teamId);
   }
 
@@ -313,8 +305,6 @@ export class TeamsService {
         ))
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildTeamMembershipResponse(teamId);
   }
 
@@ -340,8 +330,6 @@ export class TeamsService {
         .where(eq(teams.id, teamId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { deletedTeamId: teamId };
   }
 

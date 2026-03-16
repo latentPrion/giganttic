@@ -1,8 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import initSqlJs from "sql.js";
 import { defaultDevSqliteDbPath } from "./sqlite-db-paths.mjs";
+import {
+  executeSqlStatements,
+  openDatabaseConnection,
+} from "./native-sqlite.mjs";
 
 export const runtimeSqliteDbPath = path.resolve(
   process.cwd(),
@@ -48,18 +51,16 @@ export async function applySqlDdl(
     throw new Error("schemaVersion is required.");
   }
 
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
   const statements = await readGeneratedSqlStatements(schemaVersion, projectRoot);
 
-  db.exec("PRAGMA foreign_keys = ON;");
-  for (const statement of statements) {
-    db.exec(statement);
-  }
-
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, Buffer.from(db.export()));
-  db.close();
+  const db = openDatabaseConnection(outputPath);
+
+  try {
+    executeSqlStatements(db, statements);
+  } finally {
+    db.close();
+  }
 
   return outputPath;
 }

@@ -1,7 +1,6 @@
 import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -24,6 +23,10 @@ import {
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionPath, createDbTestTempDir } from "./db-test-execution-db.js";
+import {
+  openDatabaseConnection,
+  querySingleValue,
+} from "../db/native-sqlite.mjs";
 
 const TEMP_ROOT_PREFIX = "giganttic-db-createfrom-test-";
 const CUSTOM_SCHEMA_SQL = `
@@ -70,10 +73,8 @@ async function pathExists(targetPath: string) {
 }
 
 async function writeGarbageDb(filePath: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
+  const db = openDatabaseConnection(filePath);
   db.exec("CREATE TABLE Noise (id integer primary key);");
-  await writeFile(filePath, Buffer.from(db.export()));
   db.close();
 }
 
@@ -85,21 +86,19 @@ async function readSchemaNameFromDb(dbPath: string) {
 }
 
 async function countRows(dbPath: string, tableName: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-  const rows = db.exec(`SELECT COUNT(*) FROM ${tableName};`);
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const rowCount = querySingleValue(db, `SELECT COUNT(*) FROM ${tableName};`);
   db.close();
-  return Number(rows[0].values[0][0]);
+  return Number(rowCount);
 }
 
 async function tableExists(dbPath: string, tableName: string) {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
-  const rows = db.exec(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${tableName}';`,
-  );
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const row = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+  ).get(tableName);
   db.close();
-  return rows.length > 0 && rows[0].values.length > 0;
+  return row !== undefined;
 }
 
 async function createSchemaSnapshot(projectRoot: string, schemaName: string, sql = CUSTOM_SCHEMA_SQL) {
@@ -258,13 +257,10 @@ describe("db createfrom tooling", () => {
       schemaName: "v1",
     });
 
-    const SQL = await initSqlJs();
-    const db = new SQL.Database(new Uint8Array(await readFile(existingDbPath)));
+    const db = openDatabaseConnection(existingDbPath);
     db.exec("CREATE TABLE Noise (id integer primary key, name text);");
     db.exec("INSERT INTO Noise (id, name) VALUES (1, 'junk');");
-    const bytes = db.export();
     db.close();
-    await writeFile(existingDbPath, Buffer.from(bytes));
 
     await createDatabaseFromSchema({
       dbTarget: "prod",

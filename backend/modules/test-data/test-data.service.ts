@@ -65,7 +65,6 @@ export class TestDataService {
       const seededUserIds = this.ensureSeedUsers(tx);
       this.ensureScopedSeedFixtures(tx, seededUserIds);
     });
-    await this.databaseService.persist();
   }
 
   async hasTestData(): Promise<boolean> {
@@ -87,8 +86,6 @@ export class TestDataService {
       this.deleteTrackedTopLevelEntities(tx, trackedIds);
       tx.delete(managedTestDataRecords).run();
     });
-
-    await this.databaseService.persist();
   }
 
   private ensureSeedUsers(tx: SeedDatabase): SeededUserIds {

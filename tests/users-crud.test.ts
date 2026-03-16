@@ -465,7 +465,6 @@ describe("users delete api", () => {
       { projectId: projectOne.id, teamId: teamOne.id },
       { projectId: projectTwo.id, teamId: teamTwo.id },
     ]).run();
-    await harness.databaseService.persist();
 
     const projectOneDemotion = await harness.app.inject({
       headers: harness.createAuthHeaders(firstProjectOwner.accessToken),
@@ -755,7 +754,6 @@ describe("users delete api", () => {
       projectId: projectTwo.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
     await harness.app.inject({
       headers: harness.createAuthHeaders(orgCreator.accessToken),
       method: "PUT",

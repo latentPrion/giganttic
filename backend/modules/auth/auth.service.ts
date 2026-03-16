@@ -88,7 +88,6 @@ export class AuthService {
         return created;
       });
 
-      await this.databaseService.persist();
       return {
         user: this.buildAuthUser(createdUser.id),
       };
@@ -176,8 +175,6 @@ export class AuthService {
         })
         .run();
     });
-    await this.databaseService.persist();
-
     return {
       accessToken,
       session: this.buildSessionSummary(
@@ -290,7 +287,6 @@ export class AuthService {
           .where(inArray(usersSessions.id, revocableIds))
           .run();
       });
-      await this.databaseService.persist();
     }
 
     return {

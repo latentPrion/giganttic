@@ -9,7 +9,6 @@ import {
 import {
   createMigrationChecksum,
   openDatabaseFromPath,
-  persistDatabaseToPath,
   readCurrentSchemaName,
   recordAppliedMigration,
   writeCurrentSchemaName,
@@ -171,11 +170,6 @@ async function copyDbForProddev(sourceDbPath, targetDbPath) {
   await copyFile(sourceDbPath, targetDbPath);
 }
 
-async function loadDatabaseFile(targetDbPath) {
-  await ensurePathExists(targetDbPath, "Missing target DB file");
-  return readFile(targetDbPath);
-}
-
 async function readSqlFileStatements(filePath) {
   const sqlContents = await readFile(filePath, "utf8");
   return sqlContents.trim();
@@ -237,10 +231,8 @@ async function applyMigrationToSqliteDatabase({
   targetDbPath,
   toSchemaName,
 }) {
-  await loadDatabaseFile(targetDbPath);
+  await ensurePathExists(targetDbPath, "Missing target DB file");
   const db = await openDatabaseFromPath(targetDbPath);
-
-  db.exec("PRAGMA foreign_keys = ON;");
 
   const currentSchemaName = readCurrentSchemaName(db);
 
@@ -273,7 +265,6 @@ async function applyMigrationToSqliteDatabase({
     throw error;
   }
 
-  await persistDatabaseToPath(targetDbPath, db);
   db.close();
 }
 

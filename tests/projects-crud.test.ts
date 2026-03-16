@@ -298,7 +298,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const teamMemberGet = await harness.app.inject({
       headers: harness.createAuthHeaders(teamMember.accessToken),
@@ -431,7 +430,6 @@ describe("projects crud api", () => {
       roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
       userId: organizationManager.user.id,
     }).run();
-    await harness.databaseService.persist();
 
     const response = await getProject(creator.accessToken, projectId);
     const body = harness.parseJson<{
@@ -584,7 +582,6 @@ describe("projects crud api", () => {
       roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
       userId: sharedManager.user.id,
     }).run();
-    await harness.databaseService.persist();
 
     const response = await getProject(creator.accessToken, project.id);
     const body = harness.parseJson<{
@@ -695,7 +692,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const forbiddenResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(teamMember.accessToken),
@@ -1017,7 +1013,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const updateResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
@@ -1194,7 +1189,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const response = await harness.app.inject({
       headers: harness.createAuthHeaders(teamProjectManager.accessToken),
@@ -1482,7 +1476,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const grantResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(teamProjectManager.accessToken),
@@ -1538,7 +1531,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const grantResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(teamProjectManager.accessToken),
@@ -1592,7 +1584,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const revokeResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
@@ -2042,7 +2033,6 @@ describe("projects crud api", () => {
       { projectId: project.id, teamId: teamOne.id },
       { projectId: project.id, teamId: teamTwo.id },
     ]).run();
-    await harness.databaseService.persist();
 
     const indirectMembershipResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
@@ -2249,7 +2239,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const deleteResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
@@ -2335,7 +2324,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
@@ -2410,7 +2398,6 @@ describe("projects crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",

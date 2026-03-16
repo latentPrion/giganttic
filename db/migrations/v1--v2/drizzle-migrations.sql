@@ -1,5 +1,5 @@
-ALTER TABLE `Roles` RENAME TO `OrganizationRoles`;--> statement-breakpoint
-ALTER TABLE `Users_Roles` RENAME TO `SystemRoles`;--> statement-breakpoint
+ALTER TABLE `Roles` RENAME TO `__legacy_Roles`;--> statement-breakpoint
+ALTER TABLE `Users_Roles` RENAME TO `__legacy_Users_Roles`;--> statement-breakpoint
 CREATE TABLE `ClosedReasons` (
 	`code` text PRIMARY KEY NOT NULL,
 	`displayName` text NOT NULL,
@@ -66,6 +66,13 @@ CREATE TABLE `Organizations_Teams` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `Organizations_Teams_organizationId_teamId_unique` ON `Organizations_Teams` (`organizationId`,`teamId`);--> statement-breakpoint
 CREATE UNIQUE INDEX `Organizations_Teams_teamId_unique` ON `Organizations_Teams` (`teamId`);--> statement-breakpoint
+CREATE TABLE `OrganizationRoles` (
+	`code` text PRIMARY KEY NOT NULL,
+	`displayName` text NOT NULL,
+	`description` text,
+	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE `ProjectRoles` (
 	`code` text PRIMARY KEY NOT NULL,
 	`displayName` text NOT NULL,
@@ -201,7 +208,22 @@ CREATE TABLE `__new_SystemRoles` (
 	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `__new_SystemRoles`("code", "displayName", "description", "createdAt") SELECT "code", "displayName", "description", "createdAt" FROM `SystemRoles`;--> statement-breakpoint
-DROP TABLE `SystemRoles`;--> statement-breakpoint
+INSERT INTO `__new_SystemRoles`("code", "displayName", "description", "createdAt")
+SELECT
+	'GGTC_SYSTEMROLE_ADMIN',
+	"displayName",
+	"description",
+	"createdAt"
+FROM `__legacy_Roles`
+WHERE `code` = 'GGTC_ROLE_ADMIN';--> statement-breakpoint
 ALTER TABLE `__new_SystemRoles` RENAME TO `SystemRoles`;--> statement-breakpoint
+INSERT INTO `Users_SystemRoles`("userId", "roleCode", "createdAt")
+SELECT
+	"userId",
+	'GGTC_SYSTEMROLE_ADMIN',
+	"createdAt"
+FROM `__legacy_Users_Roles`
+WHERE `roleCode` = 'GGTC_ROLE_ADMIN';--> statement-breakpoint
+DROP TABLE `__legacy_Users_Roles`;--> statement-breakpoint
+DROP TABLE `__legacy_Roles`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;

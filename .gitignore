@@ -7,6 +7,8 @@ dist/
 .DS_Store
 run/*.db
 run/*.sqlite
+run/*.sqlite-shm
+run/*.sqlite-wal
 run/*.sqlite3
 /docs/3rdParty
 *.pyc

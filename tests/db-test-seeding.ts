@@ -1,7 +1,6 @@
 import { applySqlDdl } from "../db/apply-sql-ddl.mjs";
 import {
   openDatabaseFromPath,
-  persistDatabaseToPath,
   writeCurrentSchemaName,
 } from "../db/runtime-db-state.mjs";
 import { ensureReferenceData } from "../db/sqlite-reference-data-manager.mjs";
@@ -30,8 +29,6 @@ export async function seedExecutionDatabase({
     if (includeTestData) {
       ensureSeededTestData(db, schemaName, TEST_DATA_PROFILE_TESTSUITE);
     }
-
-    await persistDatabaseToPath(dbPath, db);
   } finally {
     db.close();
   }

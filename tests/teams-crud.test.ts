@@ -883,7 +883,6 @@ describe("teams crud api", () => {
       { projectId: projectOne.id, teamId: team.id },
       { projectId: projectTwo.id, teamId: team.id },
     ]).run();
-    await harness.databaseService.persist();
     const demoteFirstOwner = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
@@ -981,7 +980,6 @@ describe("teams crud api", () => {
       { projectId: project.id, teamId: teamOne.id },
       { projectId: project.id, teamId: teamTwo.id },
     ]).run();
-    await harness.databaseService.persist();
 
     const ownerDemotion = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
@@ -1188,7 +1186,6 @@ describe("teams crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const projectMembershipResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
@@ -1256,7 +1253,6 @@ describe("teams crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
 
     const deleteResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
@@ -1330,7 +1326,6 @@ describe("teams crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
     const demotionResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
@@ -1409,7 +1404,6 @@ describe("teams crud api", () => {
       projectId: project.id,
       teamId: team.id,
     }).run();
-    await harness.databaseService.persist();
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",

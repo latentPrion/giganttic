@@ -33,13 +33,13 @@ function toSqlNullableTimestamp(value) {
 }
 
 function readSingleId(db, sql) {
-  const rows = db.exec(sql);
+  const row = db.prepare(sql).raw(true).get();
 
-  if (rows.length === 0 || rows[0].values.length === 0) {
+  if (!row || row[0] === undefined) {
     throw new Error(`Expected query to return a row: ${sql}`);
   }
 
-  return Number(rows[0].values[0][0]);
+  return Number(row[0]);
 }
 
 function createIdInClause(ids) {
@@ -51,11 +51,11 @@ function createIdInClause(ids) {
 }
 
 function readTrackedEntityIds(db) {
-  const rows = db.exec(
+  const values = db.prepare(
     `SELECT entityTable, entityId FROM ${MANAGED_TEST_DATA_RECORDS_TABLE};`,
-  );
+  ).raw(true).all();
 
-  if (rows.length === 0) {
+  if (values.length === 0) {
     return {
       organizationIds: [],
       projectIds: [],
@@ -64,37 +64,33 @@ function readTrackedEntityIds(db) {
     };
   }
 
-  const values = rows[0].values.map((row) => ({
+  const trackedValues = values.map((row) => ({
     entityId: Number(row[1]),
     entityTable: String(row[0]),
   }));
 
   return {
-    organizationIds: values
+    organizationIds: trackedValues
       .filter((row) => row.entityTable === TEST_DATA_ENTITY_TABLES.organization)
       .map((row) => row.entityId),
-    projectIds: values
+    projectIds: trackedValues
       .filter((row) => row.entityTable === TEST_DATA_ENTITY_TABLES.project)
       .map((row) => row.entityId),
-    teamIds: values
+    teamIds: trackedValues
       .filter((row) => row.entityTable === TEST_DATA_ENTITY_TABLES.team)
       .map((row) => row.entityId),
-    userIds: values
+    userIds: trackedValues
       .filter((row) => row.entityTable === TEST_DATA_ENTITY_TABLES.user)
       .map((row) => row.entityId),
   };
 }
 
 function hasSeededTestData(db) {
-  const rows = db.exec(
+  const rowCount = db.prepare(
     `SELECT COUNT(*) FROM ${MANAGED_TEST_DATA_RECORDS_TABLE};`,
-  );
+  ).pluck().get();
 
-  if (rows.length === 0) {
-    return false;
-  }
-
-  return Number(rows[0].values[0][0]) > 0;
+  return Number(rowCount ?? 0) > 0;
 }
 
 function purgeSeededProjectChildren(db, projectIds) {
@@ -155,12 +151,9 @@ function purgeSeededUserChildren(db, userIds) {
   }
 
   const ids = createIdInClause(userIds);
-  const credentialRows = db.exec(
+  const credentialIds = db.prepare(
     `SELECT id FROM Users_CredentialTypes WHERE userId IN ${ids};`,
-  );
-  const credentialIds = credentialRows.length === 0
-    ? []
-    : credentialRows[0].values.map((row) => Number(row[0]));
+  ).raw(true).all().map((row) => Number(row[0]));
 
   runDelete(db, `DELETE FROM Users_Sessions WHERE userId IN ${ids};`);
   runDelete(

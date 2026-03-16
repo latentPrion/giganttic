@@ -162,8 +162,6 @@ export class OrganizationsService {
 
       return createdOrganization.id;
     });
-    await this.databaseService.persist();
-
     return {
       organization: this.getOrganizationRecordByIdOrThrow(createdOrganizationId),
     };
@@ -221,8 +219,6 @@ export class OrganizationsService {
         .where(eq(organizations.id, organizationId))
         .run();
     });
-    await this.databaseService.persist();
-
     return {
       organization: this.getOrganizationRecordByIdOrThrow(organizationId),
     };
@@ -268,8 +264,6 @@ export class OrganizationsService {
           .run();
       }
     });
-    await this.databaseService.persist();
-
     return this.buildOrganizationUsersResponse(organizationId);
   }
 
@@ -290,8 +284,6 @@ export class OrganizationsService {
         .values(createOrganizationProjectRows(organizationId, payload))
         .run();
     });
-    await this.databaseService.persist();
-
     return {
       organizationId,
       projects: this.listOrganizationProjects(organizationId),
@@ -316,8 +308,6 @@ export class OrganizationsService {
         })
         .run();
     });
-    await this.databaseService.persist();
-
     return {
       organizationId,
       teams: this.listOrganizationTeams(organizationId),
@@ -350,8 +340,6 @@ export class OrganizationsService {
         })
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildOrganizationRoleAssignmentResponse(organizationId);
   }
 
@@ -375,8 +363,6 @@ export class OrganizationsService {
         ))
         .run();
     });
-    await this.databaseService.persist();
-
     return this.buildOrganizationRoleAssignmentResponse(organizationId);
   }
 
@@ -405,8 +391,6 @@ export class OrganizationsService {
         .where(eq(organizations.id, organizationId))
         .run();
     });
-    await this.databaseService.persist();
-
     return { deletedOrganizationId: organizationId };
   }
 

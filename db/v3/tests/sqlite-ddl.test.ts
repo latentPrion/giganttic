@@ -1,8 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
-import path from "node:path";
-
-import initSqlJs from "sql.js";
-import type { Database } from "sql.js";
+import { rm } from "node:fs/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -18,34 +14,21 @@ import {
   createDbTestExecutionPath,
   createDbTestTempDir,
 } from "../../../tests/db-test-execution-db.js";
+import {
+  executeSqlStatements,
+  openDatabaseConnection,
+  openInMemoryDatabase,
+  querySingleValue,
+} from "../../native-sqlite.mjs";
 
 const SCHEMA_VERSION = "v3";
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
-function querySingleValue(
-  db: Database,
-  sql: string,
-  params: (string | number | null)[] = [],
-): unknown {
-  const result = db.exec(sql, params);
-  const value = result[0]?.values[0]?.[0];
-
-  if (value === undefined) {
-    throw new Error(`No rows returned for query: ${sql}`);
-  }
-
-  return value;
-}
-
 async function createV3Database() {
-  const SQL = await initSqlJs();
-  const db = new SQL.Database();
+  const db = openInMemoryDatabase();
   const statements = await readGeneratedSqlStatements(SCHEMA_VERSION);
 
-  db.exec("PRAGMA foreign_keys = ON;");
-  for (const statement of statements) {
-    db.exec(statement);
-  }
+  executeSqlStatements(db, statements);
 
   return db;
 }
@@ -88,8 +71,7 @@ describe("generated sqlite ddl for v3", () => {
     tempPaths.push(tempDir);
 
     const appliedPath = await applySqlDdl(outputPath, SCHEMA_VERSION);
-    const SQL = await initSqlJs();
-    const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));
+    const db = openDatabaseConnection(appliedPath, { readonly: true });
 
     const presentTableCount = querySingleValue(
       db,
@@ -153,8 +135,10 @@ describe("generated sqlite ddl for v3", () => {
   it("creates the Projects journal column", async () => {
     const db = await createV3Database();
 
-    const result = db.exec("PRAGMA table_info('Projects');");
-    const columnNames = result[0]?.values.map((row) => row[1]);
+    const columnNames = db.prepare("PRAGMA table_info('Projects');")
+      .raw(true)
+      .all()
+      .map((row) => String((row as unknown[])[1]));
 
     expect(columnNames).toContain("journal");
     db.close();
@@ -163,8 +147,10 @@ describe("generated sqlite ddl for v3", () => {
   it("creates the managed test-data tracking table", async () => {
     const db = await createV3Database();
 
-    const result = db.exec("PRAGMA table_info('ManagedTestDataRecords');");
-    const columnNames = result[0]?.values.map((row: unknown[]) => row[1]);
+    const columnNames = db.prepare("PRAGMA table_info('ManagedTestDataRecords');")
+      .raw(true)
+      .all()
+      .map((row) => String((row as unknown[])[1]));
 
     expect(columnNames).toContain("seedKey");
     expect(columnNames).toContain("entityTable");

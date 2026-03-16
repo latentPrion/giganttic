@@ -5,7 +5,6 @@ import path from "node:path";
 
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
-import initSqlJs from "sql.js";
 import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../backend/app.module.js";
 import { buildBackendConfig } from "../backend/config/backend-config.js";
@@ -26,6 +25,10 @@ import {
 } from "../db/config.js";
 import { requireDbTestRuntimeConfig } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionSandbox, createDbTestTempDir } from "./db-test-execution-db.js";
+import {
+  openDatabaseConnection,
+  querySingleValue,
+} from "../db/native-sqlite.mjs";
 
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
@@ -77,13 +80,13 @@ describe("db version selection pipeline", () => {
       outputPath,
       dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
     );
-    const SQL = await initSqlJs();
-    const db = new SQL.Database(new Uint8Array(await readFile(appliedPath)));
-    const result = db.exec(
+    const db = openDatabaseConnection(appliedPath, { readonly: true });
+    const tableCount = querySingleValue(
+      db,
       "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('Projects', 'Teams', 'SystemRoles')",
     );
 
-    expect(result[0]?.values[0]?.[0]).toBe(3);
+    expect(tableCount).toBe(3);
     db.close();
   });
 

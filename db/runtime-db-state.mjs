@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-import initSqlJs from "sql.js";
+import { openDatabaseConnection } from "./native-sqlite.mjs";
 
 const APPLIED_MIGRATIONS_TABLE_NAME = "_Giganttic_AppliedMigrations";
 const RUNTIME_METADATA_TABLE_NAME = "_Giganttic_RuntimeMetadata";
@@ -57,24 +57,9 @@ ON CONFLICT(migrationPairName) DO UPDATE SET
   appliedAt = excluded.appliedAt;`;
 }
 
-async function createSqlModule() {
-  return initSqlJs();
-}
-
 async function openDatabaseFromPath(dbPath) {
-  const SQL = await createSqlModule();
-
-  try {
-    const buffer = await readFile(dbPath);
-    return new SQL.Database(new Uint8Array(buffer));
-  } catch {
-    return new SQL.Database();
-  }
-}
-
-async function persistDatabaseToPath(dbPath, db) {
   await mkdir(path.dirname(dbPath), { recursive: true });
-  await writeFile(dbPath, Buffer.from(db.export()));
+  return openDatabaseConnection(dbPath);
 }
 
 function ensureOperationalTables(db) {
@@ -84,13 +69,13 @@ function ensureOperationalTables(db) {
 
 function readCurrentSchemaName(db) {
   ensureOperationalTables(db);
-  const rows = db.exec(createSchemaNameSelectSql());
+  const row = db.prepare(createSchemaNameSelectSql()).raw(true).get();
 
-  if (rows.length === 0 || rows[0].values.length === 0) {
+  if (!row || row[0] === undefined) {
     return null;
   }
 
-  return String(rows[0].values[0][0]);
+  return String(row[0]);
 }
 
 function writeCurrentSchemaName(db, schemaName) {
@@ -126,7 +111,6 @@ export {
   createMigrationChecksum,
   ensureOperationalTables,
   openDatabaseFromPath,
-  persistDatabaseToPath,
   readCurrentSchemaName,
   recordAppliedMigration,
   writeCurrentSchemaName,
