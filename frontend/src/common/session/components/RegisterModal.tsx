@@ -9,7 +9,7 @@ import {
   TextField,
 } from "@mui/material";
 
-import { isApiError } from "../../api/api-error.js";
+import { getApiErrorMessage, isApiError } from "../../api/api-error.js";
 import type { RegisterRequest } from "../contracts/auth.contracts.js";
 import { AuthStatusDialog } from "./AuthStatusDialog.js";
 
@@ -68,11 +68,7 @@ function buildRegistrationFailureMessage(error: unknown): string {
     return DEFAULT_REGISTRATION_FAILURE_MESSAGE;
   }
 
-  if (error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return DEFAULT_REGISTRATION_FAILURE_MESSAGE;
+  return getApiErrorMessage(error, DEFAULT_REGISTRATION_FAILURE_MESSAGE);
 }
 
 export function RegisterModal(props: RegisterModalProps) {

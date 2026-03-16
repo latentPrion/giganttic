@@ -15,10 +15,6 @@ interface LoggedInUserMenuProps {
 }
 
 const ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
-const PROJECT_MANAGER_ROLE_CODES = [
-  "GGTC_PROJECTROLE_PROJECT_MANAGER",
-  "GGTC_TEAMROLE_PROJECT_MANAGER",
-] as const;
 const MENU_TRIGGER_LABEL = "Menu";
 const MENU_BUTTON_HOVER_BACKGROUND = "rgba(255, 255, 255, 0.12)";
 const MENU_BUTTON_HOVER_BORDER_COLOR = "rgba(255, 255, 255, 0.24)";
@@ -26,10 +22,6 @@ const MENU_BUTTON_HOVER_TRANSLATE_Y = "-1px";
 
 function hasRole(roles: string[], roleCode: string): boolean {
   return roles.includes(roleCode);
-}
-
-function hasProjectManagementRole(roles: string[]): boolean {
-  return PROJECT_MANAGER_ROLE_CODES.some((roleCode) => hasRole(roles, roleCode));
 }
 
 export function LoggedInUserMenu(props: LoggedInUserMenuProps) {
@@ -79,9 +71,7 @@ export function LoggedInUserMenu(props: LoggedInUserMenuProps) {
           disabled={props.isBusy}
           onLogout={logout}
         />
-        {hasProjectManagementRole(props.roles) ? (
-          <ProjectManagementMenuItems />
-        ) : null}
+        <ProjectManagementMenuItems />
         {hasRole(props.roles, ADMIN_ROLE_CODE) ? <AdminMenuItems /> : null}
       </Menu>
     </>

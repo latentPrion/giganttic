@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../api/lobby-api.js";
 import type { GetOrganizationResponse } from "../../contracts/lobby.contracts.js";
 import {
@@ -32,11 +32,7 @@ interface OrganizationSummaryModalProps {
 }
 
 function buildOrganizationLoadErrorMessage(error: unknown): string {
-  if (isApiError(error) && error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return ORGANIZATION_LOAD_ERROR_MESSAGE;
+  return getApiErrorMessage(error, ORGANIZATION_LOAD_ERROR_MESSAGE);
 }
 
 export function OrganizationSummaryModal(props: OrganizationSummaryModalProps) {

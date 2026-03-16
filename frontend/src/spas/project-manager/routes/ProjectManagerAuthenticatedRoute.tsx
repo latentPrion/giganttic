@@ -9,7 +9,7 @@ import { AppShell } from "../../../app/shell/AppShell.js";
 import { useSessionManager } from "../../../common/session/hooks/useSessionManager.js";
 
 interface ProjectManagerAuthenticatedRouteProps {
-  children(token: string): React.ReactNode;
+  children(token: string, currentUserId: number): React.ReactNode;
 }
 
 const LOADING_MESSAGE = "Loading the project manager workspace...";
@@ -46,5 +46,9 @@ export function ProjectManagerAuthenticatedRoute(
     return <Navigate replace to="/" />;
   }
 
-  return <AppShell>{props.children(authState.auth.token)}</AppShell>;
+  return (
+    <AppShell>
+      {props.children(authState.auth.token, authState.auth.user.id)}
+    </AppShell>
+  );
 }

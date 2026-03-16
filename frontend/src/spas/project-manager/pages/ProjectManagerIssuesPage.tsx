@@ -18,7 +18,7 @@ import { IssueViewButton } from "../../../common/components/entity-actions/Issue
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import { IssueListItem } from "../../../common/components/entity-list/IssueListItem.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
 import type {
   CreateIssueRequest,
@@ -67,11 +67,7 @@ type IssueSortMode =
   | "progress";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
-  if (isApiError(error) && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function sortIssuesById(issues: Issue[]): Issue[] {

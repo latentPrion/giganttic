@@ -9,7 +9,7 @@ import {
   TextField,
 } from "@mui/material";
 
-import { isApiError } from "../../api/api-error.js";
+import { getApiErrorMessage, isApiError } from "../../api/api-error.js";
 import type { LoginRequest } from "../contracts/auth.contracts.js";
 import { AuthStatusDialog } from "./AuthStatusDialog.js";
 
@@ -59,11 +59,7 @@ function buildLoginFailureMessage(error: unknown): string {
     return DEFAULT_LOGIN_FAILURE_MESSAGE;
   }
 
-  if (error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return DEFAULT_LOGIN_FAILURE_MESSAGE;
+  return getApiErrorMessage(error, DEFAULT_LOGIN_FAILURE_MESSAGE);
 }
 
 export function LoginModal(props: LoginModalProps) {

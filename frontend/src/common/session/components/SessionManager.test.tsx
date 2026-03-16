@@ -724,11 +724,11 @@ describe("SessionManager", () => {
     ).toHaveLength(2);
   });
 
-  it("shows the project management menu only for project managers", async () => {
+  it("shows the project management menu for any authenticated user", async () => {
     const user = userEvent.setup();
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(
-      createAuthenticatedResponse(["GGTC_TEAMROLE_PROJECT_MANAGER"]),
+      createAuthenticatedResponse([]),
     );
 
     renderWithTheme(<App />);
@@ -739,7 +739,7 @@ describe("SessionManager", () => {
     expect(screen.queryByRole("menuitem", { name: "Admin Menu" })).not.toBeInTheDocument();
   });
 
-  it("shows the admin menu only for admins", async () => {
+  it("shows the admin menu for admins while keeping the project management menu visible", async () => {
     const user = userEvent.setup();
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(
@@ -751,9 +751,7 @@ describe("SessionManager", () => {
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
     expect(await screen.findByRole("menuitem", { name: "Admin Menu" })).toBeVisible();
-    expect(
-      screen.queryByRole("menuitem", { name: "Project Management Menu" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Project Management Menu" })).toBeVisible();
   });
 
   it("shows both role-based menu items when the user has both roles", async () => {
@@ -774,7 +772,7 @@ describe("SessionManager", () => {
     expect(await screen.findByRole("menuitem", { name: "Admin Menu" })).toBeVisible();
   });
 
-  it("shows only logout when the user has no roles", async () => {
+  it("shows logout plus the project management menu when the user has no roles", async () => {
     const user = userEvent.setup();
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse([]));
@@ -784,7 +782,7 @@ describe("SessionManager", () => {
     await user.click(await screen.findByRole("button", { name: MENU_BUTTON_LABEL }));
 
     expect(await screen.findByRole("menuitem", { name: LOGOUT_MENU_LABEL })).toBeVisible();
-    expect(screen.queryByRole("menuitem", { name: "Project Management Menu" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Project Management Menu" })).toBeVisible();
     expect(screen.queryByRole("menuitem", { name: "Admin Menu" })).not.toBeInTheDocument();
   });
 });

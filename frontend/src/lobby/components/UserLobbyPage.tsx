@@ -26,7 +26,7 @@ import { EntityItemList } from "../../common/components/entity-list/EntityItemLi
 import { ProjectListItem } from "../../common/components/entity-list/ProjectListItem.js";
 import { TeamListItem } from "../../common/components/entity-list/TeamListItem.js";
 import type { EntityListItemViewMode } from "../../common/components/entity-list/entity-list-item.types.js";
-import { isApiError } from "../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../common/api/api-error.js";
 import { lobbyApi } from "../api/lobby-api.js";
 import {
   type CreateOrganizationRequest,
@@ -65,11 +65,7 @@ const DEFAULT_ERROR_MESSAGE = "Unable to load your lobby right now.";
 const LIST_ITEM_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
-  if (isApiError(error) && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function createInitialLobbyData(): LobbyData {

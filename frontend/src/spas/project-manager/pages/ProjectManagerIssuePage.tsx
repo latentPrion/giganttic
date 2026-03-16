@@ -13,7 +13,7 @@ import { IssueEditButton } from "../../../common/components/entity-actions/Issue
 import { IssueViewButton } from "../../../common/components/entity-actions/IssueViewButton.js";
 import { IssueListItem } from "../../../common/components/entity-list/IssueListItem.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
 import type {
   Issue,
@@ -41,11 +41,7 @@ const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Issue Detail";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
-  if (isApiError(error) && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {

@@ -7,7 +7,7 @@ import React, {
 } from "react";
 
 import { authApi } from "../api/auth-api.js";
-import { isApiError } from "../../api/api-error.js";
+import { getApiErrorMessage } from "../../api/api-error.js";
 import type {
   LoginRequest,
   RegisterRequest,
@@ -46,15 +46,7 @@ const AUTH_SESSION_CONTEXT_ERROR =
 const AuthSessionContext = createContext<SessionManagerModel | null>(null);
 
 function buildInitializationErrorMessage(error: unknown): string {
-  if (!isApiError(error)) {
-    return DEFAULT_AUTH_ERROR_MESSAGE;
-  }
-
-  if (error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return DEFAULT_AUTH_ERROR_MESSAGE;
+  return getApiErrorMessage(error, DEFAULT_AUTH_ERROR_MESSAGE);
 }
 
 export function AuthSessionProvider(props: AuthSessionProviderProps) {

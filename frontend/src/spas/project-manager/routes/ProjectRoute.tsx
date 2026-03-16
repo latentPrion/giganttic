@@ -9,8 +9,9 @@ export function ProjectRoute() {
 
   return (
     <ProjectManagerAuthenticatedRoute>
-      {(token) => (
+      {(token, currentUserId) => (
         <ProjectManagerProjectPage
+          currentUserId={currentUserId}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
           token={token}
         />

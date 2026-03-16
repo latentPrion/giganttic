@@ -26,6 +26,7 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
 
 const lobbyApiMock = vi.mocked(lobbyApi);
 const DEFAULT_TOKEN = "pm-token";
+const DEFAULT_CURRENT_USER_ID = 101;
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 
 function createProjectManagerSources(
@@ -37,7 +38,7 @@ function createProjectManagerSources(
 function createProjectResponse() {
   return {
     members: [{
-      roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+      roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", "GGTC_PROJECTROLE_PROJECT_OWNER"],
       userId: 101,
       username: "demo-user",
     }],
@@ -89,6 +90,7 @@ describe("ProjectManagerProjectPage", () => {
   it("renders the project detail view for the selected project", async () => {
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -99,6 +101,7 @@ describe("ProjectManagerProjectPage", () => {
     expect(screen.getByText("Detailed Project View")).toBeVisible();
     expect(screen.getByText("Journal")).toBeVisible();
     expect(screen.getByText("Project execution journal")).toBeVisible();
+    expect(screen.getByText("Project Owners")).toBeVisible();
     expect(screen.getByText("Project Managers")).toBeVisible();
     expect(screen.getByText("Direct")).toBeVisible();
     expect(screen.getByText("Team")).toBeVisible();
@@ -110,6 +113,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -125,6 +129,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -154,6 +159,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -169,6 +175,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -184,6 +191,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -207,6 +215,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -232,6 +241,7 @@ describe("ProjectManagerProjectPage", () => {
   it("does not load project data when projectId is missing and shows the route fallback", async () => {
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={null}
         token={DEFAULT_TOKEN}
       />,
@@ -246,6 +256,7 @@ describe("ProjectManagerProjectPage", () => {
 
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
@@ -257,16 +268,43 @@ describe("ProjectManagerProjectPage", () => {
   it("renders project manager rows without action buttons", async () => {
     renderWithTheme(
       <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
     );
 
-    expect(await screen.findByText("Project Managers")).toBeVisible();
-    const managerRow = screen.getByRole("button", { name: /demo-user/i }).closest(".MuiPaper-root");
+    expect(await screen.findByText("Project Owners")).toBeVisible();
+    expect(screen.getAllByText("demo-user").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(screen.getByText("Project Managers")).toBeVisible();
+    const managerRow = screen.getAllByRole("button", { name: /demo-user/i })[1]?.closest(".MuiPaper-root");
 
     expect(managerRow).not.toBeNull();
     expect(within(managerRow as HTMLElement).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(within(managerRow as HTMLElement).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
+
+  it("hides delete for an effective project manager who is not a direct owner", async () => {
+    lobbyApiMock.getProject.mockResolvedValueOnce({
+      ...createProjectResponse(),
+      members: [{
+        roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+        userId: DEFAULT_CURRENT_USER_ID,
+        username: "demo-user",
+      }],
+    });
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

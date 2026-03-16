@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../api/lobby-api.js";
 import type { GetTeamResponse } from "../../contracts/lobby.contracts.js";
 import {
@@ -32,11 +32,7 @@ interface TeamSummaryModalProps {
 }
 
 function buildTeamLoadErrorMessage(error: unknown): string {
-  if (isApiError(error) && error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return TEAM_LOAD_ERROR_MESSAGE;
+  return getApiErrorMessage(error, TEAM_LOAD_ERROR_MESSAGE);
 }
 
 export function TeamSummaryModal(props: TeamSummaryModalProps) {

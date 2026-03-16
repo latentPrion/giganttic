@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../api/lobby-api.js";
 import type { GetProjectResponse } from "../../contracts/lobby.contracts.js";
 import {
@@ -29,11 +29,7 @@ interface ProjectSummaryModalProps {
 }
 
 function buildProjectLoadErrorMessage(error: unknown): string {
-  if (isApiError(error) && error.kind === "http" && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return PROJECT_LOAD_ERROR_MESSAGE;
+  return getApiErrorMessage(error, PROJECT_LOAD_ERROR_MESSAGE);
 }
 
 function formatTimestamp(value: string): string {

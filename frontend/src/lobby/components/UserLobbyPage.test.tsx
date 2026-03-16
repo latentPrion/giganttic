@@ -540,10 +540,17 @@ describe("UserLobbyPage", () => {
     expect(screen.queryByText("Apollo")).not.toBeInTheDocument();
   });
 
-  it("shows the API error body when deleting a project fails", async () => {
+  it("shows a structured blocker message when deleting a project fails", async () => {
     const user = userEvent.setup();
     lobbyApiMock.deleteProject.mockRejectedValue(new ApiError("http", "HTTP 409", {
-      responseBody: "Project still has dependent work.",
+      responseBody: JSON.stringify({
+        blockingObjects: [{
+          id: 1,
+          kind: "project",
+          reason: "last_owner",
+        }],
+        message: "Project role revoke would remove the last owner",
+      }),
       status: 409,
     }));
 
@@ -554,7 +561,9 @@ describe("UserLobbyPage", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(
-      await screen.findByText("Project still has dependent work."),
+      await screen.findByText(
+        "Project role revoke would remove the last owner Blocked by project #1 (last_owner).",
+      ),
     ).toBeVisible();
     expect(screen.getByText("Apollo")).toBeVisible();
   });

@@ -21,11 +21,13 @@ import { TeamListItem } from "../../../common/components/entity-list/TeamListIte
 import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
 import { TeamViewButton } from "../../../common/components/entity-actions/TeamViewButton.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
-import { isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import type {
   GetProjectResponse,
   LobbyProject,
+  ProjectMember,
+  ProjectManager,
   UpdateProjectRequest,
 } from "../../../lobby/contracts/lobby.contracts.js";
 import { OrganizationSummaryModal } from "../../../lobby/components/organization/OrganizationSummaryModal.js";
@@ -37,6 +39,7 @@ import { ProjectDetailsCard } from "../components/projects/ProjectDetailsCard.js
 import { createProjectIssuesRoute } from "../routes/project-route-paths.js";
 
 interface ProjectManagerProjectPageProps {
+  currentUserId?: number;
   projectId: number | null;
   token: string;
 }
@@ -51,6 +54,7 @@ const MISSING_ROUTE_MESSAGE = "Provide a valid projectId to view a project.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project";
 const PROJECT_DELETE_ERROR_MESSAGE = "Unable to delete that project.";
+const PROJECT_OWNERS_HEADING = "Project Owners";
 const PROJECT_MANAGERS_HEADING = "Project Managers";
 const DETAILS_TAB_LABEL = "Details";
 const TEAMS_TAB_LABEL = "Teams";
@@ -59,11 +63,7 @@ const ORGANIZATIONS_TAB_LABEL = "Organizations";
 type ProjectDetailsTabValue = "details" | "organizations" | "teams";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
-  if (isApiError(error) && error.responseBody) {
-    return error.responseBody;
-  }
-
-  return fallback;
+  return getApiErrorMessage(error, fallback);
 }
 
 function createSelectedProjectLabel(projectId: number | null): string {
@@ -89,6 +89,77 @@ function createProjectManagerSourceLabels(sourceKinds: readonly string[]): strin
   });
 }
 
+function hasRoleCode(member: ProjectMember, roleCode: string): boolean {
+  return member.roleCodes.includes(roleCode);
+}
+
+function createProjectOwners(
+  response: GetProjectResponse,
+): Array<{ userId: number; username: string }> {
+  return response.members
+    .filter((member) => hasRoleCode(member, "GGTC_PROJECTROLE_PROJECT_OWNER"))
+    .map((member) => ({
+      userId: member.userId,
+      username: member.username,
+    }));
+}
+
+function canEditProject(
+  currentUserId: number | undefined,
+  response: GetProjectResponse | null,
+): boolean {
+  if (!response || currentUserId === undefined) {
+    return false;
+  }
+
+  return response.members.some(
+    (member) =>
+      member.userId === currentUserId &&
+      hasRoleCode(member, "GGTC_PROJECTROLE_PROJECT_OWNER"),
+  ) || response.projectManagers.some(
+    (projectManager) => projectManager.userId === currentUserId,
+  );
+}
+
+function canDeleteProject(
+  currentUserId: number | undefined,
+  response: GetProjectResponse | null,
+): boolean {
+  if (!response || currentUserId === undefined) {
+    return false;
+  }
+
+  return response.members.some(
+    (member) =>
+      member.userId === currentUserId &&
+      hasRoleCode(member, "GGTC_PROJECTROLE_PROJECT_OWNER"),
+  );
+}
+
+function renderUserLinkList<T extends { userId: number; username: string }>(
+  users: ReadonlyArray<T>,
+  renderSupplementaryContent?: (
+    entry: T,
+  ) => React.ReactNode,
+) {
+  return (
+    <EntityItemList viewMode={LINK_ONLY_VIEW_MODE}>
+      {users.map((entry) => (
+        <UserListItem
+          key={entry.userId}
+          user={{
+            id: entry.userId,
+            username: entry.username,
+          }}
+          viewMode={LINK_ONLY_VIEW_MODE}
+        >
+          {renderSupplementaryContent ? renderSupplementaryContent(entry) : null}
+        </UserListItem>
+      ))}
+    </EntityItemList>
+  );
+}
+
 export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps) {
   const navigate = useNavigate();
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -103,6 +174,9 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
   const [teamSummaryTargetId, setTeamSummaryTargetId] = useState<number | null>(null);
 
   const project = projectResponse ? createProjectEntity(projectResponse) : null;
+  const projectOwners = projectResponse ? createProjectOwners(projectResponse) : [];
+  const allowProjectEdit = canEditProject(props.currentUserId, projectResponse);
+  const allowProjectDelete = canDeleteProject(props.currentUserId, projectResponse);
 
   useEffect(() => {
     if (props.projectId === null) {
@@ -246,26 +320,28 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
             <ProjectDetailsCard projectResponse={projectResponse} />
             <Stack spacing={1.25}>
               <Typography component="h2" variant="h6">
+                {PROJECT_OWNERS_HEADING}
+              </Typography>
+              {projectOwners.length > 0 ? renderUserLinkList(projectOwners) : (
+                <Typography color="text.secondary" variant="body2">
+                  No direct project owners are currently listed.
+                </Typography>
+              )}
+            </Stack>
+            <Stack spacing={1.25}>
+              <Typography component="h2" variant="h6">
                 {PROJECT_MANAGERS_HEADING}
               </Typography>
-              <EntityItemList viewMode={LINK_ONLY_VIEW_MODE}>
-                {projectResponse.projectManagers.map((projectManager) => (
-                  <UserListItem
-                    key={projectManager.userId}
-                    user={{
-                      id: projectManager.userId,
-                      username: projectManager.username,
-                    }}
-                    viewMode={LINK_ONLY_VIEW_MODE}
-                  >
-                    <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                      {createProjectManagerSourceLabels(projectManager.sourceKinds).map((label) => (
-                        <Chip key={`${projectManager.userId}-${label}`} label={label} size="small" />
-                      ))}
-                    </Stack>
-                  </UserListItem>
-                ))}
-              </EntityItemList>
+              {renderUserLinkList(
+                projectResponse.projectManagers,
+                (projectManager: ProjectManager) => (
+                  <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                    {createProjectManagerSourceLabels(projectManager.sourceKinds).map((label) => (
+                      <Chip key={`${projectManager.userId}-${label}`} label={label} size="small" />
+                    ))}
+                  </Stack>
+                ),
+              )}
             </Stack>
           </Stack>
         );
@@ -303,14 +379,18 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
                   disabled={busyKey === `project:${project.id}`}
                   onClick={() => setIsSummaryModalOpen(true)}
                 />
-                <ProjectEditButton
-                  disabled={busyKey === `project:${project.id}`}
-                  onClick={() => setIsEditModalOpen(true)}
-                />
-                <ProjectDeleteButton
-                  disabled={busyKey === `project:${project.id}`}
-                  onClick={() => void handleDeleteProject(project.id)}
-                />
+                {allowProjectEdit ? (
+                  <ProjectEditButton
+                    disabled={busyKey === `project:${project.id}`}
+                    onClick={() => setIsEditModalOpen(true)}
+                  />
+                ) : null}
+                {allowProjectDelete ? (
+                  <ProjectDeleteButton
+                    disabled={busyKey === `project:${project.id}`}
+                    onClick={() => void handleDeleteProject(project.id)}
+                  />
+                ) : null}
               </>
             )}
             onNavigate={() => undefined}
