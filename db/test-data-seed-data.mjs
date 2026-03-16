@@ -1,3 +1,10 @@
+const TEST_DATA_PROFILE_APP = "app";
+const TEST_DATA_PROFILE_TESTSUITE = "testsuite";
+const SUPPORTED_TEST_DATA_PROFILES = [
+  TEST_DATA_PROFILE_APP,
+  TEST_DATA_PROFILE_TESTSUITE,
+];
+
 const SEEDED_TEST_ACCOUNTS = {
   admin: {
     email: "testadminuser@giganttic.com",
@@ -279,9 +286,15 @@ const SEEDED_SCOPED_FIXTURES = {
   },
 };
 
-function getSeededTestData(schemaName) {
+function getSeededTestData(schemaName, profile = TEST_DATA_PROFILE_APP) {
   if (schemaName !== "v2" && schemaName !== "v3") {
     throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
+  }
+
+  if (!SUPPORTED_TEST_DATA_PROFILES.includes(profile)) {
+    throw new Error(
+      `Unsupported test-data profile ${profile}. Expected one of: ${SUPPORTED_TEST_DATA_PROFILES.join(", ")}.`,
+    );
   }
 
   return {
@@ -292,6 +305,9 @@ function getSeededTestData(schemaName) {
 
 export {
   getSeededTestData,
+  SUPPORTED_TEST_DATA_PROFILES,
   SEEDED_SCOPED_FIXTURES,
   SEEDED_TEST_ACCOUNTS,
+  TEST_DATA_PROFILE_APP,
+  TEST_DATA_PROFILE_TESTSUITE,
 };

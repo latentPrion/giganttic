@@ -18,16 +18,8 @@ import {
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import {
-  authSeedData,
-  closedReasons,
-  credentialTypes,
   credentialTypeCodes,
-  issueStatuses,
-  organizationRoles,
-  projectRoles,
   systemRoleCodes,
-  systemRoles,
-  teamRoles,
   users,
   usersCredentialTypes,
   usersPasswordCredentials,
@@ -56,47 +48,6 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     @Inject(BACKEND_CONFIG) private readonly config: BackendConfig,
   ) {}
-
-  async ensureReferenceData(): Promise<void> {
-    this.databaseService.db.transaction((tx) => {
-      tx
-        .insert(credentialTypes)
-        .values([...authSeedData.credentialTypes])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(systemRoles)
-        .values([...authSeedData.systemRoles])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(projectRoles)
-        .values([...authSeedData.projectRoles])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(organizationRoles)
-        .values([...authSeedData.organizationRoles])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(issueStatuses)
-        .values([...authSeedData.issueStatuses])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(closedReasons)
-        .values([...authSeedData.closedReasons])
-        .onConflictDoNothing()
-        .run();
-      tx
-        .insert(teamRoles)
-        .values([...authSeedData.teamRoles])
-        .onConflictDoNothing()
-        .run();
-    });
-    await this.databaseService.persist();
-  }
 
   async register(payload: RegisterRequest): Promise<{ user: AuthUserResponse }> {
     const passwordHash = await argon2.hash(payload.password);

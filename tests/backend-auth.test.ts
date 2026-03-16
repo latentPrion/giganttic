@@ -36,6 +36,7 @@ import {
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionSandbox } from "./db-test-execution-db.js";
+import { seedExecutionDatabase } from "./db-test-seeding.js";
 
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
 
@@ -51,10 +52,9 @@ describe("backend auth api", () => {
 
   async function buildApp(): Promise<NestFastifyApplication> {
     const config = buildBackendConfig({
-      createDbIfMissing: true,
+      createDbIfMissing: false,
       dbPath,
       port: 0,
-      seedTestAccounts: true,
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],
@@ -106,6 +106,11 @@ describe("backend auth api", () => {
     });
     dbPath = sandbox.dbPath;
     tempDir = sandbox.tempDir;
+    await seedExecutionDatabase({
+      dbPath,
+      includeTestData: true,
+      schemaName: dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
+    });
     app = await buildApp();
     databaseService = app.get(DatabaseService);
   });
@@ -912,7 +917,7 @@ describe("backend auth api", () => {
     expect(loginResponse.statusCode).toBe(401);
   });
 
-  it("seeds test accounts idempotently across repeated startup", async () => {
+  it("keeps explicitly seeded test accounts stable across repeated startup", async () => {
     await app.close();
 
     app = await buildApp();

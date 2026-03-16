@@ -15,6 +15,7 @@ import {
   requireDbTestRuntimeConfig,
 } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionSandbox } from "./db-test-execution-db.js";
+import { seedExecutionDatabase } from "./db-test-seeding.js";
 
 export const MISSING_ENTITY_ID = 999_999;
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
@@ -84,10 +85,9 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
 
   async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
     const config = buildBackendConfig({
-      createDbIfMissing: true,
+      createDbIfMissing: false,
       dbPath: databasePath,
       port: 0,
-      seedTestAccounts: true,
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],
@@ -113,6 +113,11 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
     });
     dbPath = sandbox.dbPath;
     tempDir = sandbox.tempDir;
+    await seedExecutionDatabase({
+      dbPath,
+      includeTestData: true,
+      schemaName: dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
+    });
     app = await buildApp(dbPath);
     databaseService = assertApp().get(DatabaseService);
   }

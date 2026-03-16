@@ -7,13 +7,10 @@ import {
 
 export interface BackendConfig {
   dbPath: string;
-  ensureReferenceData: boolean;
-  failIfTestDataPresent: boolean;
   host: string;
   port: number;
   routePrefix: string;
   runtimeSchemaSnapshotSubdir: string;
-  seedTestAccounts: boolean;
   sessionTtlMs: number;
   createDbIfMissing: boolean;
 }
@@ -26,13 +23,10 @@ export function buildBackendConfig(
   return {
     dbPath: path.resolve(process.cwd(), resolveRuntimeTarget(process.env)),
     createDbIfMissing: false,
-    ensureReferenceData: true,
-    failIfTestDataPresent: false,
     host: "127.0.0.1",
     port: 3000,
     routePrefix: "stc-proj-mgmt/api",
     runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),
-    seedTestAccounts: false,
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
     ...overrides,
   };
@@ -66,19 +60,6 @@ export function buildBackendConfigFromEnv(
     if (Number.isFinite(sessionTtlMs)) {
       overrides.sessionTtlMs = sessionTtlMs;
     }
-  }
-
-  if (env.GGTC_SEED_TEST_ACCOUNTS) {
-    overrides.seedTestAccounts = env.GGTC_SEED_TEST_ACCOUNTS !== "false";
-  }
-
-  if (env.GGTC_ENSURE_REFERENCE_DATA) {
-    overrides.ensureReferenceData = env.GGTC_ENSURE_REFERENCE_DATA !== "false";
-  }
-
-  if (env.GGTC_FAIL_IF_TEST_DATA_PRESENT) {
-    overrides.failIfTestDataPresent =
-      env.GGTC_FAIL_IF_TEST_DATA_PRESENT !== "false";
   }
 
   return buildBackendConfig(overrides);

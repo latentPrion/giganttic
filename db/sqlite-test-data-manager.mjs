@@ -1,4 +1,7 @@
-import { getSeededTestData } from "./test-data-seed-data.mjs";
+import {
+  getSeededTestData,
+  TEST_DATA_PROFILE_APP,
+} from "./test-data-seed-data.mjs";
 import { ensureReferenceData } from "./sqlite-reference-data-manager.mjs";
 
 const MANAGED_TEST_DATA_RECORDS_TABLE = "ManagedTestDataRecords";
@@ -317,11 +320,11 @@ VALUES (
   }
 }
 
-function createV2StyleTestData(db, schemaName) {
+function createV2StyleTestData(db, schemaName, profile) {
   const {
     seededScopedFixtures,
     seededTestAccounts,
-  } = getSeededTestData(schemaName);
+  } = getSeededTestData(schemaName, profile);
 
   const seededUserIds = {
     admin: insertSeedUser(db, seededTestAccounts.admin),
@@ -473,7 +476,11 @@ function createV2StyleTestData(db, schemaName) {
   insertSeedIssues(db, projectIds.teamProjectManager, seededScopedFixtures.issues.teamProjectManager);
 }
 
-function ensureSeededTestData(db, schemaName) {
+function ensureSeededTestData(
+  db,
+  schemaName,
+  profile = TEST_DATA_PROFILE_APP,
+) {
   ensureReferenceData(db, schemaName);
 
   db.exec("BEGIN TRANSACTION;");
@@ -490,7 +497,7 @@ function ensureSeededTestData(db, schemaName) {
       throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
     }
 
-    createV2StyleTestData(db, schemaName);
+    createV2StyleTestData(db, schemaName, profile);
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");
