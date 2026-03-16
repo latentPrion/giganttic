@@ -5,7 +5,10 @@ import type {
   IssueStatus,
   UpdateIssueRequest,
 } from "../../contracts/issue.contracts.js";
-import { ISSUE_DEFAULT_PROGRESS } from "./issue-modal.constants.js";
+import {
+  ISSUE_DEFAULT_PRIORITY,
+  ISSUE_DEFAULT_PROGRESS,
+} from "./issue-modal.constants.js";
 
 export interface IssueFormState {
   closedReason: ClosedReason | "";
@@ -13,6 +16,7 @@ export interface IssueFormState {
   description: string;
   journal: string;
   name: string;
+  priority: string;
   progressPercentage: string;
   status: IssueStatus;
 }
@@ -26,6 +30,7 @@ export function createIssueFormState(issue: Issue | null): IssueFormState {
     description: issue?.description ?? "",
     journal: issue?.journal ?? "",
     name: issue?.name ?? "",
+    priority: `${issue?.priority ?? ISSUE_DEFAULT_PRIORITY}`,
     progressPercentage: `${issue?.progressPercentage ?? ISSUE_DEFAULT_PROGRESS}`,
     status: issue?.status ?? DEFAULT_ISSUE_STATUS,
   };
@@ -49,6 +54,14 @@ function normalizeProgressPercentage(value: string): number | undefined {
   return Number(value);
 }
 
+function normalizePriority(value: string): number | undefined {
+  if (value.trim() === "") {
+    return undefined;
+  }
+
+  return Number(value);
+}
+
 export function normalizeCreateIssuePayload(
   formState: IssueFormState,
 ): CreateIssueRequest {
@@ -58,6 +71,7 @@ export function normalizeCreateIssuePayload(
     description: normalizeTextValue(formState.description),
     journal: normalizeTextValue(formState.journal),
     name: formState.name,
+    priority: normalizePriority(formState.priority),
     progressPercentage: normalizeProgressPercentage(formState.progressPercentage),
     status: formState.status,
   };
@@ -72,6 +86,7 @@ export function normalizeUpdateIssuePayload(
     description: normalizeTextValue(formState.description),
     journal: normalizeTextValue(formState.journal),
     name: formState.name,
+    priority: normalizePriority(formState.priority),
     progressPercentage: normalizeProgressPercentage(formState.progressPercentage),
     status: formState.status,
   };

@@ -117,6 +117,9 @@ export function IssueSummaryModal(props: IssueSummaryModalProps) {
               Status: {issueResponse.issue.status}
             </Typography>
             <Typography variant="body2">
+              Priority: {issueResponse.issue.priority}
+            </Typography>
+            <Typography variant="body2">
               Progress: {issueResponse.issue.progressPercentage}%
             </Typography>
             <Typography variant="body2">

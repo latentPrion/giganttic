@@ -225,4 +225,51 @@ describe("ProjectManagerTeamPage", () => {
     expect(await screen.findByText("Team 7")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add Member User" })).not.toBeInTheDocument();
   });
+
+  it("removes a member user when the current user can manage the team", async () => {
+    const user = userEvent.setup();
+    lobbyApiMock.getTeam.mockResolvedValueOnce({
+      ...createTeamResponse(),
+      members: [
+        ...createTeamResponse().members,
+        {
+          roleCodes: [],
+          userId: 202,
+          username: "removable-user",
+        },
+      ],
+    });
+    lobbyApiMock.replaceTeamMembers.mockResolvedValueOnce({
+      members: createTeamResponse().members,
+      teamId: 7,
+    });
+
+    renderWithTheme(
+      <ProjectManagerTeamPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        teamId={7}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    const memberRow = (await screen.findByRole("button", { name: /removable-user/i }))
+      .closest(".MuiPaper-root");
+    expect(memberRow).not.toBeNull();
+    await user.click(within(memberRow as HTMLElement).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => {
+      expect(lobbyApiMock.replaceTeamMembers).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        7,
+        {
+          members: [
+            {
+              roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+              userId: 101,
+            },
+          ],
+        },
+      );
+    });
+  });
 });

@@ -7,6 +7,7 @@ const ORGANIZATION_ROLE_CODES = [
 ] as const;
 const ORGANIZATION_ROLE_ENUM = z.enum(ORGANIZATION_ROLE_CODES);
 const ORGANIZATION_ID_PARAM_NAME = "organizationId";
+const TEAM_ID_PARAM_NAME = "teamId";
 const ORGANIZATION_UPDATE_REQUIRED_MESSAGE =
   "At least one field must be provided";
 const DUPLICATE_USER_MEMBERS_MESSAGE =
@@ -37,6 +38,11 @@ function hasUniqueProjectIds(
 
 export const organizationIdParamSchema = z.object({
   [ORGANIZATION_ID_PARAM_NAME]: z.coerce.number().int().positive(),
+});
+
+export const organizationTeamParamsSchema = z.object({
+  [ORGANIZATION_ID_PARAM_NAME]: z.coerce.number().int().positive(),
+  [TEAM_ID_PARAM_NAME]: z.coerce.number().int().positive(),
 });
 
 export const createOrganizationRequestSchema = z.object({

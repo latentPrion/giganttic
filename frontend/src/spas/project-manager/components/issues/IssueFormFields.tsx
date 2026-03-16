@@ -14,6 +14,7 @@ interface IssueFormState {
   description: string;
   journal: string;
   name: string;
+  priority: string;
   progressPercentage: string;
   status: IssueStatus;
 }
@@ -89,6 +90,12 @@ export function IssueFormFields(props: IssueFormFieldsProps) {
           </MenuItem>
         ))}
       </TextField>
+      <TextField
+        label="Priority"
+        onChange={(event) => props.onFieldChange("priority", event.target.value)}
+        type="number"
+        value={props.formState.priority}
+      />
       <TextField
         label="Progress Percentage"
         onChange={(event) => props.onFieldChange("progressPercentage", event.target.value)}

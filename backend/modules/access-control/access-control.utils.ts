@@ -479,6 +479,14 @@ export function hasProjectAccess(
     return true;
   }
 
+  if (
+    listOrganizationIdsForProject(database, projectId).some((organizationId) =>
+      hasOrganizationMembership(database, organizationId, userId)
+    )
+  ) {
+    return true;
+  }
+
   return Boolean(
     database
       .select({ projectId: projectsTeams.projectId })

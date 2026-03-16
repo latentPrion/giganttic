@@ -24,6 +24,7 @@ import {
   getOrganizationResponseSchema,
   listOrganizationsResponseSchema,
   organizationIdParamSchema,
+  organizationTeamParamsSchema,
   organizationRoleAssignmentRequestSchema,
   updateOrganizationProjectsRequestSchema,
   updateOrganizationProjectsResponseSchema,
@@ -144,6 +145,22 @@ export class OrganizationsController {
         request.authContext!,
         organizationId,
         body as never,
+      ),
+    );
+  }
+
+  @Delete(":organizationId/teams/:teamId")
+  async unassignTeam(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(organizationTeamParamsSchema)) params: unknown,
+  ) {
+    const { organizationId, teamId } = organizationTeamParamsSchema.parse(params);
+
+    return updateOrganizationTeamsResponseSchema.parse(
+      await this.organizationsService.unassignTeam(
+        request.authContext!,
+        organizationId,
+        teamId,
       ),
     );
   }

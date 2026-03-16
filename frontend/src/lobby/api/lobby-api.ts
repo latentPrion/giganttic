@@ -356,4 +356,17 @@ export const lobbyApi = {
       token,
     });
   },
+
+  async unassignOrganizationTeam(
+    token: string,
+    organizationId: number,
+    teamId: number,
+  ): Promise<UpdateOrganizationTeamsResponse> {
+    return await requestJson({
+      method: "DELETE",
+      path: `${createOrganizationPath(organizationId)}/teams/${teamId}`,
+      responseSchema: updateOrganizationTeamsResponseSchema,
+      token,
+    });
+  },
 };

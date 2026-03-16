@@ -347,6 +347,31 @@ export class OrganizationsService {
     };
   }
 
+  async unassignTeam(
+    authContext: AuthContext,
+    organizationId: number,
+    teamId: number,
+  ): Promise<UpdateOrganizationTeamsResponse> {
+    this.assertOrganizationExists(organizationId);
+    this.assertTeamExists(teamId);
+    this.assertCanManageOrganization(authContext, organizationId);
+    this.assertTeamAssignedToOrganization(organizationId, teamId);
+    this.assertTeamRetainsDirectManagerAfterUnassign(teamId);
+
+    this.databaseService.db.transaction((tx) => {
+      tx.delete(organizationsTeams)
+        .where(and(
+          eq(organizationsTeams.organizationId, organizationId),
+          eq(organizationsTeams.teamId, teamId),
+        ))
+        .run();
+    });
+    return {
+      organizationId,
+      teams: this.listOrganizationTeams(organizationId),
+    };
+  }
+
   async grantOrganizationRole(
     authContext: AuthContext,
     organizationId: number,
@@ -688,6 +713,38 @@ export class OrganizationsService {
     if (existingRow) {
       throw new ConflictException(TEAM_ALREADY_ASSIGNED_MESSAGE);
     }
+  }
+
+  private assertTeamAssignedToOrganization(
+    organizationId: number,
+    teamId: number,
+  ): void {
+    const existingRow = this.databaseService.db
+      .select({ organizationId: organizationsTeams.organizationId })
+      .from(organizationsTeams)
+      .where(and(
+        eq(organizationsTeams.organizationId, organizationId),
+        eq(organizationsTeams.teamId, teamId),
+      ))
+      .get();
+
+    if (!existingRow) {
+      throw new NotFoundException("That team is not assigned to the organization");
+    }
+  }
+
+  private assertTeamRetainsDirectManagerAfterUnassign(teamId: number): void {
+    if (listDirectTeamManagerUserIds(this.databaseService.db, teamId).length > 0) {
+      return;
+    }
+
+    throw createBlockingConflictException(LAST_TEAM_MANAGER_MESSAGE, [
+      {
+        id: teamId,
+        kind: BLOCKING_OBJECT_KIND_TEAM,
+        reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+      },
+    ]);
   }
 
   private assertUsersExist(userIds: number[]): void {

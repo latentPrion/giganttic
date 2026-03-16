@@ -156,7 +156,7 @@ describe("ProjectManagerIssuesPage", () => {
 
   it("opens the create issue modal and adds the new issue to the list", async () => {
     const user = userEvent.setup();
-    const createdIssue = createIssue(9, { name: "Created issue" });
+    const createdIssue = createIssue(9, { name: "Created issue", priority: 8 });
     issuesApiMock.createIssue.mockResolvedValue({ issue: createdIssue });
 
     renderWithTheme(
@@ -164,14 +164,17 @@ describe("ProjectManagerIssuesPage", () => {
     );
 
     await user.click(await screen.findByRole("button", { name: "Create Issue" }));
-    await user.type(screen.getByLabelText("Name"), "Created issue");
-    await user.click(screen.getByRole("button", { name: "Create Issue" }));
+    const createDialog = await screen.findByRole("dialog", { name: "Create Issue" });
+    await user.type(within(createDialog).getByLabelText("Name"), "Created issue");
+    await user.clear(within(createDialog).getByLabelText("Priority"));
+    await user.type(within(createDialog).getByLabelText("Priority"), "8");
+    await user.click(within(createDialog).getByRole("button", { name: "Create Issue" }));
 
     await waitFor(() => {
       expect(issuesApiMock.createIssue).toHaveBeenCalledWith(
         DEFAULT_TOKEN,
         42,
-        expect.objectContaining({ name: "Created issue" }),
+        expect.objectContaining({ name: "Created issue", priority: 8 }),
       );
     });
     expect(await screen.findByText("Created issue")).toBeVisible();
@@ -268,7 +271,7 @@ describe("ProjectManagerIssuesPage", () => {
   it("updates an issue through the edit modal", async () => {
     const user = userEvent.setup();
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue(7, { name: "Updated issue", progressPercentage: 80 }),
+      issue: createIssue(7, { name: "Updated issue", priority: 6, progressPercentage: 80 }),
     });
 
     renderWithTheme(
@@ -276,18 +279,21 @@ describe("ProjectManagerIssuesPage", () => {
     );
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));
-    expect(await screen.findByRole("dialog", { name: "Edit Issue" })).toBeVisible();
-    const nameField = screen.getByLabelText("Name");
+    const editDialog = await screen.findByRole("dialog", { name: "Edit Issue" });
+    expect(editDialog).toBeVisible();
+    const nameField = within(editDialog).getByLabelText("Name");
     await user.clear(nameField);
     await user.type(nameField, "Updated issue");
-    await user.click(screen.getByRole("button", { name: "Save Changes" }));
+    await user.clear(within(editDialog).getByLabelText("Priority"));
+    await user.type(within(editDialog).getByLabelText("Priority"), "6");
+    await user.click(within(editDialog).getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => {
       expect(issuesApiMock.updateIssue).toHaveBeenCalledWith(
         DEFAULT_TOKEN,
         42,
         7,
-        expect.objectContaining({ name: "Updated issue" }),
+        expect.objectContaining({ name: "Updated issue", priority: 6 }),
       );
     });
     expect(await screen.findByText("Updated issue")).toBeVisible();

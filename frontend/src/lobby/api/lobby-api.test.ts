@@ -270,6 +270,27 @@ describe("lobbyApi", () => {
     );
   });
 
+  it("removes a team from an organization", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        organizationId: 22,
+        teams: [],
+      }),
+    );
+
+    await lobbyApi.unassignOrganizationTeam(TEST_TOKEN, 22, 7);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/organizations/22/teams/7",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${TEST_TOKEN}`,
+        }),
+        method: "DELETE",
+      }),
+    );
+  });
+
   it("creates a team with typed payload validation", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

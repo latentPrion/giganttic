@@ -27,6 +27,7 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
     listTeams: vi.fn(),
     listUsers: vi.fn(),
     replaceOrganizationUsers: vi.fn(),
+    unassignOrganizationTeam: vi.fn(),
   },
 }));
 
@@ -81,6 +82,7 @@ describe("ProjectManagerOrganizationPage", () => {
     lobbyApiMock.listTeams.mockReset();
     lobbyApiMock.listUsers.mockReset();
     lobbyApiMock.replaceOrganizationUsers.mockReset();
+    lobbyApiMock.unassignOrganizationTeam.mockReset();
     lobbyApiMock.getOrganization.mockResolvedValue(createOrganizationResponse());
     lobbyApiMock.listTeams.mockResolvedValue({
       teams: [{
@@ -123,6 +125,10 @@ describe("ProjectManagerOrganizationPage", () => {
           updatedAt: DEFAULT_TIMESTAMP,
         },
       ],
+    });
+    lobbyApiMock.unassignOrganizationTeam.mockResolvedValue({
+      organizationId: 9,
+      teams: [],
     });
     lobbyApiMock.createProject.mockResolvedValue({
       project: {
@@ -278,5 +284,61 @@ describe("ProjectManagerOrganizationPage", () => {
     expect(await screen.findByText("Org 9")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add Member User" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Member Team" })).not.toBeInTheDocument();
+  });
+
+  it("removes a member user and a member team when the current user can manage the organization", async () => {
+    const user = userEvent.setup();
+    lobbyApiMock.getOrganization.mockResolvedValueOnce({
+      ...createOrganizationResponse(),
+      members: [
+        ...createOrganizationResponse().members,
+        {
+          roleCodes: [],
+          userId: 202,
+          username: "removable-user",
+        },
+      ],
+    });
+    lobbyApiMock.replaceOrganizationUsers.mockResolvedValueOnce({
+      members: createOrganizationResponse().members,
+      organizationId: 9,
+    });
+
+    renderWithTheme(
+      <ProjectManagerOrganizationPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        organizationId={9}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    const memberRow = (await screen.findByRole("button", { name: /removable-user/i }))
+      .closest(".MuiPaper-root");
+    expect(memberRow).not.toBeNull();
+    await user.click(within(memberRow as HTMLElement).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => {
+      expect(lobbyApiMock.replaceOrganizationUsers).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        9,
+        {
+          members: [
+            { userId: 101 },
+          ],
+        },
+      );
+    });
+
+    const teamRow = screen.getByText("Team 7").closest(".MuiPaper-root");
+    expect(teamRow).not.toBeNull();
+    await user.click(within(teamRow as HTMLElement).getByRole("button", { name: "Remove" }));
+
+    await waitFor(() => {
+      expect(lobbyApiMock.unassignOrganizationTeam).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        9,
+        7,
+      );
+    });
   });
 });

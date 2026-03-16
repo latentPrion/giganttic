@@ -6,6 +6,7 @@ export const ISSUE_SUMMARY_DIALOG_TITLE = "Issue Summary";
 export const ISSUE_FORM_SUBMIT_LABEL_CREATE = "Create Issue";
 export const ISSUE_FORM_SUBMIT_LABEL_EDIT = "Save Changes";
 export const ISSUE_CREATE_ERROR_MESSAGE = "Unable to create that issue.";
+export const ISSUE_DEFAULT_PRIORITY = 0;
 export const ISSUE_UPDATE_ERROR_MESSAGE = "Unable to update that issue.";
 export const ISSUE_LOAD_ERROR_MESSAGE = "Unable to load that issue right now.";
 export const ISSUE_DEFAULT_PROGRESS = 0;

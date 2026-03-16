@@ -22,6 +22,21 @@ const harness = createCrudTestHarness("teams-crud.sqlite");
 const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("teams crud api", () => {
+  function createOrganization(
+    accessToken: string,
+    payload: {
+      description?: string | null;
+      name: string;
+    },
+  ) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "POST",
+      payload,
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+  }
+
   function createTeam(
     accessToken: string,
     payload: {
@@ -234,6 +249,53 @@ describe("teams crud api", () => {
     });
 
     expect(grantResponse.statusCode).toBe(200);
+    expect(getResponse.statusCode).toBe(200);
+  });
+
+  it("allows a direct organization member to list and view a team assigned to that organization", async () => {
+    const creator = await harness.registerUser("team-org-member-creator");
+    const organizationMember = await harness.registerUser("team-org-member-viewer");
+    const teamResponse = await createTeam(creator.accessToken, {
+      name: "Org Visible Team",
+    });
+    const organizationResponse = await createOrganization(creator.accessToken, {
+      name: "Parent Org",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(teamResponse.payload);
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      organizationResponse.payload,
+    );
+
+    const organizationUsersResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: creator.user.id },
+          { userId: organizationMember.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const assignResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(organizationMember.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/teams",
+    });
+    const getResponse = await getTeam(organizationMember.accessToken, team.id);
+
+    expect(organizationUsersResponse.statusCode).toBe(200);
+    expect(assignResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ teams: Array<{ id: number }> }>(listResponse.payload).teams
+        .map((entry) => entry.id),
+    ).toContain(team.id);
     expect(getResponse.statusCode).toBe(200);
   });
 

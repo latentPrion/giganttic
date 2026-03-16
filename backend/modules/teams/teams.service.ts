@@ -8,12 +8,14 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  organizationsTeams,
   projects,
   projectsOrganizations,
   projectsTeams,
   teams,
   teamsUsers,
   users,
+  usersOrganizations,
   usersOrganizationsOrganizationRoles,
   usersTeamsTeamRoles,
 } from "../../../db/index.js";
@@ -189,7 +191,23 @@ export class TeamsService {
       .where(eq(usersTeamsTeamRoles.userId, authContext.userId))
       .all()
       .map((row) => row.teamId);
-    const teamIds = [...new Set([...membershipTeamIds, ...roleTeamIds])];
+    const organizationMembershipTeamIds = this.databaseService.db
+      .select({ teamId: organizationsTeams.teamId })
+      .from(organizationsTeams)
+      .innerJoin(
+        usersOrganizations,
+        eq(usersOrganizations.organizationId, organizationsTeams.organizationId),
+      )
+      .where(eq(usersOrganizations.userId, authContext.userId))
+      .all()
+      .map((row) => row.teamId);
+    const teamIds = [
+      ...new Set([
+        ...membershipTeamIds,
+        ...roleTeamIds,
+        ...organizationMembershipTeamIds,
+      ]),
+    ];
 
     if (teamIds.length === 0) {
       return { teams: [] };
@@ -465,10 +483,21 @@ export class TeamsService {
 
     if (
       !hasTeamMembership(this.databaseService.db, teamId, authContext.userId) &&
+      !this.hasOrganizationMembershipForTeam(teamId, authContext.userId) &&
       !hasAnyTeamRole(this.databaseService.db, teamId, authContext.userId)
     ) {
       throw new ForbiddenException("Not permitted to access that team");
     }
+  }
+
+  private hasOrganizationMembershipForTeam(teamId: number, userId: number): boolean {
+    const organizationId = getOrganizationIdForTeam(this.databaseService.db, teamId);
+
+    if (organizationId === null) {
+      return false;
+    }
+
+    return hasOrganizationMembership(this.databaseService.db, organizationId, userId);
   }
 
   private assertLinkedProjectsRetainManagers(

@@ -731,6 +731,40 @@ describe("projects crud api", () => {
     ]);
   });
 
+  it("allows a direct organization member to view a directly associated project", async () => {
+    const creator = await harness.registerUser("project-org-member-creator");
+    const organizationMember = await harness.registerUser("project-org-member-viewer");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Org Visible Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const organizationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Visible Org" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const organizationId = harness.parseJson<{ organization: { id: number } }>(
+      organizationResponse.payload,
+    ).organization.id;
+
+    harness.databaseService.db.insert(projectsOrganizations).values({
+      organizationId,
+      projectId: project.id,
+    }).run();
+    harness.databaseService.db.insert(usersOrganizations).values({
+      organizationId,
+      userId: organizationMember.user.id,
+    }).run();
+
+    const response = await getProject(organizationMember.accessToken, project.id);
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it("requires a project owner or self-granted sysadmin owner to update project membership", async () => {
     const creator = await harness.registerUser("project-membership-manager");
     const outsider = await harness.registerUser("project-membership-outsider");

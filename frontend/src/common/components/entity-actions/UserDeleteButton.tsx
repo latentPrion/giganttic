@@ -3,6 +3,7 @@ import { EntityActionButton } from "./EntityActionButton.js";
 
 interface UserDeleteButtonProps {
   disabled?: boolean;
+  label?: string;
   onClick(): void;
 }
 
@@ -11,7 +12,7 @@ export function UserDeleteButton(props: UserDeleteButtonProps) {
     <EntityActionButton
       color="error"
       disabled={props.disabled}
-      label="Delete"
+      label={props.label ?? "Delete"}
       onClick={props.onClick}
     />
   );

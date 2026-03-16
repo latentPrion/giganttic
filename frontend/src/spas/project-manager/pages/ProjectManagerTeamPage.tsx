@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { EntityActionButton } from "../../../common/components/entity-actions/EntityActionButton.js";
 import { ProjectCreateButton } from "../../../common/components/entity-actions/ProjectCreateButton.js";
+import { UserDeleteButton } from "../../../common/components/entity-actions/UserDeleteButton.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { ProjectListItem } from "../../../common/components/entity-list/ProjectListItem.js";
@@ -46,6 +47,7 @@ const LIST_ITEM_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const MISSING_ROUTE_MESSAGE = "Provide a valid teamId to view a team.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Team";
+const REMOVE_MEMBER_LABEL = "Remove";
 const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
 const TEAM_MEMBERS_HEADING = "Members";
 const TEAM_MANAGERS_HEADING = "Current Team Managers";
@@ -84,6 +86,10 @@ function createSelectedTeamLabel(teamId: number | null): string {
   return teamId === null ? "None" : `${teamId}`;
 }
 
+function createRemoveUserBusyKey(teamId: number | null, userId: number): string {
+  return `team:${teamId ?? "unknown"}:user:${userId}:remove`;
+}
+
 function createTeamMembersPayload(
   response: GetTeamResponse,
   userId: number,
@@ -99,6 +105,20 @@ function createTeamMembersPayload(
         userId,
       },
     ],
+  };
+}
+
+function createTeamMembersRemovalPayload(
+  response: GetTeamResponse,
+  userId: number,
+): ReplaceTeamMembersRequest {
+  return {
+    members: response.members
+      .filter((member) => member.userId !== userId)
+      .map((member) => ({
+        roleCodes: member.roleCodes,
+        userId: member.userId,
+      })),
   };
 }
 
@@ -133,18 +153,21 @@ function renderUsersSection(
   emptyMessage: string,
   onNavigate: (userId: number) => void,
   actionContent?: React.ReactNode,
+  renderRowActionContent?: (user: { userId: number; username: string }) => React.ReactNode,
+  viewMode: EntityListItemViewMode = "link-only-no-action-buttons",
 ) {
   return (
     <Stack spacing={1.25}>
       {renderSectionHeading(title, actionContent)}
       {users.length > 0 ? (
-        <EntityItemList viewMode="link-only-no-action-buttons">
+        <EntityItemList viewMode={viewMode}>
           {users.map((user) => (
             <UserListItem
+              actionContent={renderRowActionContent ? renderRowActionContent(user) : undefined}
               key={user.userId}
               onNavigate={() => onNavigate(user.userId)}
               user={{ id: user.userId, username: user.username }}
-              viewMode="link-only-no-action-buttons"
+              viewMode={viewMode}
             />
           ))}
         </EntityItemList>
@@ -306,6 +329,29 @@ export function ProjectManagerTeamPage(props: ProjectManagerTeamPageProps) {
     }
   }
 
+  async function handleRemoveUser(userId: number): Promise<void> {
+    if (props.teamId === null || !teamResponse) {
+      return;
+    }
+
+    const actionKey = createRemoveUserBusyKey(props.teamId, userId);
+    setBusyKey(actionKey);
+    setErrorMessage(null);
+
+    try {
+      const response = await lobbyApi.replaceTeamMembers(
+        props.token,
+        props.teamId,
+        createTeamMembersRemovalPayload(teamResponse, userId),
+      );
+      setTeamResponse((current) => current ? { ...current, members: response.members } : current);
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, "Unable to remove that member user."));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   function navigateToProject(projectId: number): void {
     navigate(createProjectDetailRoute(projectId));
   }
@@ -361,6 +407,14 @@ export function ProjectManagerTeamPage(props: ProjectManagerTeamPageProps) {
               onClick={openAddUserModal}
             />
           ) : undefined,
+          allowTeamMembershipChanges ? (user) => (
+            <UserDeleteButton
+              disabled={busyKey === createRemoveUserBusyKey(props.teamId, user.userId)}
+              label={REMOVE_MEMBER_LABEL}
+              onClick={() => void handleRemoveUser(user.userId)}
+            />
+          ) : undefined,
+          LIST_ITEM_VIEW_MODE,
         )}
         {renderUsersSection(
           TEAM_MANAGERS_HEADING,

@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { EntityActionButton } from "../../../common/components/entity-actions/EntityActionButton.js";
 import { ProjectCreateButton } from "../../../common/components/entity-actions/ProjectCreateButton.js";
+import { TeamDeleteButton } from "../../../common/components/entity-actions/TeamDeleteButton.js";
+import { UserDeleteButton } from "../../../common/components/entity-actions/UserDeleteButton.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { OrganizationListItem } from "../../../common/components/entity-list/OrganizationListItem.js";
@@ -57,6 +59,7 @@ const ORGANIZATION_TEAMS_HEADING = "Current Teams";
 const ORGANIZATION_USERS_HEADING = "Members";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Organization";
+const REMOVE_MEMBER_LABEL = "Remove";
 const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
@@ -73,6 +76,14 @@ function createAssociateUserBusyKey(organizationId: number | null): string {
 
 function createSelectedOrganizationLabel(organizationId: number | null): string {
   return organizationId === null ? "None" : `${organizationId}`;
+}
+
+function createRemoveTeamBusyKey(organizationId: number | null, teamId: number): string {
+  return `organization:${organizationId ?? "unknown"}:team:${teamId}:remove`;
+}
+
+function createRemoveUserBusyKey(organizationId: number | null, userId: number): string {
+  return `organization:${organizationId ?? "unknown"}:user:${userId}:remove`;
 }
 
 function filterAssociableTeams(
@@ -142,6 +153,17 @@ function createOrganizationUsersPayload(
   };
 }
 
+function createOrganizationUsersRemovalPayload(
+  response: GetOrganizationResponse,
+  userId: number,
+): ReplaceOrganizationUsersRequest {
+  return {
+    members: response.members
+      .filter((member) => member.userId !== userId)
+      .map((member) => ({ userId: member.userId })),
+  };
+}
+
 function renderSectionHeading(title: string, actionContent?: React.ReactNode) {
   return (
     <Stack
@@ -164,18 +186,21 @@ function renderUsersSection(
   emptyMessage: string,
   onNavigate: (userId: number) => void,
   actionContent?: React.ReactNode,
+  renderRowActionContent?: (user: { userId: number; username: string }) => React.ReactNode,
+  viewMode: EntityListItemViewMode = "link-only-no-action-buttons",
 ) {
   return (
     <Stack spacing={1.25}>
       {renderSectionHeading(title, actionContent)}
       {users.length > 0 ? (
-        <EntityItemList viewMode="link-only-no-action-buttons">
+        <EntityItemList viewMode={viewMode}>
           {users.map((user) => (
             <UserListItem
+              actionContent={renderRowActionContent ? renderRowActionContent(user) : undefined}
               key={user.userId}
               onNavigate={() => onNavigate(user.userId)}
               user={{ id: user.userId, username: user.username }}
-              viewMode="link-only-no-action-buttons"
+              viewMode={viewMode}
             />
           ))}
         </EntityItemList>
@@ -219,6 +244,7 @@ function renderTeamsSection(
   teams: GetOrganizationResponse["teams"],
   onNavigate: (teamId: number) => void,
   actionContent?: React.ReactNode,
+  renderRowActionContent?: (team: GetOrganizationResponse["teams"][number]) => React.ReactNode,
 ) {
   return (
     <Stack spacing={1.25}>
@@ -227,6 +253,7 @@ function renderTeamsSection(
         <EntityItemList viewMode={LIST_ITEM_VIEW_MODE}>
           {teams.map((team) => (
             <TeamListItem
+              actionContent={renderRowActionContent ? renderRowActionContent(team) : undefined}
               key={team.id}
               onNavigate={() => onNavigate(team.id)}
               team={team}
@@ -405,6 +432,52 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
     }
   }
 
+  async function handleRemoveUser(userId: number): Promise<void> {
+    if (props.organizationId === null || !organizationResponse) {
+      return;
+    }
+
+    const actionKey = createRemoveUserBusyKey(props.organizationId, userId);
+    setBusyKey(actionKey);
+    setErrorMessage(null);
+
+    try {
+      const response = await lobbyApi.replaceOrganizationUsers(
+        props.token,
+        props.organizationId,
+        createOrganizationUsersRemovalPayload(organizationResponse, userId),
+      );
+      setOrganizationResponse((current) => current ? { ...current, members: response.members } : current);
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, "Unable to remove that member user."));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleRemoveTeam(teamId: number): Promise<void> {
+    if (props.organizationId === null) {
+      return;
+    }
+
+    const actionKey = createRemoveTeamBusyKey(props.organizationId, teamId);
+    setBusyKey(actionKey);
+    setErrorMessage(null);
+
+    try {
+      const response = await lobbyApi.unassignOrganizationTeam(
+        props.token,
+        props.organizationId,
+        teamId,
+      );
+      setOrganizationResponse((current) => current ? { ...current, teams: response.teams } : current);
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, "Unable to remove that member team."));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   function navigateToProject(projectId: number): void {
     navigate(createProjectDetailRoute(projectId));
   }
@@ -469,6 +542,14 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
               onClick={openAddUserModal}
             />
           ) : undefined,
+          allowAddOrganizationUsers ? (user) => (
+            <UserDeleteButton
+              disabled={busyKey === createRemoveUserBusyKey(props.organizationId, user.userId)}
+              label={REMOVE_MEMBER_LABEL}
+              onClick={() => void handleRemoveUser(user.userId)}
+            />
+          ) : undefined,
+          LIST_ITEM_VIEW_MODE,
         )}
         {renderUsersSection(
           ORGANIZATION_MANAGERS_HEADING,
@@ -497,6 +578,13 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
               disabled={busyKey === createAssociateTeamBusyKey(props.organizationId)}
               label={ADD_MEMBER_TEAM_LABEL}
               onClick={openAddTeamModal}
+            />
+          ) : undefined,
+          allowAddOrganizationTeams ? (team) => (
+            <TeamDeleteButton
+              disabled={busyKey === createRemoveTeamBusyKey(props.organizationId, team.id)}
+              label={REMOVE_MEMBER_LABEL}
+              onClick={() => void handleRemoveTeam(team.id)}
             />
           ) : undefined,
         )}
