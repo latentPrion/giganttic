@@ -16,6 +16,7 @@ const ISSUE_STATUS_BLOCKED = "ISSUE_STATUS_BLOCKED";
 const ISSUE_CLOSED_REASON_RESOLVED = "ISSUE_CLOSED_REASON_RESOLVED";
 const ISSUE_CLOSED_REASON_WONTFIX = "ISSUE_CLOSED_REASON_WONTFIX";
 const DEFAULT_ISSUE_PRIORITY = 0;
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("issues crud api", () => {
   function createProject(
@@ -214,7 +215,7 @@ describe("issues crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -822,7 +823,7 @@ describe("issues crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: creator.user.id },
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: creator.user.id },
           { roleCodes: [], userId: member.user.id },
         ],
       },
@@ -863,7 +864,7 @@ describe("issues crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: creator.user.id },
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: creator.user.id },
           { roleCodes: [], userId: member.user.id },
         ],
       },
@@ -944,7 +945,7 @@ describe("issues crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: creator.user.id },
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: creator.user.id },
           { roleCodes: [], userId: member.user.id },
         ],
       },

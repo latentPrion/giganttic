@@ -41,19 +41,23 @@ describe("db version selection pipeline", () => {
     }
   });
 
-  it("advertises v2 as the active schema version", () => {
-    expect(availableSchemaVersions).toContain("v2");
-    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v2");
+  it("advertises v3 as the active schema version", () => {
+    expect(availableSchemaVersions).toContain("v3");
+    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v3");
   });
 
   it("resolves generated artifact paths from explicit version arguments", () => {
     expect(getGeneratedSqlDdlDir("v1")).toContain("db/v1/generated-sql-ddl");
     expect(getGeneratedSqlDdlDir("v2")).toContain("db/v2/generated-sql-ddl");
+    expect(getGeneratedSqlDdlDir("v3")).toContain("db/v3/generated-sql-ddl");
     expect(getGeneratedSqlDdlFilePath("v1")).toContain(
       "db/v1/generated-sql-ddl/schema.sql",
     );
     expect(getGeneratedSqlDdlFilePath("v2")).toContain(
       "db/v2/generated-sql-ddl/schema.sql",
+    );
+    expect(getGeneratedSqlDdlFilePath("v3")).toContain(
+      "db/v3/generated-sql-ddl/schema.sql",
     );
   });
 

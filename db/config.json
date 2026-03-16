@@ -1,5 +1,5 @@
 {
-  "availableSchemaVersions": ["v1", "v2"],
+  "availableSchemaVersions": ["v1", "v2", "v3"],
   "CONFIG_GGTC_DB_RT_TARGET": "run/giganttic-dev.sqlite",
-  "CONFIG_GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR": "v2"
+  "CONFIG_GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR": "v3"
 }

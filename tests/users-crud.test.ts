@@ -18,9 +18,15 @@ import {
   usersSessions,
   usersTeamsTeamRoles,
 } from "../db/index.js";
+import {
+  expectBlockingConflictPayload,
+  type BlockingConflictPayload,
+} from "./blocking-conflict-helpers.js";
 import { createCrudTestHarness } from "./crud-test-helpers.js";
 
 const harness = createCrudTestHarness("users-crud.sqlite");
+const PROJECT_MANAGER_ROLE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("users delete api", () => {
   function createProject(
@@ -99,11 +105,11 @@ describe("users delete api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: replacement.user.id,
           },
         ],
@@ -148,6 +154,17 @@ describe("users delete api", () => {
     });
 
     expect(deleteResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(deleteResponse.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_owner",
+        },
+        message: "User delete would remove the last owner",
+      },
+    );
   });
 
   it("blocks self deletion when the caller is the sole remaining team manager", async () => {
@@ -168,6 +185,17 @@ describe("users delete api", () => {
     });
 
     expect(deleteResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(deleteResponse.payload),
+      {
+        firstBlockingObject: {
+          id: team.id,
+          kind: "team",
+          reason: "last_effective_team_manager",
+        },
+        message: "User delete would remove the last effective team manager",
+      },
+    );
   });
 
   it("allows an admin to delete another user only after management coverage remains", async () => {
@@ -191,11 +219,11 @@ describe("users delete api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: replacement.user.id,
           },
         ],
@@ -209,8 +237,68 @@ describe("users delete api", () => {
     });
 
     expect(blockedDelete.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(blockedDelete.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_owner",
+        },
+        message: "User delete would remove the last owner",
+      },
+    );
     expect(membershipResponse.statusCode).toBe(200);
     expect(allowedDelete.statusCode).toBe(200);
+  });
+
+  it("reports at least one concrete blocking project when deleting a user who owns multiple projects", async () => {
+    const creator = await harness.registerUser("users-delete-multi-owner");
+    const replacement = await harness.registerUser("users-delete-multi-owner-replacement");
+    const firstProjectResponse = await createProject(creator.accessToken, {
+      name: "First Owned Project",
+    });
+    const secondProjectResponse = await createProject(creator.accessToken, {
+      name: "Second Owned Project",
+    });
+    const firstProject = harness.parseJson<{ project: { id: number } }>(
+      firstProjectResponse.payload,
+    ).project;
+    const secondProject = harness.parseJson<{ project: { id: number } }>(
+      secondProjectResponse.payload,
+    ).project;
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: replacement.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${secondProject.id}/members`,
+    });
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/users/${creator.user.id}`,
+    });
+    const payload = harness.parseJson<BlockingConflictPayload>(deleteResponse.payload);
+
+    expect(deleteResponse.statusCode).toBe(409);
+    expect(payload.message).toBe("User delete would remove the last owner");
+    expect(payload.blockingObjects.length).toBeGreaterThan(0);
+    expect(payload.blockingObjects[0].kind).toBe("project");
+    expect([firstProject.id, secondProject.id]).toContain(payload.blockingObjects[0].id);
+    expect(payload.blockingObjects[0].reason).toBe("last_owner");
   });
 
   it("deleting a user cascades sessions, credential rows, memberships, and role assignments", async () => {
@@ -251,11 +339,11 @@ describe("users delete api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: replacement.user.id,
           },
         ],
@@ -383,7 +471,7 @@ describe("users delete api", () => {
       headers: harness.createAuthHeaders(firstProjectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: firstProjectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: firstProjectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${projectOne.id}/members`,
     });
@@ -391,7 +479,7 @@ describe("users delete api", () => {
       headers: harness.createAuthHeaders(secondProjectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: secondProjectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: secondProjectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${projectTwo.id}/members`,
     });
@@ -492,8 +580,8 @@ describe("users delete api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: creator.user.id },
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: replacement.user.id },
+          { roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE], userId: creator.user.id },
+          { roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE], userId: replacement.user.id },
         ],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
@@ -861,8 +949,8 @@ describe("users delete api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: target.user.id },
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: replacement.user.id },
+          { roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE], userId: target.user.id },
+          { roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE], userId: replacement.user.id },
         ],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,

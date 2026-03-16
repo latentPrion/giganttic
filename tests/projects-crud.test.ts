@@ -16,8 +16,18 @@ import {
   MISSING_ENTITY_ID,
   createCrudTestHarness,
 } from "./crud-test-helpers.js";
+import {
+  expectBlockingConflictPayload,
+  type BlockingConflictPayload,
+} from "./blocking-conflict-helpers.js";
 
 const harness = createCrudTestHarness("projects-crud.sqlite");
+const PROJECT_MANAGER_ROLE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
+
+function sortRoleCodes(roleCodes: ReadonlyArray<string>) {
+  return [...roleCodes].sort();
+}
 
 describe("projects crud api", () => {
   function createTeam(
@@ -67,7 +77,7 @@ describe("projects crud api", () => {
     await harness.cleanup();
   });
 
-  it("allows any authenticated user to create a project and makes the creator a project manager member", async () => {
+  it("allows any authenticated user to create a project and makes the creator a project owner manager member", async () => {
     const creator = await harness.registerUser("project-creator");
     const response = await createProject(creator.accessToken, {
       description: "Delivery project",
@@ -85,15 +95,64 @@ describe("projects crud api", () => {
       .from(projectsUsers)
       .where(eq(projectsUsers.projectId, body.project.id))
       .get();
-    const roleRow = harness.databaseService.db
+    const roleRows = harness.databaseService.db
       .select()
       .from(usersProjectsProjectRoles)
       .where(eq(usersProjectsProjectRoles.projectId, body.project.id))
-      .get();
+      .all();
 
     expect(membershipRow?.userId).toBe(creator.user.id);
-    expect(roleRow?.userId).toBe(creator.user.id);
-    expect(roleRow?.roleCode).toBe("GGTC_PROJECTROLE_PROJECT_MANAGER");
+    expect(roleRows.map((row) => row.userId)).toEqual([
+      creator.user.id,
+      creator.user.id,
+    ]);
+    expect(sortRoleCodes(roleRows.map((row) => row.roleCode))).toEqual([
+      PROJECT_MANAGER_ROLE,
+      PROJECT_OWNER_ROLE,
+    ]);
+  });
+
+  it("assigns ownership independently per project when different users create separate projects", async () => {
+    const firstCreator = await harness.registerUser("project-owner-scope-first");
+    const secondCreator = await harness.registerUser("project-owner-scope-second");
+    const firstResponse = await createProject(firstCreator.accessToken, {
+      name: "Scoped Ownership One",
+    });
+    const secondResponse = await createProject(secondCreator.accessToken, {
+      name: "Scoped Ownership Two",
+    });
+    const firstProject = harness.parseJson<{ project: { id: number } }>(
+      firstResponse.payload,
+    ).project;
+    const secondProject = harness.parseJson<{ project: { id: number } }>(
+      secondResponse.payload,
+    ).project;
+
+    const firstProjectRoles = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, firstProject.id))
+      .all();
+    const secondProjectRoles = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, secondProject.id))
+      .all();
+
+    expect(sortRoleCodes(firstProjectRoles.map((row) => row.roleCode))).toEqual([
+      PROJECT_MANAGER_ROLE,
+      PROJECT_OWNER_ROLE,
+    ]);
+    expect(sortRoleCodes(secondProjectRoles.map((row) => row.roleCode))).toEqual([
+      PROJECT_MANAGER_ROLE,
+      PROJECT_OWNER_ROLE,
+    ]);
+    expect(new Set(firstProjectRoles.map((row) => row.userId))).toEqual(
+      new Set([firstCreator.user.id]),
+    );
+    expect(new Set(secondProjectRoles.map((row) => row.userId))).toEqual(
+      new Set([secondCreator.user.id]),
+    );
   });
 
   it("persists project journal through create, get, and update", async () => {
@@ -563,7 +622,7 @@ describe("projects crud api", () => {
     ]);
   });
 
-  it("requires a project manager or sysadmin to update project membership", async () => {
+  it("requires a project owner or self-granted sysadmin owner to update project membership", async () => {
     const creator = await harness.registerUser("project-membership-manager");
     const outsider = await harness.registerUser("project-membership-outsider");
     const member = await harness.registerUser("project-membership-member");
@@ -580,7 +639,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -595,7 +654,7 @@ describe("projects crud api", () => {
     expect(forbiddenResponse.statusCode).toBe(403);
   });
 
-  it("allows team-derived project managers to update project membership", async () => {
+  it("forbids team-derived project managers from updating project membership", async () => {
     const projectOwner = await harness.registerUser("project-team-access-owner");
     const teamCreator = await harness.registerUser("project-team-access-team-manager");
     const teamMember = await harness.registerUser("project-team-access-member");
@@ -638,13 +697,13 @@ describe("projects crud api", () => {
     }).run();
     await harness.databaseService.persist();
 
-    const allowedResponse = await harness.app.inject({
+    const forbiddenResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(teamMember.accessToken),
       method: "PUT",
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: projectOwner.user.id,
           },
           {
@@ -656,10 +715,10 @@ describe("projects crud api", () => {
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 
-    expect(allowedResponse.statusCode).toBe(200);
+    expect(forbiddenResponse.statusCode).toBe(403);
   });
 
-  it("allows a sysadmin to update project metadata and membership without being a member", async () => {
+  it("requires a sysadmin to self-grant owner before updating project metadata and membership", async () => {
     const creator = await harness.registerUser("project-admin-manager");
     const member = await harness.registerUser("project-admin-member");
     const admin = await harness.loginSeededAdmin();
@@ -670,6 +729,21 @@ describe("projects crud api", () => {
       createResponse.payload,
     );
 
+    const blockedMetadataResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "PATCH",
+      payload: { description: "Updated by admin" },
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+    const selfGrantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
     const metadataResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "PATCH",
@@ -682,7 +756,11 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_OWNER_ROLE],
+            userId: admin.user.id,
+          },
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE],
             userId: member.user.id,
           },
         ],
@@ -690,6 +768,8 @@ describe("projects crud api", () => {
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 
+    expect(blockedMetadataResponse.statusCode).toBe(403);
+    expect(selfGrantResponse.statusCode).toBe(200);
     expect(metadataResponse.statusCode).toBe(200);
     expect(membershipResponse.statusCode).toBe(200);
   });
@@ -709,7 +789,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -727,8 +807,8 @@ describe("projects crud api", () => {
         members: [
           {
             roleCodes: [
-              "GGTC_PROJECTROLE_PROJECT_MANAGER",
-              "GGTC_PROJECTROLE_PROJECT_MANAGER",
+              PROJECT_MANAGER_ROLE,
+              PROJECT_MANAGER_ROLE,
             ],
             userId: creator.user.id,
           },
@@ -742,7 +822,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -870,7 +950,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: [],
+            roleCodes: [PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -883,6 +963,17 @@ describe("projects crud api", () => {
     });
 
     expect(updateResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(updateResponse.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_effective_project_manager",
+        },
+        message: "Project membership update would remove the last effective project manager",
+      },
+    );
   });
 
   it("allows removing the last direct project manager when a linked team project manager remains", async () => {
@@ -934,7 +1025,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: [],
+            roleCodes: [PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -965,11 +1056,11 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: otherManager.user.id,
           },
         ],
@@ -985,7 +1076,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: otherManager.user.id,
           },
         ],
@@ -999,11 +1090,13 @@ describe("projects crud api", () => {
       .all();
 
     expect(secondUpdate.statusCode).toBe(200);
-    expect(roleRows).toHaveLength(1);
-    expect(roleRows[0]?.userId).toBe(otherManager.user.id);
+    expect(roleRows).toHaveLength(2);
+    expect(new Set(roleRows.map((row) => row.userId))).toEqual(
+      new Set([otherManager.user.id]),
+    );
   });
 
-  it("requires a sysadmin to self-grant direct project management before deleting a project", async () => {
+  it("requires a sysadmin to self-grant direct project ownership before deleting a project", async () => {
     const creator = await harness.registerUser("project-delete-manager");
     const admin = await harness.loginSeededAdmin();
     const createResponse = await createProject(creator.accessToken, {
@@ -1027,6 +1120,20 @@ describe("projects crud api", () => {
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
+    const deleteStillBlocked = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+    const selfGrantOwnerResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(admin.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: admin.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
     const deleteResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "DELETE",
@@ -1035,6 +1142,8 @@ describe("projects crud api", () => {
 
     expect(blockedDelete.statusCode).toBe(403);
     expect(selfGrantResponse.statusCode).toBe(200);
+    expect(deleteStillBlocked.statusCode).toBe(403);
+    expect(selfGrantOwnerResponse.statusCode).toBe(200);
     expect(deleteResponse.statusCode).toBe(200);
     expect(
       harness.databaseService.db
@@ -1097,7 +1206,7 @@ describe("projects crud api", () => {
     expect(response.statusCode).toBe(200);
   });
 
-  it("supports granting and revoking direct project manager roles", async () => {
+  it("lets a project owner grant and revoke direct project manager and owner roles", async () => {
     const creator = await harness.registerUser("project-role-grant-creator");
     const target = await harness.registerUser("project-role-grant-target");
     const createResponse = await createProject(creator.accessToken, {
@@ -1112,7 +1221,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -1128,25 +1237,104 @@ describe("projects crud api", () => {
 
     const grantResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
+        method: "POST",
+      payload: {
+        roleCode: PROJECT_MANAGER_ROLE,
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const ownerGrantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_OWNER_ROLE,
         userId: target.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
     const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(target.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_MANAGER_ROLE,
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+    const ownerRevokeResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_OWNER_ROLE,
         userId: target.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
     });
 
     expect(grantResponse.statusCode).toBe(200);
+    expect(ownerGrantResponse.statusCode).toBe(200);
     expect(revokeResponse.statusCode).toBe(200);
+    expect(ownerRevokeResponse.statusCode).toBe(200);
+  });
+
+  it("auto-creates direct membership when an owner grants manager or owner to non-members", async () => {
+    const creator = await harness.registerUser("project-role-autojoin-creator");
+    const managerTarget = await harness.registerUser("project-role-autojoin-manager");
+    const ownerTarget = await harness.registerUser("project-role-autojoin-owner");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Auto Join Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const grantManagerResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_MANAGER_ROLE,
+        userId: managerTarget.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const grantOwnerResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: ownerTarget.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const membershipRows = harness.databaseService.db
+      .select()
+      .from(projectsUsers)
+      .where(eq(projectsUsers.projectId, project.id))
+      .all();
+    const roleRows = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, project.id))
+      .all();
+
+    expect(grantManagerResponse.statusCode).toBe(200);
+    expect(grantOwnerResponse.statusCode).toBe(200);
+    expect(new Set(membershipRows.map((row) => row.userId))).toEqual(
+      new Set([creator.user.id, managerTarget.user.id, ownerTarget.user.id]),
+    );
+    expect(
+      roleRows.some(
+        (row) =>
+          row.userId === managerTarget.user.id && row.roleCode === PROJECT_MANAGER_ROLE,
+      ),
+    ).toBe(true);
+    expect(
+      roleRows.some(
+        (row) =>
+          row.userId === ownerTarget.user.id && row.roleCode === PROJECT_OWNER_ROLE,
+      ),
+    ).toBe(true);
   });
 
   it("rejects invalid project role payloads and unauthorized grant attempts", async () => {
@@ -1161,7 +1349,7 @@ describe("projects crud api", () => {
     );
     const invalidRoleResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
-      method: "POST",
+        method: "POST",
       payload: {
         roleCode: "GGTC_PROJECTROLE_NOT_REAL",
         userId: target.user.id,
@@ -1170,18 +1358,18 @@ describe("projects crud api", () => {
     });
     const invalidUserIdResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
-      method: "POST",
+        method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: 0,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
     const unauthorizedResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(outsider.accessToken),
-      method: "POST",
+        method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: target.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
@@ -1192,7 +1380,50 @@ describe("projects crud api", () => {
     expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
-  it("lets a team project manager grant direct project manager to a direct member outside the team", async () => {
+  it("forbids a direct project manager who is not an owner from granting owner", async () => {
+    const creator = await harness.registerUser("project-direct-pm-no-owner-creator");
+    const manager = await harness.registerUser("project-direct-pm-no-owner-manager");
+    const target = await harness.registerUser("project-direct-pm-no-owner-target");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "PM Cannot Grant Owner",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE],
+            userId: manager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(manager.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: target.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+
+    expect(grantResponse.statusCode).toBe(403);
+  });
+
+  it("forbids a team project manager from granting direct project manager", async () => {
     const projectOwner = await harness.registerUser("project-role-teampm-owner");
     const teamCreator = await harness.registerUser("project-role-teampm-creator");
     const teamProjectManager = await harness.registerUser("project-role-teampm-pm");
@@ -1232,7 +1463,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: projectOwner.user.id,
           },
           {
@@ -1257,16 +1488,16 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(teamProjectManager.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: directProjectMember.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
 
-    expect(grantResponse.statusCode).toBe(200);
+    expect(grantResponse.statusCode).toBe(403);
   });
 
-  it("rejects granting direct project manager to a non-member even for a team project manager", async () => {
+  it("forbids a team project manager from granting direct project manager to a non-member", async () => {
     const projectOwner = await harness.registerUser("project-role-nonmember-owner");
     const teamCreator = await harness.registerUser("project-role-nonmember-creator");
     const teamProjectManager = await harness.registerUser("project-role-nonmember-pm");
@@ -1311,15 +1542,15 @@ describe("projects crud api", () => {
 
     const grantResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(teamProjectManager.accessToken),
-      method: "POST",
+        method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: outsider.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
 
-    expect(grantResponse.statusCode).toBe(409);
+    expect(grantResponse.statusCode).toBe(403);
   });
 
   it("allows revoking the only direct project manager role when the same user remains an indirect manager", async () => {
@@ -1376,6 +1607,244 @@ describe("projects crud api", () => {
     expect(revokeResponse.statusCode).toBe(200);
   });
 
+  it("blocks revoking the last project owner and reports the blocking project", async () => {
+    const creator = await harness.registerUser("project-last-owner-creator");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Last Owner Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: creator.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+
+    expect(revokeResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(revokeResponse.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_owner",
+        },
+        message: "Project role revoke would remove the last owner",
+      },
+    );
+  });
+
+  it("allows an owner to revoke another owner and remain the sole owner", async () => {
+    const creator = await harness.registerUser("project-owner-revoke-other-creator");
+    const secondOwner = await harness.registerUser("project-owner-revoke-other-target");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Owner Revoke Other Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: secondOwner.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const revokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: secondOwner.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+    const ownerRows = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, project.id))
+      .all()
+      .filter((row) => row.roleCode === PROJECT_OWNER_ROLE);
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(revokeResponse.statusCode).toBe(200);
+    expect(ownerRows).toHaveLength(1);
+    expect(ownerRows[0].userId).toBe(creator.user.id);
+  });
+
+  it("allows self-revoking owner when another owner remains", async () => {
+    const creator = await harness.registerUser("project-owner-self-revoke-creator");
+    const secondOwner = await harness.registerUser("project-owner-self-revoke-second");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Owner Self Revoke Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: secondOwner.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const selfRevokeResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: creator.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+    const ownerRows = harness.databaseService.db
+      .select()
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.projectId, project.id))
+      .all()
+      .filter((row) => row.roleCode === PROJECT_OWNER_ROLE);
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(selfRevokeResponse.statusCode).toBe(200);
+    expect(ownerRows).toHaveLength(1);
+    expect(ownerRows[0].userId).toBe(secondOwner.user.id);
+  });
+
+  it("lets an owner without project-manager keep metadata edit powers while owner-only actions still enforce manager-preservation", async () => {
+    const creator = await harness.registerUser("project-owner-only-creator");
+    const fallbackManager = await harness.registerUser("project-owner-only-fallback");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Owner Only Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+    const membershipSeedResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: creator.user.id,
+          },
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE],
+            userId: fallbackManager.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+    const demoteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_MANAGER_ROLE,
+        userId: creator.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+    const metadataResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: { description: "Owner only metadata" },
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+    const member = await harness.registerUser("project-owner-only-member");
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: [PROJECT_OWNER_ROLE], userId: creator.user.id },
+          { roleCodes: [], userId: member.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    expect(membershipSeedResponse.statusCode).toBe(200);
+    expect(demoteResponse.statusCode).toBe(200);
+    expect(metadataResponse.statusCode).toBe(200);
+    expect(membershipResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(membershipResponse.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_effective_project_manager",
+        },
+        message: "Project membership update would remove the last effective project manager",
+      },
+    );
+  });
+
+  it("downgrades a former owner to metadata-only manager behavior after owner revoke", async () => {
+    const creator = await harness.registerUser("project-manager-after-owner-creator");
+    const secondOwner = await harness.registerUser("project-manager-after-owner-second");
+    const newMember = await harness.registerUser("project-manager-after-owner-member");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Manager After Owner Revoke",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+
+    await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: secondOwner.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
+    });
+    const revokeOwnerResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(secondOwner.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: PROJECT_OWNER_ROLE,
+        userId: creator.user.id,
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
+    });
+    const metadataResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: { description: "Still a manager" },
+      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+    });
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { roleCodes: [PROJECT_OWNER_ROLE], userId: secondOwner.user.id },
+          { roleCodes: [], userId: newMember.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
+    });
+
+    expect(revokeOwnerResponse.statusCode).toBe(200);
+    expect(metadataResponse.statusCode).toBe(200);
+    expect(membershipResponse.statusCode).toBe(403);
+  });
+
   it("keeps project rows unchanged after a blocked revoke of the final effective project manager", async () => {
     const creator = await harness.registerUser("project-atomic-revoke-creator");
     const createResponse = await createProject(creator.accessToken, {
@@ -1394,7 +1863,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: creator.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/revoke`,
@@ -1406,6 +1875,17 @@ describe("projects crud api", () => {
       .all();
 
     expect(revokeResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(revokeResponse.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_effective_project_manager",
+        },
+        message: "Project role revoke would remove the last effective project manager",
+      },
+    );
     expect(afterRows).toEqual(beforeRows);
   });
 
@@ -1429,7 +1909,7 @@ describe("projects crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: [], userId: creator.user.id },
+          { roleCodes: [PROJECT_OWNER_ROLE], userId: creator.user.id },
           { roleCodes: [], userId: member.user.id },
         ],
       },
@@ -1442,6 +1922,17 @@ describe("projects crud api", () => {
       .all();
 
     expect(response.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(response.payload),
+      {
+        firstBlockingObject: {
+          id: project.id,
+          kind: "project",
+          reason: "last_effective_project_manager",
+        },
+        message: "Project membership update would remove the last effective project manager",
+      },
+    );
     expect(afterMembers).toEqual(beforeMembers);
   });
 
@@ -1458,7 +1949,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_OWNER_ROLE,
         userId: admin.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
@@ -1467,7 +1958,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_OWNER_ROLE,
         userId: admin.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
@@ -1539,7 +2030,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
@@ -1557,7 +2048,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
@@ -1592,7 +2083,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(admin.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_OWNER_ROLE,
         userId: admin.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
@@ -1608,12 +2099,12 @@ describe("projects crud api", () => {
     const lingeringMembership = harness.databaseService.db
       .select()
       .from(projectsUsers)
-      .where(eq(projectsUsers.userId, admin.user.id))
+      .where(eq(projectsUsers.projectId, project.id))
       .all();
     const lingeringRoles = harness.databaseService.db
       .select()
       .from(usersProjectsProjectRoles)
-      .where(eq(usersProjectsProjectRoles.userId, admin.user.id))
+      .where(eq(usersProjectsProjectRoles.projectId, project.id))
       .all();
 
     expect(deleteResponse.statusCode).toBe(200);
@@ -1621,7 +2112,7 @@ describe("projects crud api", () => {
     expect(lingeringRoles).toHaveLength(0);
   });
 
-  it("allows an organization project manager to grant direct project manager on an organization-associated project", async () => {
+  it("forbids an organization project manager from granting direct project manager on an organization-associated project", async () => {
     const orgCreator = await harness.registerUser("project-org-grant-creator");
     const orgProjectManager = await harness.registerUser("project-org-grant-manager");
     const target = await harness.registerUser("project-org-grant-target");
@@ -1655,7 +2146,7 @@ describe("projects crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: projectOwner.user.id },
+          { roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE], userId: projectOwner.user.id },
           { roleCodes: [], userId: target.user.id },
         ],
       },
@@ -1680,7 +2171,7 @@ describe("projects crud api", () => {
       headers: harness.createAuthHeaders(orgProjectManager.accessToken),
       method: "POST",
       payload: {
-        roleCode: "GGTC_PROJECTROLE_PROJECT_MANAGER",
+        roleCode: PROJECT_MANAGER_ROLE,
         userId: target.user.id,
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
@@ -1690,7 +2181,7 @@ describe("projects crud api", () => {
     expect(projectMembership.statusCode).toBe(200);
     expect(orgProjectAssociation.statusCode).toBe(200);
     expect(orgRoleGrant.statusCode).toBe(200);
-    expect(projectRoleGrant.statusCode).toBe(200);
+    expect(projectRoleGrant.statusCode).toBe(403);
     expect(
       harness.databaseService.db
         .select()
@@ -1734,7 +2225,7 @@ describe("projects crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
             userId: creator.user.id,
           },
           {
@@ -1848,12 +2339,12 @@ describe("projects crud api", () => {
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
-      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      payload: { members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }] },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 
     const revokeResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(teamProjectManager.accessToken),
+      headers: harness.createAuthHeaders(teamCreator.accessToken),
       method: "POST",
       payload: {
         roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
@@ -1923,7 +2414,7 @@ describe("projects crud api", () => {
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
-      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      payload: { members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }] },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 

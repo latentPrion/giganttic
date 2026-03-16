@@ -13,8 +13,13 @@ import {
   MISSING_ENTITY_ID,
   createCrudTestHarness,
 } from "./crud-test-helpers.js";
+import {
+  expectBlockingConflictPayload,
+  type BlockingConflictPayload,
+} from "./blocking-conflict-helpers.js";
 
 const harness = createCrudTestHarness("teams-crud.sqlite");
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("teams crud api", () => {
   function createTeam(
@@ -194,6 +199,72 @@ describe("teams crud api", () => {
     ).not.toContain(team.id);
     expect(outsiderGet.statusCode).toBe(403);
     expect(adminGet.statusCode).toBe(200);
+  });
+
+  it("allows a privileged non-member team project manager to view the team", async () => {
+    const creator = await harness.registerUser("team-view-pm-creator");
+    const privilegedNonMember = await harness.registerUser("team-view-pm-nonmember");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "Visible To Team PM",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: privilegedNonMember.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const getResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(privilegedNonMember.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(getResponse.statusCode).toBe(200);
+  });
+
+  it("includes a privileged non-member team project manager in team listings without granting write access", async () => {
+    const creator = await harness.registerUser("team-list-pm-creator");
+    const privilegedNonMember = await harness.registerUser("team-list-pm-member");
+    const createResponse = await createTeam(creator.accessToken, {
+      name: "List Visible Team",
+    });
+    const { team } = harness.parseJson<{ team: { id: number } }>(
+      createResponse.payload,
+    );
+    const grantResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: {
+        roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
+        userId: privilegedNonMember.user.id,
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/roles/grant`,
+    });
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(privilegedNonMember.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/teams",
+    });
+    const patchResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(privilegedNonMember.accessToken),
+      method: "PATCH",
+      payload: { description: "Should stay forbidden" },
+      url: `/stc-proj-mgmt/api/teams/${team.id}`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ teams: Array<{ id: number }> }>(listResponse.payload).teams
+        .map((entry) => entry.id),
+    ).toContain(team.id);
+    expect(patchResponse.statusCode).toBe(403);
   });
 
   it("requires a team manager or sysadmin to update team membership", async () => {
@@ -454,6 +525,17 @@ describe("teams crud api", () => {
     });
 
     expect(updateResponse.statusCode).toBe(409);
+    expectBlockingConflictPayload(
+      harness.parseJson<BlockingConflictPayload>(updateResponse.payload),
+      {
+        firstBlockingObject: {
+          id: team.id,
+          kind: "team",
+          reason: "last_effective_team_manager",
+        },
+        message: "Team membership update would remove the last effective team manager",
+      },
+    );
   });
 
   it("allows transferring team management when another manager remains", async () => {
@@ -647,7 +729,7 @@ describe("teams crud api", () => {
     expect(unauthorizedResponse.statusCode).toBe(403);
   });
 
-  it("allows a team project manager to grant and revoke team project manager on the same team", async () => {
+  it("forbids a team project manager from granting and revoking team project manager on the same team", async () => {
     const creator = await harness.registerUser("team-pm-grant-creator");
     const grantor = await harness.registerUser("team-pm-grant-grantor");
     const target = await harness.registerUser("team-pm-grant-target");
@@ -691,8 +773,8 @@ describe("teams crud api", () => {
       url: `/stc-proj-mgmt/api/teams/${team.id}/roles/revoke`,
     });
 
-    expect(grantResponse.statusCode).toBe(200);
-    expect(revokeResponse.statusCode).toBe(200);
+    expect(grantResponse.statusCode).toBe(403);
+    expect(revokeResponse.statusCode).toBe(403);
   });
 
   it("forbids cross-team team-project-manager grants and team-manager-only grants of team PM", async () => {
@@ -758,7 +840,7 @@ describe("teams crud api", () => {
     });
 
     expect(crossTeamGrant.statusCode).toBe(403);
-    expect(teamManagerOnlyGrant.statusCode).toBe(403);
+    expect(teamManagerOnlyGrant.statusCode).toBe(200);
   });
 
   it("blocks revoking a team project manager when linked projects would be orphaned and keeps rows unchanged", async () => {
@@ -803,18 +885,18 @@ describe("teams crud api", () => {
     ]).run();
     await harness.databaseService.persist();
     const demoteFirstOwner = await harness.app.inject({
-      headers: harness.createAuthHeaders(projectManager.accessToken),
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${projectOne.id}/members`,
     });
     const demoteSecondOwner = await harness.app.inject({
-      headers: harness.createAuthHeaders(projectManager.accessToken),
+      headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${projectTwo.id}/members`,
     });
@@ -825,7 +907,7 @@ describe("teams crud api", () => {
       .where(eq(usersTeamsTeamRoles.teamId, team.id))
       .all();
     const revokeResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(projectManager.accessToken),
+      headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
       payload: {
         roleCode: "GGTC_TEAMROLE_PROJECT_MANAGER",
@@ -905,7 +987,7 @@ describe("teams crud api", () => {
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
@@ -1114,7 +1196,7 @@ describe("teams crud api", () => {
       payload: {
         members: [
           {
-            roleCodes: [],
+            roleCodes: [PROJECT_OWNER_ROLE],
             userId: projectOwner.user.id,
           },
         ],
@@ -1252,7 +1334,7 @@ describe("teams crud api", () => {
     const demotionResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
-      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      payload: { members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }] },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 
@@ -1331,7 +1413,7 @@ describe("teams crud api", () => {
     await harness.app.inject({
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
-      payload: { members: [{ roleCodes: [], userId: projectOwner.user.id }] },
+      payload: { members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }] },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
 

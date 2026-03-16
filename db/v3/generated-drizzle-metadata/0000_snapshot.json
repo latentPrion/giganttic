@@ -1,0 +1,1904 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "b2891a69-0622-4f48-b11c-87f96905ec51",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "ClosedReasons": {
+      "name": "ClosedReasons",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "CredentialTypes": {
+      "name": "CredentialTypes",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "allowsMultiplePerUser": {
+          "name": "allowsMultiplePerUser",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "IssueStatuses": {
+      "name": "IssueStatuses",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Issues": {
+      "name": "Issues",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "journal": {
+          "name": "journal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ISSUE_STATUS_OPEN'"
+        },
+        "closedReason": {
+          "name": "closedReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "progressPercentage": {
+          "name": "progressPercentage",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "openedAt": {
+          "name": "openedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "closedAt": {
+          "name": "closedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "closedReasonDescription": {
+          "name": "closedReasonDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "Issues_projectId_Projects_id_fk": {
+          "name": "Issues_projectId_Projects_id_fk",
+          "tableFrom": "Issues",
+          "tableTo": "Projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Issues_status_IssueStatuses_code_fk": {
+          "name": "Issues_status_IssueStatuses_code_fk",
+          "tableFrom": "Issues",
+          "tableTo": "IssueStatuses",
+          "columnsFrom": [
+            "status"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        },
+        "Issues_closedReason_ClosedReasons_code_fk": {
+          "name": "Issues_closedReason_ClosedReasons_code_fk",
+          "tableFrom": "Issues",
+          "tableTo": "ClosedReasons",
+          "columnsFrom": [
+            "closedReason"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "Issues_priority_non_negative_check": {
+          "name": "Issues_priority_non_negative_check",
+          "value": "\"Issues\".\"priority\" >= 0"
+        },
+        "Issues_progressPercentage_range_check": {
+          "name": "Issues_progressPercentage_range_check",
+          "value": "\"Issues\".\"progressPercentage\" >= 0 AND \"Issues\".\"progressPercentage\" <= 100"
+        }
+      }
+    },
+    "ManagedTestDataRecords": {
+      "name": "ManagedTestDataRecords",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "seedKey": {
+          "name": "seedKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityTable": {
+          "name": "entityTable",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityId": {
+          "name": "entityId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "ManagedTestDataRecords_seedKey_unique": {
+          "name": "ManagedTestDataRecords_seedKey_unique",
+          "columns": [
+            "seedKey"
+          ],
+          "isUnique": true
+        },
+        "ManagedTestDataRecords_entityTable_entityId_unique": {
+          "name": "ManagedTestDataRecords_entityTable_entityId_unique",
+          "columns": [
+            "entityTable",
+            "entityId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "OrganizationRoles": {
+      "name": "OrganizationRoles",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Organizations": {
+      "name": "Organizations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Organizations_Teams": {
+      "name": "Organizations_Teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "organizationId": {
+          "name": "organizationId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Organizations_Teams_organizationId_teamId_unique": {
+          "name": "Organizations_Teams_organizationId_teamId_unique",
+          "columns": [
+            "organizationId",
+            "teamId"
+          ],
+          "isUnique": true
+        },
+        "Organizations_Teams_teamId_unique": {
+          "name": "Organizations_Teams_teamId_unique",
+          "columns": [
+            "teamId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Organizations_Teams_organizationId_Organizations_id_fk": {
+          "name": "Organizations_Teams_organizationId_Organizations_id_fk",
+          "tableFrom": "Organizations_Teams",
+          "tableTo": "Organizations",
+          "columnsFrom": [
+            "organizationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Organizations_Teams_teamId_Teams_id_fk": {
+          "name": "Organizations_Teams_teamId_Teams_id_fk",
+          "tableFrom": "Organizations_Teams",
+          "tableTo": "Teams",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "ProjectRoles": {
+      "name": "ProjectRoles",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Projects": {
+      "name": "Projects",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "journal": {
+          "name": "journal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Projects_Organizations": {
+      "name": "Projects_Organizations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "organizationId": {
+          "name": "organizationId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Projects_Organizations_organizationId_projectId_unique": {
+          "name": "Projects_Organizations_organizationId_projectId_unique",
+          "columns": [
+            "organizationId",
+            "projectId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Projects_Organizations_organizationId_Organizations_id_fk": {
+          "name": "Projects_Organizations_organizationId_Organizations_id_fk",
+          "tableFrom": "Projects_Organizations",
+          "tableTo": "Organizations",
+          "columnsFrom": [
+            "organizationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Projects_Organizations_projectId_Projects_id_fk": {
+          "name": "Projects_Organizations_projectId_Projects_id_fk",
+          "tableFrom": "Projects_Organizations",
+          "tableTo": "Projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Projects_Teams": {
+      "name": "Projects_Teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Projects_Teams_projectId_teamId_unique": {
+          "name": "Projects_Teams_projectId_teamId_unique",
+          "columns": [
+            "projectId",
+            "teamId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Projects_Teams_projectId_Projects_id_fk": {
+          "name": "Projects_Teams_projectId_Projects_id_fk",
+          "tableFrom": "Projects_Teams",
+          "tableTo": "Projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Projects_Teams_teamId_Teams_id_fk": {
+          "name": "Projects_Teams_teamId_Teams_id_fk",
+          "tableFrom": "Projects_Teams",
+          "tableTo": "Teams",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Projects_Users": {
+      "name": "Projects_Users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Projects_Users_projectId_userId_unique": {
+          "name": "Projects_Users_projectId_userId_unique",
+          "columns": [
+            "projectId",
+            "userId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Projects_Users_projectId_Projects_id_fk": {
+          "name": "Projects_Users_projectId_Projects_id_fk",
+          "tableFrom": "Projects_Users",
+          "tableTo": "Projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Projects_Users_userId_Users_id_fk": {
+          "name": "Projects_Users_userId_Users_id_fk",
+          "tableFrom": "Projects_Users",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "SystemRoles": {
+      "name": "SystemRoles",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "TeamRoles": {
+      "name": "TeamRoles",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Teams": {
+      "name": "Teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Teams_Users": {
+      "name": "Teams_Users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Teams_Users_teamId_userId_unique": {
+          "name": "Teams_Users_teamId_userId_unique",
+          "columns": [
+            "teamId",
+            "userId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Teams_Users_teamId_Teams_id_fk": {
+          "name": "Teams_Users_teamId_Teams_id_fk",
+          "tableFrom": "Teams_Users",
+          "tableTo": "Teams",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Teams_Users_userId_Users_id_fk": {
+          "name": "Teams_Users_userId_Users_id_fk",
+          "tableFrom": "Teams_Users",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users": {
+      "name": "Users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "isActive": {
+          "name": "isActive",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "deactivatedAt": {
+          "name": "deactivatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "deletedAt": {
+          "name": "deletedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "Users_username_unique": {
+          "name": "Users_username_unique",
+          "columns": [
+            "username"
+          ],
+          "isUnique": true
+        },
+        "Users_email_unique": {
+          "name": "Users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_CredentialTypes": {
+      "name": "Users_CredentialTypes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credentialTypeCode": {
+          "name": "credentialTypeCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credentialLabel": {
+          "name": "credentialLabel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "Users_CredentialTypes_password_singleton_unique": {
+          "name": "Users_CredentialTypes_password_singleton_unique",
+          "columns": [
+            "userId"
+          ],
+          "isUnique": true,
+          "where": "\"Users_CredentialTypes\".\"credentialTypeCode\" = 'GGTC_CREDTYPE_USERNAME_PASSWORD'"
+        }
+      },
+      "foreignKeys": {
+        "Users_CredentialTypes_userId_Users_id_fk": {
+          "name": "Users_CredentialTypes_userId_Users_id_fk",
+          "tableFrom": "Users_CredentialTypes",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_CredentialTypes_credentialTypeCode_CredentialTypes_code_fk": {
+          "name": "Users_CredentialTypes_credentialTypeCode_CredentialTypes_code_fk",
+          "tableFrom": "Users_CredentialTypes",
+          "tableTo": "CredentialTypes",
+          "columnsFrom": [
+            "credentialTypeCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_Organizations": {
+      "name": "Users_Organizations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "organizationId": {
+          "name": "organizationId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_Organizations_organizationId_userId_unique": {
+          "name": "Users_Organizations_organizationId_userId_unique",
+          "columns": [
+            "organizationId",
+            "userId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_Organizations_organizationId_Organizations_id_fk": {
+          "name": "Users_Organizations_organizationId_Organizations_id_fk",
+          "tableFrom": "Users_Organizations",
+          "tableTo": "Organizations",
+          "columnsFrom": [
+            "organizationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Organizations_userId_Users_id_fk": {
+          "name": "Users_Organizations_userId_Users_id_fk",
+          "tableFrom": "Users_Organizations",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_Organizations_OrganizationRoles": {
+      "name": "Users_Organizations_OrganizationRoles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organizationId": {
+          "name": "organizationId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roleCode": {
+          "name": "roleCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_Organizations_OrganizationRoles_userId_organizationId_roleCode_unique": {
+          "name": "Users_Organizations_OrganizationRoles_userId_organizationId_roleCode_unique",
+          "columns": [
+            "userId",
+            "organizationId",
+            "roleCode"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_Organizations_OrganizationRoles_userId_Users_id_fk": {
+          "name": "Users_Organizations_OrganizationRoles_userId_Users_id_fk",
+          "tableFrom": "Users_Organizations_OrganizationRoles",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Organizations_OrganizationRoles_organizationId_Organizations_id_fk": {
+          "name": "Users_Organizations_OrganizationRoles_organizationId_Organizations_id_fk",
+          "tableFrom": "Users_Organizations_OrganizationRoles",
+          "tableTo": "Organizations",
+          "columnsFrom": [
+            "organizationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Organizations_OrganizationRoles_roleCode_OrganizationRoles_code_fk": {
+          "name": "Users_Organizations_OrganizationRoles_roleCode_OrganizationRoles_code_fk",
+          "tableFrom": "Users_Organizations_OrganizationRoles",
+          "tableTo": "OrganizationRoles",
+          "columnsFrom": [
+            "roleCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_PasswordCredentials": {
+      "name": "Users_PasswordCredentials",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userCredentialTypeId": {
+          "name": "userCredentialTypeId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "passwordHash": {
+          "name": "passwordHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "passwordAlgorithm": {
+          "name": "passwordAlgorithm",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'argon2id'"
+        },
+        "passwordVersion": {
+          "name": "passwordVersion",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "passwordUpdatedAt": {
+          "name": "passwordUpdatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_PasswordCredentials_userCredentialTypeId_unique": {
+          "name": "Users_PasswordCredentials_userCredentialTypeId_unique",
+          "columns": [
+            "userCredentialTypeId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_PasswordCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk": {
+          "name": "Users_PasswordCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk",
+          "tableFrom": "Users_PasswordCredentials",
+          "tableTo": "Users_CredentialTypes",
+          "columnsFrom": [
+            "userCredentialTypeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_Projects_ProjectRoles": {
+      "name": "Users_Projects_ProjectRoles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roleCode": {
+          "name": "roleCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_Projects_ProjectRoles_userId_projectId_roleCode_unique": {
+          "name": "Users_Projects_ProjectRoles_userId_projectId_roleCode_unique",
+          "columns": [
+            "userId",
+            "projectId",
+            "roleCode"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_Projects_ProjectRoles_userId_Users_id_fk": {
+          "name": "Users_Projects_ProjectRoles_userId_Users_id_fk",
+          "tableFrom": "Users_Projects_ProjectRoles",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Projects_ProjectRoles_projectId_Projects_id_fk": {
+          "name": "Users_Projects_ProjectRoles_projectId_Projects_id_fk",
+          "tableFrom": "Users_Projects_ProjectRoles",
+          "tableTo": "Projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Projects_ProjectRoles_roleCode_ProjectRoles_code_fk": {
+          "name": "Users_Projects_ProjectRoles_roleCode_ProjectRoles_code_fk",
+          "tableFrom": "Users_Projects_ProjectRoles",
+          "tableTo": "ProjectRoles",
+          "columnsFrom": [
+            "roleCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_Sessions": {
+      "name": "Users_Sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sessionTokenHash": {
+          "name": "sessionTokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "startTimestamp": {
+          "name": "startTimestamp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expirationTimestamp": {
+          "name": "expirationTimestamp",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ipAddress": {
+          "name": "ipAddress",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "location": {
+          "name": "location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "oauthAuthorizationCode": {
+          "name": "oauthAuthorizationCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "oauthAccessToken": {
+          "name": "oauthAccessToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "oauthRefreshToken": {
+          "name": "oauthRefreshToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_Sessions_sessionTokenHash_unique": {
+          "name": "Users_Sessions_sessionTokenHash_unique",
+          "columns": [
+            "sessionTokenHash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_Sessions_userId_Users_id_fk": {
+          "name": "Users_Sessions_userId_Users_id_fk",
+          "tableFrom": "Users_Sessions",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "Users_Sessions_expirationTimestamp_after_startTimestamp_check": {
+          "name": "Users_Sessions_expirationTimestamp_after_startTimestamp_check",
+          "value": "\"Users_Sessions\".\"expirationTimestamp\" > \"Users_Sessions\".\"startTimestamp\""
+        }
+      }
+    },
+    "Users_SystemRoles": {
+      "name": "Users_SystemRoles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roleCode": {
+          "name": "roleCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_SystemRoles_userId_roleCode_unique": {
+          "name": "Users_SystemRoles_userId_roleCode_unique",
+          "columns": [
+            "userId",
+            "roleCode"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_SystemRoles_userId_Users_id_fk": {
+          "name": "Users_SystemRoles_userId_Users_id_fk",
+          "tableFrom": "Users_SystemRoles",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_SystemRoles_roleCode_SystemRoles_code_fk": {
+          "name": "Users_SystemRoles_roleCode_SystemRoles_code_fk",
+          "tableFrom": "Users_SystemRoles",
+          "tableTo": "SystemRoles",
+          "columnsFrom": [
+            "roleCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_Teams_TeamRoles": {
+      "name": "Users_Teams_TeamRoles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "teamId": {
+          "name": "teamId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "roleCode": {
+          "name": "roleCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_Teams_TeamRoles_userId_teamId_roleCode_unique": {
+          "name": "Users_Teams_TeamRoles_userId_teamId_roleCode_unique",
+          "columns": [
+            "userId",
+            "teamId",
+            "roleCode"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_Teams_TeamRoles_userId_Users_id_fk": {
+          "name": "Users_Teams_TeamRoles_userId_Users_id_fk",
+          "tableFrom": "Users_Teams_TeamRoles",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Teams_TeamRoles_teamId_Teams_id_fk": {
+          "name": "Users_Teams_TeamRoles_teamId_Teams_id_fk",
+          "tableFrom": "Users_Teams_TeamRoles",
+          "tableTo": "Teams",
+          "columnsFrom": [
+            "teamId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_Teams_TeamRoles_roleCode_TeamRoles_code_fk": {
+          "name": "Users_Teams_TeamRoles_roleCode_TeamRoles_code_fk",
+          "tableFrom": "Users_Teams_TeamRoles",
+          "tableTo": "TeamRoles",
+          "columnsFrom": [
+            "roleCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

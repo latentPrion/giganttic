@@ -317,11 +317,11 @@ VALUES (
   }
 }
 
-function createV2TestData(db) {
+function createV2StyleTestData(db, schemaName) {
   const {
     seededScopedFixtures,
     seededTestAccounts,
-  } = getSeededTestData("v2");
+  } = getSeededTestData(schemaName);
 
   const seededUserIds = {
     admin: insertSeedUser(db, seededTestAccounts.admin),
@@ -486,11 +486,11 @@ function ensureSeededTestData(db, schemaName) {
     purgeTrackedTopLevelEntities(db, readTrackedEntityIds(db));
     runDelete(db, `DELETE FROM ${MANAGED_TEST_DATA_RECORDS_TABLE};`);
 
-    if (schemaName !== "v2") {
-      throw new Error(`Test data seeding is only supported for schema v2, received ${schemaName}.`);
+    if (schemaName !== "v2" && schemaName !== "v3") {
+      throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
     }
 
-    createV2TestData(db);
+    createV2StyleTestData(db, schemaName);
     db.exec("COMMIT;");
   } catch (error) {
     db.exec("ROLLBACK;");

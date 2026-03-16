@@ -17,6 +17,7 @@ import {
 } from "./crud-test-helpers.js";
 
 const harness = createCrudTestHarness("organizations-crud.sqlite");
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("organizations crud api", () => {
   function createOrganization(
@@ -544,7 +545,7 @@ describe("organizations crud api", () => {
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
@@ -595,7 +596,7 @@ describe("organizations crud api", () => {
       headers: harness.createAuthHeaders(orphanProjectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: orphanProjectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: orphanProjectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${orphanProject.id}/members`,
     });
@@ -711,6 +712,37 @@ describe("organizations crud api", () => {
     expect(adminListBody.organizations.some((row) => row.id === organization.id)).toBe(false);
   });
 
+  it("allows a privileged non-member organization project manager to view the organization without edit powers", async () => {
+    const creator = await harness.registerUser("org-view-pm-creator");
+    const privilegedNonMember = await harness.registerUser("org-view-pm-member");
+    const orgResponse = await createOrganization(creator.accessToken, {
+      name: "Visible To Org PM",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      orgResponse.payload,
+    );
+    const grantResponse = await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: privilegedNonMember.user.id,
+    });
+    const listResponse = await listOrganizations(privilegedNonMember.accessToken);
+    const getResponse = await getOrganization(privilegedNonMember.accessToken, organization.id);
+    const patchResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(privilegedNonMember.accessToken),
+      method: "PATCH",
+      payload: { description: "Should stay forbidden" },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}`,
+    });
+
+    expect(grantResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ organizations: Array<{ id: number }> }>(listResponse.payload).organizations
+        .map((entry) => entry.id),
+    ).toContain(organization.id);
+    expect(getResponse.statusCode).toBe(200);
+    expect(patchResponse.statusCode).toBe(403);
+  });
+
   it("allows targeting org roles at indirect org members on org-owned teams", async () => {
     const creator = await harness.registerUser("org-indirect-role-creator");
     const teamOwner = await harness.registerUser("org-indirect-role-owner");
@@ -784,7 +816,7 @@ describe("organizations crud api", () => {
       headers: harness.createAuthHeaders(projectOwner.accessToken),
       method: "PUT",
       payload: {
-        members: [{ roleCodes: [], userId: projectOwner.user.id }],
+        members: [{ roleCodes: [PROJECT_OWNER_ROLE], userId: projectOwner.user.id }],
       },
       url: `/stc-proj-mgmt/api/projects/${project.id}/members`,
     });
@@ -935,10 +967,10 @@ describe("organizations crud api", () => {
     });
 
     expect(allowedGrant.statusCode).toBe(200);
-    expect(forbiddenGrant.statusCode).toBe(409);
+    expect(forbiddenGrant.statusCode).toBe(403);
   });
 
-  it("lets an organization team manager grant direct project manager on eligible projects to users outside the org", async () => {
+  it("forbids an organization team manager from granting direct project manager on eligible projects", async () => {
     const creator = await harness.registerUser("org-team-grant-project-creator");
     const orgTeamManager = await harness.registerUser("org-team-grant-project-manager");
     const teamOwner = await harness.registerUser("org-team-grant-project-owner");
@@ -974,7 +1006,7 @@ describe("organizations crud api", () => {
       method: "PUT",
       payload: {
         members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"], userId: projectOwner.user.id },
+          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: projectOwner.user.id },
           { roleCodes: [], userId: outsider.user.id },
         ],
       },
@@ -996,10 +1028,10 @@ describe("organizations crud api", () => {
       url: `/stc-proj-mgmt/api/projects/${project.id}/roles/grant`,
     });
 
-    expect(grantResponse.statusCode).toBe(200);
+    expect(grantResponse.statusCode).toBe(403);
   });
 
-  it("lets an organization manager grant org roles only to org members and rejects duplicates and missing revokes", async () => {
+  it("lets an organization manager grant scoped org roles to non-members while still requiring membership for org manager", async () => {
     const creator = await harness.registerUser("org-org-manager-creator");
     const member = await harness.registerUser("org-org-manager-member");
     const outsider = await harness.registerUser("org-org-manager-outsider");
@@ -1023,8 +1055,12 @@ describe("organizations crud api", () => {
       roleCode: "GGTC_ORGANIZATIONROLE_TEAM_MANAGER",
       userId: member.user.id,
     });
-    const outsiderGrant = await grantOrganizationRole(creator.accessToken, organization.id, {
+    const outsiderProjectManagerGrant = await grantOrganizationRole(creator.accessToken, organization.id, {
       roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: outsider.user.id,
+    });
+    const outsiderOrgManagerGrant = await grantOrganizationRole(creator.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER",
       userId: outsider.user.id,
     });
     const missingRevoke = await revokeOrganizationRole(creator.accessToken, organization.id, {
@@ -1034,7 +1070,8 @@ describe("organizations crud api", () => {
 
     expect(memberGrant.statusCode).toBe(200);
     expect(duplicateGrant.statusCode).toBe(409);
-    expect(outsiderGrant.statusCode).toBe(409);
+    expect(outsiderProjectManagerGrant.statusCode).toBe(200);
+    expect(outsiderOrgManagerGrant.statusCode).toBe(409);
     expect(missingRevoke.statusCode).toBe(404);
   });
 

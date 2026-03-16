@@ -24,6 +24,7 @@ import {
   hasOrganizationProjectManagerRoleForProject,
   hasOrganizationTeamManagerRoleForTeam,
   hasSystemAdminRole,
+  listDirectProjectOwnerUserIds,
   listEffectiveProjectManagerUserIds,
   listEffectiveTeamManagerUserIds,
   listProjectIdsForOrganization,
@@ -34,12 +35,21 @@ import {
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import {
+  BLOCKING_OBJECT_KIND_PROJECT,
+  BLOCKING_OBJECT_KIND_TEAM,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+  BLOCKING_OBJECT_REASON_LAST_OWNER,
+  createBlockingConflictException,
+} from "../access-control/blocking-conflicts.js";
 import type { DeleteUserResponse } from "./users.contracts.js";
 
+const LAST_OWNER_DELETE_MESSAGE = "User delete would remove the last owner";
 const LAST_PROJECT_MANAGER_DELETE_MESSAGE =
-  "That user is still the final PROJECT_MANAGER for at least one project";
+  "User delete would remove the last effective project manager";
 const LAST_TEAM_MANAGER_DELETE_MESSAGE =
-  "That user is still the final TEAM_MANAGER for at least one team";
+  "User delete would remove the last effective team manager";
 
 @Injectable()
 export class UsersService {
@@ -54,6 +64,7 @@ export class UsersService {
   ): Promise<DeleteUserResponse> {
     this.assertUserExists(userId);
     this.assertCanDeleteUser(authContext, userId);
+    this.assertUserDeletionPreservesProjectOwners(userId);
     this.assertUserDeletionPreservesTeamManagers(userId);
     this.assertUserDeletionPreservesProjectManagers(userId);
 
@@ -99,6 +110,25 @@ export class UsersService {
     throw new ForbiddenException("Not permitted to delete that user");
   }
 
+  private assertUserDeletionPreservesProjectOwners(userId: number): void {
+    for (const projectId of this.listOwnedProjectIds(userId)) {
+      const remainingOwnerIds = listDirectProjectOwnerUserIds(
+        this.databaseService.db,
+        projectId,
+      ).filter((ownerUserId) => ownerUserId !== userId);
+
+      if (remainingOwnerIds.length === 0) {
+        throw createBlockingConflictException(LAST_OWNER_DELETE_MESSAGE, [
+          {
+            id: projectId,
+            kind: BLOCKING_OBJECT_KIND_PROJECT,
+            reason: BLOCKING_OBJECT_REASON_LAST_OWNER,
+          },
+        ]);
+      }
+    }
+  }
+
   private assertUserDeletionPreservesProjectManagers(userId: number): void {
     for (const projectId of this.listAffectedProjectIds(userId)) {
       const remainingManagerIds = listEffectiveProjectManagerUserIds(
@@ -107,7 +137,13 @@ export class UsersService {
       ).filter((managerUserId) => managerUserId !== userId);
 
       if (remainingManagerIds.length === 0) {
-        throw new ConflictException(LAST_PROJECT_MANAGER_DELETE_MESSAGE);
+        throw createBlockingConflictException(LAST_PROJECT_MANAGER_DELETE_MESSAGE, [
+          {
+            id: projectId,
+            kind: BLOCKING_OBJECT_KIND_PROJECT,
+            reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+          },
+        ]);
       }
     }
   }
@@ -120,7 +156,13 @@ export class UsersService {
       ).filter((managerUserId) => managerUserId !== userId);
 
       if (remainingManagerIds.length === 0) {
-        throw new ConflictException(LAST_TEAM_MANAGER_DELETE_MESSAGE);
+        throw createBlockingConflictException(LAST_TEAM_MANAGER_DELETE_MESSAGE, [
+          {
+            id: teamId,
+            kind: BLOCKING_OBJECT_KIND_TEAM,
+            reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+          },
+        ]);
       }
     }
   }
@@ -148,6 +190,20 @@ export class UsersService {
       .flatMap((teamId) => listProjectIdsForTeam(this.databaseService.db, teamId));
 
     return uniqueNumberValues([...directProjectIds, ...teamProjectIds]);
+  }
+
+  private listOwnedProjectIds(userId: number): number[] {
+    return this.databaseService.db
+      .select({ projectId: usersProjectsProjectRoles.projectId })
+      .from(usersProjectsProjectRoles)
+      .where(eq(usersProjectsProjectRoles.userId, userId))
+      .all()
+      .filter((row) =>
+        listDirectProjectOwnerUserIds(this.databaseService.db, row.projectId)
+          .includes(userId)
+      )
+      .map((row) => row.projectId)
+      .filter((projectId, index, values) => values.indexOf(projectId) === index);
   }
 
   private listManagedTeamIds(userId: number): number[] {

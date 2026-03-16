@@ -20,6 +20,7 @@ import type { AuthContext } from "../auth/auth.types.js";
 
 export const SYSTEM_ADMIN_ROLE_CODE = systemRoleCodes.admin;
 export const PROJECT_MANAGER_ROLE_CODE = projectRoleCodes.projectManager;
+export const PROJECT_OWNER_ROLE_CODE = projectRoleCodes.projectOwner;
 export const TEAM_MANAGER_ROLE_CODE = "GGTC_TEAMROLE_TEAM_MANAGER";
 export const TEAM_PROJECT_MANAGER_ROLE_CODE = "GGTC_TEAMROLE_PROJECT_MANAGER";
 export const ORGANIZATION_MANAGER_ROLE_CODE =
@@ -227,12 +228,35 @@ export function listDirectProjectManagerUserIds(
   database: AppDatabase,
   projectId: number,
 ): number[] {
+  return listDirectProjectRoleUserIds(
+    database,
+    projectId,
+    PROJECT_MANAGER_ROLE_CODE,
+  );
+}
+
+export function listDirectProjectOwnerUserIds(
+  database: AppDatabase,
+  projectId: number,
+): number[] {
+  return listDirectProjectRoleUserIds(
+    database,
+    projectId,
+    PROJECT_OWNER_ROLE_CODE,
+  );
+}
+
+function listDirectProjectRoleUserIds(
+  database: AppDatabase,
+  projectId: number,
+  roleCode: string,
+): number[] {
   return database
     .select({ userId: usersProjectsProjectRoles.userId })
     .from(usersProjectsProjectRoles)
     .where(and(
       eq(usersProjectsProjectRoles.projectId, projectId),
-      eq(usersProjectsProjectRoles.roleCode, PROJECT_MANAGER_ROLE_CODE),
+      eq(usersProjectsProjectRoles.roleCode, roleCode),
     ))
     .all()
     .map((row) => row.userId);
@@ -346,6 +370,14 @@ export function hasDirectProjectManagerRole(
   return listDirectProjectManagerUserIds(database, projectId).includes(userId);
 }
 
+export function hasDirectProjectOwnerRole(
+  database: AppDatabase,
+  projectId: number,
+  userId: number,
+): boolean {
+  return listDirectProjectOwnerUserIds(database, projectId).includes(userId);
+}
+
 export function hasEffectiveProjectManagerRole(
   database: AppDatabase,
   projectId: number,
@@ -375,7 +407,24 @@ export function hasTeamProjectManagerRole(
   teamId: number,
   userId: number,
 ): boolean {
-  return listTeamProjectManagerUserIds(database, teamId).includes(userId);
+  return hasTeamRole(database, teamId, userId, TEAM_PROJECT_MANAGER_ROLE_CODE);
+}
+
+export function hasAnyTeamRole(
+  database: AppDatabase,
+  teamId: number,
+  userId: number,
+): boolean {
+  return Boolean(
+    database
+      .select({ id: usersTeamsTeamRoles.id })
+      .from(usersTeamsTeamRoles)
+      .where(and(
+        eq(usersTeamsTeamRoles.teamId, teamId),
+        eq(usersTeamsTeamRoles.userId, userId),
+      ))
+      .get(),
+  );
 }
 
 export function hasOrganizationProjectManagerRoleForProject(
@@ -451,17 +500,29 @@ function listTeamRoleUserIds(
   return database
     .select({ userId: usersTeamsTeamRoles.userId })
     .from(usersTeamsTeamRoles)
-    .innerJoin(
-      teamsUsers,
-      and(
-        eq(teamsUsers.teamId, usersTeamsTeamRoles.teamId),
-        eq(teamsUsers.userId, usersTeamsTeamRoles.userId),
-      ),
-    )
     .where(and(
       eq(usersTeamsTeamRoles.teamId, teamId),
       eq(usersTeamsTeamRoles.roleCode, roleCode),
     ))
     .all()
     .map((row) => row.userId);
+}
+
+function hasTeamRole(
+  database: AppDatabase,
+  teamId: number,
+  userId: number,
+  roleCode: string,
+): boolean {
+  return Boolean(
+    database
+      .select({ id: usersTeamsTeamRoles.id })
+      .from(usersTeamsTeamRoles)
+      .where(and(
+        eq(usersTeamsTeamRoles.teamId, teamId),
+        eq(usersTeamsTeamRoles.userId, userId),
+        eq(usersTeamsTeamRoles.roleCode, roleCode),
+      ))
+      .get(),
+  );
 }

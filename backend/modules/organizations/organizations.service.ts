@@ -36,6 +36,15 @@ import {
   ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
   ORGANIZATION_TEAM_MANAGER_ROLE_CODE,
 } from "../access-control/access-control.utils.js";
+import {
+  BLOCKING_OBJECT_KIND_ORGANIZATION,
+  BLOCKING_OBJECT_KIND_PROJECT,
+  BLOCKING_OBJECT_KIND_TEAM,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_ORGANIZATION_MANAGER,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+  createBlockingConflictException,
+} from "../access-control/blocking-conflicts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import type {
@@ -57,11 +66,11 @@ import type {
 } from "./organizations.contracts.js";
 
 const LAST_PROJECT_MANAGER_MESSAGE =
-  "Deleting that organization would strand at least one project without a PROJECT_MANAGER";
+  "Organization change would remove the last effective project manager";
 const LAST_TEAM_MANAGER_MESSAGE =
-  "Deleting that organization would strand at least one team without a TEAM_MANAGER";
+  "Organization change would remove the last effective team manager";
 const LAST_ORGANIZATION_MANAGER_MESSAGE =
-  "An organization must retain at least one ORGANIZATION_MANAGER member";
+  "Organization change would remove the last effective organization manager";
 const ORGANIZATION_ROLE_ALREADY_ASSIGNED_MESSAGE =
   "That organization role is already assigned";
 const ORGANIZATION_ROLE_NOT_ASSIGNED_MESSAGE =
@@ -111,6 +120,10 @@ function createOrganizationProjectRows(
     organizationId,
     projectId: project.projectId,
   }));
+}
+
+function roleRequiresDirectOrganizationMembership(roleCode: string) {
+  return roleCode === ORGANIZATION_MANAGER_ROLE_CODE;
 }
 
 @Injectable()
@@ -319,7 +332,7 @@ export class OrganizationsService {
     this.assertOrganizationExists(organizationId);
     this.assertUsersExist([payload.userId]);
     this.assertCanGrantOrganizationRole(authContext, organizationId, payload);
-    this.assertCanTargetOrganizationRole(authContext, organizationId, payload.userId);
+    this.assertCanTargetOrganizationRole(authContext, organizationId, payload);
     this.assertOrganizationRoleAbsent(organizationId, payload.userId, payload.roleCode);
 
     this.databaseService.db.transaction((tx) => {
@@ -444,13 +457,16 @@ export class OrganizationsService {
   private assertCanTargetOrganizationRole(
     authContext: AuthContext,
     organizationId: number,
-    userId: number,
+    payload: OrganizationRoleAssignmentRequest,
   ): void {
-    if (hasOrganizationMembership(this.databaseService.db, organizationId, userId)) {
+    if (
+      !roleRequiresDirectOrganizationMembership(payload.roleCode) ||
+      hasOrganizationMembership(this.databaseService.db, organizationId, payload.userId)
+    ) {
       return;
     }
 
-    if (hasSystemAdminRole(authContext) && authContext.userId === userId) {
+    if (hasSystemAdminRole(authContext) && authContext.userId === payload.userId) {
       return;
     }
 
@@ -484,7 +500,13 @@ export class OrganizationsService {
       .map((project) => project.projectId);
 
     if (associatedTeamIds.length > 0) {
-      throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
+      throw createBlockingConflictException(LAST_TEAM_MANAGER_MESSAGE, [
+        {
+          id: organizationId,
+          kind: BLOCKING_OBJECT_KIND_ORGANIZATION,
+          reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+        },
+      ]);
     }
 
     for (const projectId of directlyAssociatedProjectIds) {
@@ -492,13 +514,25 @@ export class OrganizationsService {
         organizationId,
         projectId,
       ).length === 0) {
-        throw new ConflictException(LAST_PROJECT_MANAGER_MESSAGE);
+        throw createBlockingConflictException(LAST_PROJECT_MANAGER_MESSAGE, [
+          {
+            id: projectId,
+            kind: BLOCKING_OBJECT_KIND_PROJECT,
+            reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+          },
+        ]);
       }
     }
 
     for (const teamId of associatedTeamIds) {
       if (listDirectTeamManagerUserIds(this.databaseService.db, teamId).length === 0) {
-        throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
+        throw createBlockingConflictException(LAST_TEAM_MANAGER_MESSAGE, [
+          {
+            id: teamId,
+            kind: BLOCKING_OBJECT_KIND_TEAM,
+            reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+          },
+        ]);
       }
     }
   }
@@ -530,7 +564,13 @@ export class OrganizationsService {
     ).filter((userId) => userId !== payload.userId);
 
     if (remainingManagerIds.length === 0) {
-      throw new ConflictException(LAST_ORGANIZATION_MANAGER_MESSAGE);
+      throw createBlockingConflictException(LAST_ORGANIZATION_MANAGER_MESSAGE, [
+        {
+          id: organizationId,
+          kind: BLOCKING_OBJECT_KIND_ORGANIZATION,
+          reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_ORGANIZATION_MANAGER,
+        },
+      ]);
     }
   }
 
@@ -546,7 +586,13 @@ export class OrganizationsService {
     );
 
     if (!currentManagerIds.some((userId) => retainedUserIds.includes(userId))) {
-      throw new ConflictException(LAST_ORGANIZATION_MANAGER_MESSAGE);
+      throw createBlockingConflictException(LAST_ORGANIZATION_MANAGER_MESSAGE, [
+        {
+          id: organizationId,
+          kind: BLOCKING_OBJECT_KIND_ORGANIZATION,
+          reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_ORGANIZATION_MANAGER,
+        },
+      ]);
     }
   }
 

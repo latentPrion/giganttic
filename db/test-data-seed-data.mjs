@@ -280,8 +280,8 @@ const SEEDED_SCOPED_FIXTURES = {
 };
 
 function getSeededTestData(schemaName) {
-  if (schemaName !== "v2") {
-    throw new Error(`Test data seeding is only supported for schema v2, received ${schemaName}.`);
+  if (schemaName !== "v2" && schemaName !== "v3") {
+    throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
   }
 
   return {

@@ -7,10 +7,12 @@ import {
 } from "./config.js";
 import * as v1 from "./v1/index.js";
 import * as v2 from "./v2/index.js";
+import * as v3 from "./v3/index.js";
 
 const schemaModules = {
   v1,
   v2,
+  v3,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -21,7 +23,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v2;
+] as typeof v3;
 
 export {
   availableSchemaVersions,

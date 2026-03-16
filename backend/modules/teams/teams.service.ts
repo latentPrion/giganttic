@@ -19,6 +19,8 @@ import {
 import {
   assertUsersExistOrThrow,
   getOrganizationIdForTeam,
+  hasAnyTeamRole,
+  hasDirectTeamManagerRole,
   hasEffectiveTeamManagerRole,
   hasOrganizationMembership,
   hasOrganizationTeamManagerRoleForTeam,
@@ -34,6 +36,13 @@ import {
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
 } from "../access-control/access-control.utils.js";
+import {
+  BLOCKING_OBJECT_KIND_PROJECT,
+  BLOCKING_OBJECT_KIND_TEAM,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+  BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+  createBlockingConflictException,
+} from "../access-control/blocking-conflicts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import type {
@@ -51,14 +60,14 @@ import type {
 } from "./teams.contracts.js";
 
 const LAST_LINKED_PROJECT_MANAGER_MESSAGE =
-  "Deleting or downgrading that team would strand at least one linked project without a PROJECT_MANAGER";
+  "Team change would remove the last effective project manager";
 const LAST_TEAM_MANAGER_MESSAGE =
-  "A team must retain at least one TEAM_MANAGER member";
+  "Team membership update would remove the last effective team manager";
+const LAST_TEAM_MANAGER_ROLE_REVOKE_MESSAGE =
+  "Team role revoke would remove the last effective team manager";
 const TEAM_ROLE_ALREADY_ASSIGNED_MESSAGE = "That team role is already assigned";
 const TEAM_ROLE_NOT_ASSIGNED_MESSAGE =
   "That team role assignment was not found";
-const TEAM_ROLE_REQUIRES_MEMBERSHIP_MESSAGE =
-  "A team role requires team membership";
 
 function normalizeDescription(
   description: string | null | undefined,
@@ -157,12 +166,19 @@ export class TeamsService {
   }
 
   listTeams(authContext: AuthContext): ListTeamsResponse {
-    const teamIds = this.databaseService.db
+    const membershipTeamIds = this.databaseService.db
       .select({ teamId: teamsUsers.teamId })
       .from(teamsUsers)
       .where(eq(teamsUsers.userId, authContext.userId))
       .all()
       .map((row) => row.teamId);
+    const roleTeamIds = this.databaseService.db
+      .select({ teamId: usersTeamsTeamRoles.teamId })
+      .from(usersTeamsTeamRoles)
+      .where(eq(usersTeamsTeamRoles.userId, authContext.userId))
+      .all()
+      .map((row) => row.teamId);
+    const teamIds = [...new Set([...membershipTeamIds, ...roleTeamIds])];
 
     if (teamIds.length === 0) {
       return { teams: [] };
@@ -354,7 +370,7 @@ export class TeamsService {
     if (
       payload.roleCode === TEAM_PROJECT_MANAGER_ROLE_CODE &&
       (
-        hasTeamProjectManagerRole(this.databaseService.db, teamId, authContext.userId) ||
+        hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId) ||
         this.canOrganizationTeamManagerGrantTeamProjectManager(
           authContext,
           teamId,
@@ -394,7 +410,13 @@ export class TeamsService {
 
     if (
       payload.roleCode === TEAM_PROJECT_MANAGER_ROLE_CODE &&
-      hasTeamProjectManagerRole(this.databaseService.db, teamId, authContext.userId)
+      (
+        hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId) ||
+        this.canOrganizationTeamManagerGrantTeamProjectManager(
+          authContext,
+          teamId,
+        )
+      )
     ) {
       return;
     }
@@ -407,26 +429,29 @@ export class TeamsService {
     teamId: number,
     payload: TeamRoleAssignmentRequest,
   ): void {
-    if (hasTeamMembership(this.databaseService.db, teamId, payload.userId)) {
-      return;
-    }
-
     if (
       hasSystemAdminRole(authContext) &&
-      payload.userId === authContext.userId &&
+      authContext.userId === payload.userId &&
       payload.roleCode === TEAM_MANAGER_ROLE_CODE
     ) {
       return;
     }
 
+    if (hasDirectTeamManagerRole(this.databaseService.db, teamId, authContext.userId)) {
+      return;
+    }
+
     if (
-      payload.roleCode === TEAM_MANAGER_ROLE_CODE &&
-      this.canOrganizationTeamManagerBootstrapMembership(authContext, teamId, payload.userId)
+      (
+        payload.roleCode === TEAM_PROJECT_MANAGER_ROLE_CODE ||
+        payload.roleCode === TEAM_MANAGER_ROLE_CODE
+      ) &&
+      this.canOrganizationTeamManagerTargetUser(authContext, teamId, payload.userId)
     ) {
       return;
     }
 
-    throw new ConflictException(TEAM_ROLE_REQUIRES_MEMBERSHIP_MESSAGE);
+    throw new ForbiddenException("Not permitted to target that user for the team role");
   }
 
   private assertCanViewTeam(authContext: AuthContext, teamId: number): void {
@@ -434,7 +459,10 @@ export class TeamsService {
       return;
     }
 
-    if (!hasTeamMembership(this.databaseService.db, teamId, authContext.userId)) {
+    if (
+      !hasTeamMembership(this.databaseService.db, teamId, authContext.userId) &&
+      !hasAnyTeamRole(this.databaseService.db, teamId, authContext.userId)
+    ) {
       throw new ForbiddenException("Not permitted to access that team");
     }
   }
@@ -454,7 +482,13 @@ export class TeamsService {
           treatChangedTeamAsRemoved,
         ).length === 0
       ) {
-        throw new ConflictException(LAST_LINKED_PROJECT_MANAGER_MESSAGE);
+        throw createBlockingConflictException(LAST_LINKED_PROJECT_MANAGER_MESSAGE, [
+          {
+            id: projectId,
+            kind: BLOCKING_OBJECT_KIND_PROJECT,
+            reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_PROJECT_MANAGER,
+          },
+        ]);
       }
     }
   }
@@ -501,7 +535,13 @@ export class TeamsService {
     ]);
 
     if (effectiveManagerIds.size === 0) {
-      throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
+      throw createBlockingConflictException(LAST_TEAM_MANAGER_MESSAGE, [
+        {
+          id: teamId,
+          kind: BLOCKING_OBJECT_KIND_TEAM,
+          reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+        },
+      ]);
     }
   }
 
@@ -517,7 +557,13 @@ export class TeamsService {
       .filter((userId) => userId !== payload.userId);
 
     if (remainingManagerIds.length === 0) {
-      throw new ConflictException(LAST_TEAM_MANAGER_MESSAGE);
+      throw createBlockingConflictException(LAST_TEAM_MANAGER_ROLE_REVOKE_MESSAGE, [
+        {
+          id: teamId,
+          kind: BLOCKING_OBJECT_KIND_TEAM,
+          reason: BLOCKING_OBJECT_REASON_LAST_EFFECTIVE_TEAM_MANAGER,
+        },
+      ]);
     }
   }
 
@@ -577,34 +623,12 @@ export class TeamsService {
   }
 
   private ensureTeamMembershipForRoleGrant(
-    tx: DatabaseService["db"],
-    authContext: AuthContext,
-    teamId: number,
-    payload: TeamRoleAssignmentRequest,
+    _tx: DatabaseService["db"],
+    _authContext: AuthContext,
+    _teamId: number,
+    _payload: TeamRoleAssignmentRequest,
   ): void {
-    if (
-      !hasSystemAdminRole(authContext) ||
-      payload.userId !== authContext.userId ||
-      payload.roleCode !== TEAM_MANAGER_ROLE_CODE ||
-      hasTeamMembership(this.databaseService.db, teamId, payload.userId)
-    ) {
-      if (
-        !this.canOrganizationTeamManagerBootstrapMembership(
-          authContext,
-          teamId,
-          payload.userId,
-        )
-      ) {
-        return;
-      }
-    }
-
-    tx.insert(teamsUsers)
-      .values({
-        teamId,
-        userId: payload.userId,
-      })
-      .run();
+    return;
   }
 
   private getTeamRecordByIdOrThrow(teamId: number): TeamResponse {
@@ -702,15 +726,11 @@ export class TeamsService {
       .map((row) => row.userId);
   }
 
-  private canOrganizationTeamManagerBootstrapMembership(
+  private canOrganizationTeamManagerTargetUser(
     authContext: AuthContext,
     teamId: number,
     userId: number,
   ): boolean {
-    if (hasTeamMembership(this.databaseService.db, teamId, userId)) {
-      return false;
-    }
-
     if (
       !hasOrganizationTeamManagerRoleForTeam(
         this.databaseService.db,

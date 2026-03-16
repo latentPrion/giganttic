@@ -88,6 +88,13 @@ async function countIssueStatuses(dbPath: string) {
   );
 }
 
+async function countRowsWhere(dbPath: string, tableName: string, whereClause: string) {
+  return querySingleNumber(
+    dbPath,
+    `SELECT COUNT(*) FROM ${tableName} WHERE ${whereClause};`,
+  );
+}
+
 async function renameSeededUser(dbPath: string) {
   const SQL = await initSqlJs();
   const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
@@ -119,6 +126,46 @@ async function deleteOneSeededUser(dbPath: string) {
   const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
 
   db.exec("DELETE FROM Users WHERE username = 'testadminuser';");
+
+  const bytes = db.export();
+  db.close();
+  await writeFile(dbPath, Buffer.from(bytes));
+}
+
+async function deleteProjectRoleCode(dbPath: string, roleCode: string) {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
+
+  db.exec(`DELETE FROM ProjectRoles WHERE code = '${roleCode}';`);
+
+  const bytes = db.export();
+  db.close();
+  await writeFile(dbPath, Buffer.from(bytes));
+}
+
+async function seedV2ProjectManagerAssignment(dbPath: string) {
+  const SQL = await initSqlJs();
+  const db = new SQL.Database(new Uint8Array(await readFile(dbPath)));
+
+  db.exec(
+    `INSERT INTO ProjectRoles (code, displayName)
+     VALUES ('GGTC_PROJECTROLE_PROJECT_MANAGER', 'Project Manager');`,
+  );
+  db.exec(
+    `INSERT INTO Users (id, username, email, isActive, createdAt, updatedAt)
+     VALUES (101, 'legacy-ownerless-manager', 'legacy-ownerless-manager@example.com', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+  );
+  db.exec(
+    `INSERT INTO Projects (id, name, createdAt, updatedAt)
+     VALUES (501, 'Legacy Managed Project', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+  );
+  db.exec(
+    "INSERT INTO Projects_Users (userId, projectId) VALUES (101, 501);",
+  );
+  db.exec(
+    `INSERT INTO Users_Projects_ProjectRoles (userId, projectId, roleCode)
+     VALUES (101, 501, 'GGTC_PROJECTROLE_PROJECT_MANAGER');`,
+  );
 
   const bytes = db.export();
   db.close();
@@ -295,6 +342,11 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v1--v2",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v2--v3",
+      projectRoot: tempDir,
+    });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
@@ -321,16 +373,16 @@ describe("db lifecycle scripts", () => {
     await createDatabaseFromSchema({
       dbTarget: "prod",
       projectRoot: tempDir,
-      schemaName: "v1",
+      schemaName: "v2",
     });
 
     await migrateDatabase({
       dbTarget: "proddev",
-      migrationPairName: "v1--v2",
+      migrationPairName: "v2--v3",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(prodDbPath)).toBe("v1");
+    expect(await readSchemaName(prodDbPath)).toBe("v2");
     expect(await readSchemaName(proddevDbPath)).toBe(
       dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir,
     );
@@ -570,6 +622,88 @@ describe("db lifecycle scripts", () => {
     expect(await countIssueStatuses(dbPath)).toBe(initialIssueStatusCount);
     expect(await countSeededUsers(dbPath)).toBe(0);
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
+  }, 20_000);
+
+  it("prepareDatabase on v3 re-seeds a missing project owner reference row", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await createRuntimeSchemaDb(tempDir, "dev");
+    await prepareDatabase({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+    });
+    await deleteProjectRoleCode(dbPath, "GGTC_PROJECTROLE_PROJECT_OWNER");
+
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ProjectRoles",
+        "code = 'GGTC_PROJECTROLE_PROJECT_OWNER'",
+      ),
+    ).toBe(0);
+
+    await prepareDatabase({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+    });
+
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ProjectRoles",
+        "code = 'GGTC_PROJECTROLE_PROJECT_OWNER'",
+      ),
+    ).toBe(1);
+  }, 20_000);
+
+  it("migrates v2 to v3 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+      schemaName: "v2",
+    });
+    await seedV2ProjectManagerAssignment(dbPath);
+
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "Users_Projects_ProjectRoles",
+        "roleCode = 'GGTC_PROJECTROLE_PROJECT_MANAGER'",
+      ),
+    ).toBe(1);
+
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v2--v3",
+      projectRoot: tempDir,
+    });
+    await prepareDatabase({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+    });
+
+    expect(await readSchemaName(dbPath)).toBe("v3");
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "Users_Projects_ProjectRoles",
+        "roleCode = 'GGTC_PROJECTROLE_PROJECT_MANAGER'",
+      ),
+    ).toBe(1);
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ProjectRoles",
+        "code = 'GGTC_PROJECTROLE_PROJECT_OWNER'",
+      ),
+    ).toBe(1);
   }, 20_000);
 
   it("prepareDatabase fails cleanly when the DB exists but has no schema metadata", async () => {

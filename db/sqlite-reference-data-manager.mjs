@@ -47,8 +47,8 @@ function ensureV1ReferenceData(db) {
   }
 }
 
-function ensureV2ReferenceData(db) {
-  const referenceSeedData = getReferenceSeedData("v2");
+function ensureV2StyleReferenceData(db, schemaName) {
+  const referenceSeedData = getReferenceSeedData(schemaName);
 
   for (const credentialType of referenceSeedData.credentialTypes) {
     runReferenceUpsert(db, "CredentialTypes", createCredentialTypeUpsertSql(credentialType));
@@ -85,8 +85,8 @@ function ensureReferenceData(db, schemaName) {
   try {
     if (schemaName === "v1") {
       ensureV1ReferenceData(db);
-    } else if (schemaName === "v2") {
-      ensureV2ReferenceData(db);
+    } else if (schemaName === "v2" || schemaName === "v3") {
+      ensureV2StyleReferenceData(db, schemaName);
     } else {
       throw new Error(`Unsupported schema for reference data reconciliation: ${schemaName}`);
     }
