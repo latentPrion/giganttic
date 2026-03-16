@@ -5,6 +5,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 
 import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
@@ -13,6 +14,7 @@ interface EntityListItemCardProps {
   children?: React.ReactNode;
   description: string | null;
   onNavigate?(): void;
+  paperSx?: SxProps<Theme>;
   title: string;
   viewMode: EntityListItemViewMode;
 }
@@ -34,7 +36,15 @@ export function EntityListItemCard(props: EntityListItemCardProps) {
   const isNavigable = props.onNavigate !== undefined;
 
   return (
-    <Paper elevation={0} sx={{ padding: CARD_PADDING }}>
+    <Paper
+      elevation={0}
+      sx={[
+        {
+          padding: CARD_PADDING,
+        },
+        ...(Array.isArray(props.paperSx) ? props.paperSx : [props.paperSx]),
+      ]}
+    >
       <Stack
         alignItems={{ sm: "center", xs: "flex-start" }}
         direction={{ sm: "row", xs: "column" }}

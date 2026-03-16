@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import {
   createProjectDetailRoute,
   createProjectGanttRoute,
+  createProjectKanbanRoute,
   createProjectIssuesRoute,
   type ProjectRouteSection,
 } from "../routes/project-route-paths.js";
@@ -18,6 +19,7 @@ interface ProjectManagerProjectNavigationProps {
 
 const DETAIL_LABEL = "Details";
 const GANTT_LABEL = "Gantt";
+const KANBAN_LABEL = "Kanban Board";
 const ISSUES_LABEL = "Issues";
 
 function buildRouteForSection(
@@ -33,6 +35,8 @@ function buildRouteForSection(
       return createProjectDetailRoute(projectId);
     case "gantt":
       return createProjectGanttRoute(projectId);
+    case "kanban":
+      return createProjectKanbanRoute(projectId);
     case "issues":
       return createProjectIssuesRoute(projectId);
   }
@@ -58,6 +62,7 @@ export function ProjectManagerProjectNavigation(
     <Tabs onChange={handleSectionChange} value={props.currentSection}>
       <Tab disabled={props.projectId === null} label={DETAIL_LABEL} value="detail" />
       <Tab disabled={props.projectId === null} label={GANTT_LABEL} value="gantt" />
+      <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
       <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
     </Tabs>
   );

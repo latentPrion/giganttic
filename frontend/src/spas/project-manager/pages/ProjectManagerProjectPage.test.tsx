@@ -170,6 +170,22 @@ describe("ProjectManagerProjectPage", () => {
     expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
   });
 
+  it("navigates to the kanban route while preserving project id", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Kanban Board" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/kanban?projectId=42");
+  });
+
   it("navigates to the issues route while preserving project id", async () => {
     const user = userEvent.setup();
 

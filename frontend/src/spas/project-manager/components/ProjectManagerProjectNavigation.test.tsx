@@ -28,10 +28,12 @@ describe("ProjectManagerProjectNavigation", () => {
     );
 
     await user.click(screen.getByRole("tab", { name: "Gantt" }));
+    await user.click(screen.getByRole("tab", { name: "Kanban Board" }));
     await user.click(screen.getByRole("tab", { name: "Issues" }));
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project/gantt?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/issues?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/kanban?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(3, "/pm/project/issues?projectId=42");
   });
 
   it("disables project-scoped navigation when no project is selected", () => {
@@ -41,6 +43,7 @@ describe("ProjectManagerProjectNavigation", () => {
 
     expect(screen.getByRole("tab", { name: "Details" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Gantt" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Kanban Board" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Issues" })).toBeDisabled();
   });
 });

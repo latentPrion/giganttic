@@ -291,6 +291,19 @@ describe("app routing", () => {
     expect(await screen.findByRole("tab", { name: "Both" })).toBeVisible();
   });
 
+  it("renders the PM project kanban SPA for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/kanban?projectId=1"],
+    });
+
+    expect(await screen.findByText("Project Kanban Board")).toBeVisible();
+    expect(screen.getByText("Selected project: 1")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Open" })).toBeVisible();
+  });
+
   it("renders the PM project route with a safe fallback when the project query param is invalid", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
@@ -371,6 +384,18 @@ describe("app routing", () => {
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
     expect(screen.getByText("No gantt chart file exists for this project yet.")).toBeVisible();
+  });
+
+  it("renders a safe fallback when the PM kanban route is missing projectId", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/kanban"],
+    });
+
+    expect(await screen.findByText("Project Kanban Board")).toBeVisible();
+    expect(screen.getByText("Select a valid project to view its kanban board.")).toBeVisible();
   });
 
   it("renders a safe fallback when the PM issues route is missing projectId", async () => {
