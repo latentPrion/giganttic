@@ -2,6 +2,7 @@ import React from "react";
 import { Chip, Stack, Typography } from "@mui/material";
 
 import { EntityListItemCard } from "../../../../common/components/entity-list/EntityListItemCard.js";
+import { getIssuePriorityLabel } from "../../lib/issue-priority.js";
 import type { KanbanIssueCardData } from "./kanban.types.js";
 
 const VIEW_MODE = "link-only-no-action-buttons";
@@ -46,7 +47,7 @@ export function KanbanIssueCard(props: { card: KanbanIssueCardData }) {
           variant="outlined"
         />
         <Chip
-          label={`Priority ${issue.priority}`}
+          label={`Priority ${getIssuePriorityLabel(issue.priority)}`}
           size="small"
           variant="outlined"
         />

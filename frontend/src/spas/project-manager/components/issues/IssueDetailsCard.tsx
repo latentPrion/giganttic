@@ -5,6 +5,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Issue } from "../../contracts/issue.contracts.js";
+import { getIssuePriorityLabel } from "../../lib/issue-priority.js";
 
 interface IssueDetailsCardProps {
   issue: Issue;
@@ -25,7 +26,9 @@ export function IssueDetailsCard(props: IssueDetailsCardProps) {
           {props.issue.description ?? "No description provided."}
         </Typography>
         <Typography variant="body2">Status: {props.issue.status}</Typography>
-        <Typography variant="body2">Priority: {props.issue.priority}</Typography>
+        <Typography variant="body2">
+          Priority: {getIssuePriorityLabel(props.issue.priority)}
+        </Typography>
         <Typography variant="body2">
           Progress: {props.issue.progressPercentage}%
         </Typography>

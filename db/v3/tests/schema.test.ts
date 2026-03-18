@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   closedReasonCodes,
   credentialTypeCodes,
+  IssuePriorityCode,
   issueStatusCodes,
+  issuePriorityLabels,
   organizationRoleCodes,
   projectRoleCodes,
   systemRoleCodes,
@@ -153,14 +155,21 @@ describe("auth and access v3 zod schemas", () => {
   it("accepts an issue insert payload", () => {
     const issue = issuesInsertSchema.parse({
       name: "Broken upload flow",
-      priority: 2,
+      priority: IssuePriorityCode.ISSUE_PRIORITY_HIGH,
       projectId: 7,
       status: issueStatusCodes.open,
     });
 
-    expect(issue.priority).toBe(2);
+    expect(issue.priority).toBe(IssuePriorityCode.ISSUE_PRIORITY_HIGH);
     expect(issue.projectId).toBe(7);
     expect(issue.status).toBe(issueStatusCodes.open);
+  });
+
+  it("exports priority labels for all four issue priorities", () => {
+    expect(issuePriorityLabels[IssuePriorityCode.ISSUE_PRIORITY_LOW]).toBe("Low");
+    expect(issuePriorityLabels[IssuePriorityCode.ISSUE_PRIORITY_MEDIUM]).toBe("Medium");
+    expect(issuePriorityLabels[IssuePriorityCode.ISSUE_PRIORITY_HIGH]).toBe("High");
+    expect(issuePriorityLabels[IssuePriorityCode.ISSUE_PRIORITY_URGENT]).toBe("Urgent");
   });
 
   it("accepts a managed test-data tracking insert payload", () => {

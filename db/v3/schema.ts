@@ -33,6 +33,27 @@ export const issueStatusCodes = {
   open: "ISSUE_STATUS_OPEN",
 } as const;
 
+export enum IssuePriorityCode {
+  ISSUE_PRIORITY_LOW = 0,
+  ISSUE_PRIORITY_MEDIUM = 1,
+  ISSUE_PRIORITY_HIGH = 2,
+  ISSUE_PRIORITY_URGENT = 3,
+}
+
+export const issuePriorityValues = [
+  IssuePriorityCode.ISSUE_PRIORITY_LOW,
+  IssuePriorityCode.ISSUE_PRIORITY_MEDIUM,
+  IssuePriorityCode.ISSUE_PRIORITY_HIGH,
+  IssuePriorityCode.ISSUE_PRIORITY_URGENT,
+] as const;
+
+export const issuePriorityLabels: Record<IssuePriorityCode, string> = {
+  [IssuePriorityCode.ISSUE_PRIORITY_LOW]: "Low",
+  [IssuePriorityCode.ISSUE_PRIORITY_MEDIUM]: "Medium",
+  [IssuePriorityCode.ISSUE_PRIORITY_HIGH]: "High",
+  [IssuePriorityCode.ISSUE_PRIORITY_URGENT]: "Urgent",
+};
+
 export const closedReasonCodes = {
   cantFix: "ISSUE_CLOSED_REASON_CANTFIX",
   resolved: "ISSUE_CLOSED_REASON_RESOLVED",
@@ -45,8 +66,10 @@ export const teamRoleCodes = {
 } as const;
 
 const nowTimestampExpression = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
-const issuePriorityMinimum = 0;
+export const issuePriorityMinimum = IssuePriorityCode.ISSUE_PRIORITY_LOW;
+export const issuePriorityMaximum = IssuePriorityCode.ISSUE_PRIORITY_URGENT;
 const issuePriorityMinimumLiteral = sql.raw(`${issuePriorityMinimum}`);
+const issuePriorityMaximumLiteral = sql.raw(`${issuePriorityMaximum}`);
 const issueProgressPercentageMaximum = 100;
 const issueProgressPercentageMaximumLiteral = sql.raw(
   `${issueProgressPercentageMaximum}`,
@@ -166,8 +189,8 @@ export const issues = sqliteTable(
   },
   (table) => [
     check(
-      "Issues_priority_non_negative_check",
-      sql`${table.priority} >= ${issuePriorityMinimumLiteral}`,
+      "Issues_priority_range_check",
+      sql`${table.priority} >= ${issuePriorityMinimumLiteral} AND ${table.priority} <= ${issuePriorityMaximumLiteral}`,
     ),
     check(
       "Issues_progressPercentage_range_check",

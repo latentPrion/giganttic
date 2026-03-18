@@ -61,9 +61,9 @@ describe("ProjectManagerIssuesPage", () => {
     issuesApiMock.updateIssue.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
-        createIssue(7, { name: "In Progress High", priority: 5, progressPercentage: 35 }),
+        createIssue(7, { name: "In Progress High", priority: 2, progressPercentage: 35 }),
         createIssue(8, { name: "Open Low", priority: 1, progressPercentage: 10, status: "ISSUE_STATUS_OPEN" }),
-        createIssue(9, { name: "Blocked Medium", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
+        createIssue(9, { name: "Blocked Urgent", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
         createIssue(10, {
           closedAt: DEFAULT_TIMESTAMP,
           closedReason: "ISSUE_CLOSED_REASON_RESOLVED",
@@ -103,7 +103,7 @@ describe("ProjectManagerIssuesPage", () => {
     expect(screen.queryByText("In Progress High")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Blocked" }));
-    expect(await screen.findByText("Blocked Medium")).toBeVisible();
+    expect(await screen.findByText("Blocked Urgent")).toBeVisible();
 
     await user.click(screen.getByRole("tab", { name: "Closed" }));
     expect(await screen.findByText("Closed Done")).toBeVisible();
@@ -135,7 +135,7 @@ describe("ProjectManagerIssuesPage", () => {
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
         createIssue(7, { name: "In Progress Low Priority", priority: 1, progressPercentage: 90 }),
-        createIssue(8, { name: "In Progress High Priority", priority: 5, progressPercentage: 10 }),
+        createIssue(8, { name: "In Progress High Priority", priority: 2, progressPercentage: 10 }),
       ],
     });
 
@@ -156,7 +156,7 @@ describe("ProjectManagerIssuesPage", () => {
 
   it("opens the create issue modal and adds the new issue to the list", async () => {
     const user = userEvent.setup();
-    const createdIssue = createIssue(9, { name: "Created issue", priority: 8 });
+    const createdIssue = createIssue(9, { name: "Created issue", priority: 3 });
     issuesApiMock.createIssue.mockResolvedValue({ issue: createdIssue });
 
     renderWithTheme(
@@ -166,15 +166,15 @@ describe("ProjectManagerIssuesPage", () => {
     await user.click(await screen.findByRole("button", { name: "Create Issue" }));
     const createDialog = await screen.findByRole("dialog", { name: "Create Issue" });
     await user.type(within(createDialog).getByLabelText("Name"), "Created issue");
-    await user.clear(within(createDialog).getByLabelText("Priority"));
-    await user.type(within(createDialog).getByLabelText("Priority"), "8");
+    await user.click(within(createDialog).getByRole("combobox", { name: "Priority" }));
+    await user.click(await screen.findByRole("option", { name: "Urgent" }));
     await user.click(within(createDialog).getByRole("button", { name: "Create Issue" }));
 
     await waitFor(() => {
       expect(issuesApiMock.createIssue).toHaveBeenCalledWith(
         DEFAULT_TOKEN,
         42,
-        expect.objectContaining({ name: "Created issue", priority: 8 }),
+        expect.objectContaining({ name: "Created issue", priority: 3 }),
       );
     });
     expect(await screen.findByText("Created issue")).toBeVisible();
@@ -271,7 +271,7 @@ describe("ProjectManagerIssuesPage", () => {
   it("updates an issue through the edit modal", async () => {
     const user = userEvent.setup();
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue(7, { name: "Updated issue", priority: 6, progressPercentage: 80 }),
+      issue: createIssue(7, { name: "Updated issue", priority: 3, progressPercentage: 80 }),
     });
 
     renderWithTheme(
@@ -284,8 +284,8 @@ describe("ProjectManagerIssuesPage", () => {
     const nameField = within(editDialog).getByLabelText("Name");
     await user.clear(nameField);
     await user.type(nameField, "Updated issue");
-    await user.clear(within(editDialog).getByLabelText("Priority"));
-    await user.type(within(editDialog).getByLabelText("Priority"), "6");
+    await user.click(within(editDialog).getByRole("combobox", { name: "Priority" }));
+    await user.click(await screen.findByRole("option", { name: "Urgent" }));
     await user.click(within(editDialog).getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => {
@@ -293,7 +293,7 @@ describe("ProjectManagerIssuesPage", () => {
         DEFAULT_TOKEN,
         42,
         7,
-        expect.objectContaining({ name: "Updated issue", priority: 6 }),
+        expect.objectContaining({ name: "Updated issue", priority: 3 }),
       );
     });
     expect(await screen.findByText("Updated issue")).toBeVisible();

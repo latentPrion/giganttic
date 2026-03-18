@@ -235,6 +235,7 @@ export function ProjectManagerTeamPage(props: ProjectManagerTeamPageProps) {
       return;
     }
 
+    const teamId = props.teamId;
     let isMounted = true;
 
     async function loadTeam(): Promise<void> {
@@ -242,7 +243,7 @@ export function ProjectManagerTeamPage(props: ProjectManagerTeamPageProps) {
       setIsLoading(true);
 
       try {
-        const response = await lobbyApi.getTeam(props.token, props.teamId);
+        const response = await lobbyApi.getTeam(props.token, teamId);
         if (isMounted) {
           setTeamResponse(response);
         }

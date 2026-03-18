@@ -68,7 +68,7 @@ describe("ProjectManagerIssuePage", () => {
     expect(await screen.findByText("Issue Detail")).toBeVisible();
     expect(await screen.findByText("Issue 7")).toBeVisible();
     expect(screen.getByText("Detailed Issue View")).toBeVisible();
-    expect(screen.getByText("Priority: 2")).toBeVisible();
+    expect(screen.getByText("Priority: High")).toBeVisible();
     expect(issuesApiMock.getIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
   });
 
@@ -83,14 +83,14 @@ describe("ProjectManagerIssuePage", () => {
 
     const summaryDialog = await screen.findByRole("dialog", { name: "Issue Summary" });
     expect(summaryDialog).toBeVisible();
-    expect(within(summaryDialog).getByText("Priority: 2")).toBeVisible();
+    expect(within(summaryDialog).getByText("Priority: High")).toBeVisible();
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("updates the issue and refreshes the detail preview row", async () => {
     const user = userEvent.setup();
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue({ name: "Issue 7 Updated", priority: 9, progressPercentage: 90 }),
+      issue: createIssue({ name: "Issue 7 Updated", priority: 3, progressPercentage: 90 }),
     });
 
     renderWithTheme(
@@ -102,8 +102,8 @@ describe("ProjectManagerIssuePage", () => {
     const nameField = screen.getByLabelText("Name");
     await user.clear(nameField);
     await user.type(nameField, "Issue 7 Updated");
-    await user.clear(screen.getByLabelText("Priority"));
-    await user.type(screen.getByLabelText("Priority"), "9");
+    await user.click(screen.getByRole("combobox", { name: "Priority" }));
+    await user.click(await screen.findByRole("option", { name: "Urgent" }));
     await user.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() => {
@@ -111,11 +111,11 @@ describe("ProjectManagerIssuePage", () => {
         DEFAULT_TOKEN,
         42,
         7,
-        expect.objectContaining({ name: "Issue 7 Updated", priority: 9 }),
+        expect.objectContaining({ name: "Issue 7 Updated", priority: 3 }),
       );
     });
     expect(await screen.findByText("Issue 7 Updated")).toBeVisible();
-    expect(screen.getByText("Priority: 9")).toBeVisible();
+    expect(screen.getByText("Priority: Urgent")).toBeVisible();
     expect(screen.getByText("Progress 90%")).toBeVisible();
   }, 10000);
 

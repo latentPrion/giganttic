@@ -7,6 +7,8 @@ import type {
   ClosedReason,
   IssueStatus,
 } from "../../contracts/issue.contracts.js";
+import type { IssuePriorityCode } from "../../lib/issue-priority.js";
+import { createIssuePriorityOptions } from "../../lib/issue-priority.js";
 
 interface IssueFormState {
   closedReason: ClosedReason | "";
@@ -40,6 +42,7 @@ const CLOSED_REASON_OPTIONS: ClosedReason[] = [
   "ISSUE_CLOSED_REASON_CANTFIX",
 ];
 const CLOSED_STATUS = "ISSUE_STATUS_CLOSED";
+const ISSUE_PRIORITY_OPTIONS = createIssuePriorityOptions();
 
 function createIssueStatusLabel(status: IssueStatus): string {
   return status.replace("ISSUE_STATUS_", "").toLowerCase().replace("_", " ");
@@ -93,9 +96,15 @@ export function IssueFormFields(props: IssueFormFieldsProps) {
       <TextField
         label="Priority"
         onChange={(event) => props.onFieldChange("priority", event.target.value)}
-        type="number"
+        select
         value={props.formState.priority}
-      />
+      >
+        {ISSUE_PRIORITY_OPTIONS.map((priority: { label: string; value: IssuePriorityCode }) => (
+          <MenuItem key={priority.value} value={`${priority.value}`}>
+            {priority.label}
+          </MenuItem>
+        ))}
+      </TextField>
       <TextField
         label="Progress Percentage"
         onChange={(event) => props.onFieldChange("progressPercentage", event.target.value)}

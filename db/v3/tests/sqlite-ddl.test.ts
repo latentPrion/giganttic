@@ -220,6 +220,11 @@ describe("generated sqlite ddl for v3", () => {
         "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Negative Priority', -1, 'ISSUE_STATUS_OPEN', 0);",
       ),
     ).toThrow(/check/i);
+    expect(() =>
+      db.exec(
+        "INSERT INTO Issues (projectId, name, priority, status, progressPercentage) VALUES (1, 'Too Urgent', 4, 'ISSUE_STATUS_OPEN', 0);",
+      ),
+    ).toThrow(/check/i);
     db.close();
   });
 

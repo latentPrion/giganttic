@@ -5,6 +5,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Issue } from "../../../spas/project-manager/contracts/issue.contracts.js";
+import { getIssuePriorityLabel } from "../../../spas/project-manager/lib/issue-priority.js";
 import { EntityListItemCard } from "./EntityListItemCard.js";
 import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
@@ -45,6 +46,11 @@ export function IssueListItem(props: IssueListItemProps) {
         <Chip
           color={createStatusColor(props.issue.status)}
           label={createStatusLabel(props.issue.status)}
+          size="small"
+          variant="outlined"
+        />
+        <Chip
+          label={`Priority ${getIssuePriorityLabel(props.issue.priority)}`}
           size="small"
           variant="outlined"
         />

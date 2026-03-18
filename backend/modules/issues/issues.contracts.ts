@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  issuePriorityMaximum,
+  issuePriorityMinimum,
+} from "../../../db/index.js";
 
 
 const issueStatusCodes = [
@@ -15,7 +19,6 @@ const closedReasonCodes = [
 const issueStatusEnum = z.enum(issueStatusCodes);
 const closedReasonEnum = z.enum(closedReasonCodes);
 const issueUpdateRequiredMessage = "At least one field must be provided";
-const priorityMinimum = 0;
 const progressPercentageMaximum = 100;
 
 function createIssueIdSchema() {
@@ -35,7 +38,7 @@ function createIssueProgressSchema() {
 }
 
 function createIssuePrioritySchema() {
-  return z.number().int().min(priorityMinimum);
+  return z.number().int().min(issuePriorityMinimum).max(issuePriorityMaximum);
 }
 
 export const issueRouteParamsSchema = z.object({

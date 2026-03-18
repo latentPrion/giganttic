@@ -1,7 +1,10 @@
 import { z } from "zod";
+import {
+  issuePriorityMaximum,
+  issuePriorityMinimum,
+} from "../../../../../db/v3/schema.js";
 
 const ISSUE_PROGRESS_MAXIMUM = 100;
-const ISSUE_PRIORITY_MINIMUM = 0;
 
 export const issueStatusSchema = z.enum([
   "ISSUE_STATUS_OPEN",
@@ -29,7 +32,7 @@ function createProgressPercentageSchema() {
 }
 
 function createIssuePrioritySchema() {
-  return z.number().int().min(ISSUE_PRIORITY_MINIMUM);
+  return z.number().int().min(issuePriorityMinimum).max(issuePriorityMaximum);
 }
 
 export const issueSchema = z.object({

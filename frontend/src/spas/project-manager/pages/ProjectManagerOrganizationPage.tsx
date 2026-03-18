@@ -313,6 +313,7 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
       return;
     }
 
+    const organizationId = props.organizationId;
     let isMounted = true;
 
     async function loadOrganization(): Promise<void> {
@@ -320,7 +321,7 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
       setIsLoading(true);
 
       try {
-        const response = await lobbyApi.getOrganization(props.token, props.organizationId);
+        const response = await lobbyApi.getOrganization(props.token, organizationId);
         if (isMounted) {
           setOrganizationResponse(response);
         }

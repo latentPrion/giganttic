@@ -282,9 +282,9 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
-        "Issues_priority_non_negative_check": {
-          "name": "Issues_priority_non_negative_check",
-          "value": "\"Issues\".\"priority\" >= 0"
+        "Issues_priority_range_check": {
+          "name": "Issues_priority_range_check",
+          "value": "\"Issues\".\"priority\" >= 0 AND \"Issues\".\"priority\" <= 3"
         },
         "Issues_progressPercentage_range_check": {
           "name": "Issues_progressPercentage_range_check",

@@ -1,7 +1,12 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { issues, projects, projectsTeams } from "../db/index.js";
+import {
+  IssuePriorityCode,
+  issues,
+  projects,
+  projectsTeams,
+} from "../db/index.js";
 import {
   MISSING_ENTITY_ID,
   createCrudTestHarness,
@@ -15,7 +20,7 @@ const ISSUE_STATUS_CLOSED = "ISSUE_STATUS_CLOSED";
 const ISSUE_STATUS_BLOCKED = "ISSUE_STATUS_BLOCKED";
 const ISSUE_CLOSED_REASON_RESOLVED = "ISSUE_CLOSED_REASON_RESOLVED";
 const ISSUE_CLOSED_REASON_WONTFIX = "ISSUE_CLOSED_REASON_WONTFIX";
-const DEFAULT_ISSUE_PRIORITY = 0;
+const DEFAULT_ISSUE_PRIORITY = IssuePriorityCode.ISSUE_PRIORITY_LOW;
 const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 describe("issues crud api", () => {
@@ -183,7 +188,7 @@ describe("issues crud api", () => {
     const createResponse = await createIssue(creator.accessToken, projectId, {
       description: "Fix upload blocking error",
       name: "Upload bug",
-      priority: 4,
+      priority: IssuePriorityCode.ISSUE_PRIORITY_URGENT,
       progressPercentage: 10,
     });
     const listResponse = await harness.app.inject({
@@ -199,7 +204,7 @@ describe("issues crud api", () => {
     const listBody = harness.parseJson<{ issues: Array<{ id: number }> }>(listResponse.payload);
 
     expect(createBody.issue.projectId).toBe(projectId);
-    expect(createBody.issue.priority).toBe(4);
+    expect(createBody.issue.priority).toBe(IssuePriorityCode.ISSUE_PRIORITY_URGENT);
     expect(createBody.issue.status).toBe("ISSUE_STATUS_OPEN");
     expect(listBody.issues.map((issue) => issue.id)).toContain(createBody.issue.id);
   });
@@ -661,12 +666,12 @@ describe("issues crud api", () => {
     const issueId = harness.parseJson<{ issue: { id: number } }>(
       (await createIssue(creator.accessToken, projectId, {
         name: "Priority issue",
-        priority: 1,
+        priority: IssuePriorityCode.ISSUE_PRIORITY_MEDIUM,
       })).payload,
     ).issue.id;
 
     const updateResponse = await updateIssue(creator.accessToken, projectId, issueId, {
-      priority: 9,
+      priority: IssuePriorityCode.ISSUE_PRIORITY_URGENT,
       progressPercentage: 55,
     });
     const getResponse = await getIssue(creator.accessToken, projectId, issueId);
@@ -687,11 +692,11 @@ describe("issues crud api", () => {
     }>(listResponse.payload);
     const listedIssue = listBody.issues.find((issue) => issue.id === issueId);
 
-    expect(updateBody.issue.priority).toBe(9);
+    expect(updateBody.issue.priority).toBe(IssuePriorityCode.ISSUE_PRIORITY_URGENT);
     expect(updateBody.issue.progressPercentage).toBe(55);
-    expect(getBody.issue.priority).toBe(9);
+    expect(getBody.issue.priority).toBe(IssuePriorityCode.ISSUE_PRIORITY_URGENT);
     expect(getBody.issue.progressPercentage).toBe(55);
-    expect(listedIssue?.priority).toBe(9);
+    expect(listedIssue?.priority).toBe(IssuePriorityCode.ISSUE_PRIORITY_URGENT);
     expect(listedIssue?.progressPercentage).toBe(55);
   });
 
@@ -778,8 +783,10 @@ describe("issues crud api", () => {
       createIssue(creator.accessToken, projectId, { name: "Bad status", status: "BAD_STATUS" }),
       createIssue(creator.accessToken, projectId, { name: "Bad reason", closedReason: "BAD_REASON" }),
       createIssue(creator.accessToken, projectId, { name: "Bad priority", priority: -1 }),
+      createIssue(creator.accessToken, projectId, { name: "Too urgent", priority: 4 }),
       updateIssue(creator.accessToken, projectId, issueId, { progressPercentage: -1 }),
       updateIssue(creator.accessToken, projectId, issueId, { priority: -2 }),
+      updateIssue(creator.accessToken, projectId, issueId, { priority: 4 }),
       updateIssue(creator.accessToken, projectId, issueId, { closedReasonDescription: "No closed state" }),
     ]);
 

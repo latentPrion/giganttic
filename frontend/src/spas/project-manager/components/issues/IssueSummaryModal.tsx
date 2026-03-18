@@ -12,6 +12,7 @@ import {
 import { isApiError } from "../../../../common/api/api-error.js";
 import { issuesApi } from "../../api/issues-api.js";
 import type { GetIssueResponse } from "../../contracts/issue.contracts.js";
+import { getIssuePriorityLabel } from "../../lib/issue-priority.js";
 import {
   ISSUE_DIALOG_MAX_WIDTH,
   ISSUE_LOAD_ERROR_MESSAGE,
@@ -117,7 +118,7 @@ export function IssueSummaryModal(props: IssueSummaryModalProps) {
               Status: {issueResponse.issue.status}
             </Typography>
             <Typography variant="body2">
-              Priority: {issueResponse.issue.priority}
+              Priority: {getIssuePriorityLabel(issueResponse.issue.priority)}
             </Typography>
             <Typography variant="body2">
               Progress: {issueResponse.issue.progressPercentage}%

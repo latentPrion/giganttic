@@ -25,7 +25,7 @@ describe("kanban cards", () => {
             journal: "Blocked on dependency",
             name: "Blocked issue",
             openedAt: DEFAULT_TIMESTAMP,
-            priority: 4,
+            priority: 3,
             progressPercentage: 25,
             projectId: 42,
             status: "ISSUE_STATUS_BLOCKED",
@@ -38,7 +38,7 @@ describe("kanban cards", () => {
     );
 
     expect(screen.getByText("Blocked issue")).toBeVisible();
-    expect(screen.getByText("Priority 4")).toBeVisible();
+    expect(screen.getByText("Priority Urgent")).toBeVisible();
     expect(screen.getByText("Progress 25%")).toBeVisible();
   });
 
