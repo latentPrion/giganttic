@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { EntityActionButton } from "../../../common/components/entity-actions/EntityActionButton.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { OrganizationListItem } from "../../../common/components/entity-list/OrganizationListItem.js";
@@ -16,28 +17,36 @@ import { TeamListItem } from "../../../common/components/entity-list/TeamListIte
 import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import type { GetUserResponse } from "../../../lobby/contracts/lobby.contracts.js";
+import { UserPasswordChangeModal } from "../components/users/UserPasswordChangeModal.js";
 import {
   createProjectDetailRoute,
   createProjectManagerOrganizationRoute,
   createProjectManagerTeamRoute,
+  createProjectManagerUserRoute,
 } from "../routes/project-route-paths.js";
 
 interface ProjectManagerUserPageProps {
+  currentUserId?: number;
+  currentUserRoles?: string[];
+  onSelfPasswordRevoked?(): Promise<void>;
   token: string;
   userId: number | null;
 }
 
+const CHANGE_PASSWORD_BUTTON_LABEL = "Change Password";
 const DEFAULT_ERROR_MESSAGE = "Unable to load that user right now.";
 const EMPTY_ORGANIZATIONS_MESSAGE = "This user is not directly associated with any organizations.";
-const EMPTY_PROJECTS_MESSAGE = "This user is not directly associated with any projects.";
-const EMPTY_TEAMS_MESSAGE = "This user is not directly associated with any teams.";
+const EMPTY_PROJECTS_MESSAGE = "This user cannot currently see any projects through membership associations.";
+const EMPTY_TEAMS_MESSAGE = "This user cannot currently see any teams through membership associations.";
 const LIST_ITEM_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const MISSING_ROUTE_MESSAGE = "Provide a valid userId to view a user profile.";
 const ORGANIZATIONS_HEADING = "Direct Organizations";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "User Profile";
-const PROJECTS_HEADING = "Direct Projects";
-const TEAMS_HEADING = "Direct Teams";
+const PROJECTS_HEADING = "Visible Projects";
+const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
+const TEAMS_HEADING = "Visible Teams";
+const USER_PASSWORD_CHANGED_MESSAGE = "Password updated.";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
   return getApiErrorMessage(error, fallback);
@@ -137,7 +146,10 @@ function renderOrganizationsSection(
 export function ProjectManagerUserPage(props: ProjectManagerUserPageProps) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(props.userId !== null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [userResponse, setUserResponse] = useState<GetUserResponse | null>(null);
 
   useEffect(() => {
@@ -190,6 +202,49 @@ export function ProjectManagerUserPage(props: ProjectManagerUserPageProps) {
     navigate(createProjectManagerOrganizationRoute(organizationId));
   }
 
+  function navigateToUser(userId: number): void {
+    navigate(createProjectManagerUserRoute(userId));
+  }
+
+  function isAdmin(): boolean {
+    return props.currentUserRoles?.includes(SYSTEM_ADMIN_ROLE_CODE) ?? false;
+  }
+
+  function canChangePassword(): boolean {
+    return props.userId !== null && (
+      props.currentUserId === props.userId ||
+      isAdmin()
+    );
+  }
+
+  function requiresCurrentPassword(): boolean {
+    return props.userId !== null && props.currentUserId === props.userId;
+  }
+
+  async function handleChangePassword(payload: {
+    currentPassword?: string;
+    newPassword: string;
+    revokeSessions: boolean;
+  }): Promise<void> {
+    if (props.userId === null) {
+      throw new Error(DEFAULT_ERROR_MESSAGE);
+    }
+
+    setIsChangingPassword(true);
+    setSuccessMessage(null);
+
+    try {
+      await lobbyApi.changeUserPassword(props.token, props.userId, payload);
+      if (payload.revokeSessions && props.currentUserId === props.userId) {
+        await props.onSelfPasswordRevoked?.();
+        return;
+      }
+      setSuccessMessage(USER_PASSWORD_CHANGED_MESSAGE);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
   function renderContent() {
     if (props.userId === null) {
       return <Alert severity="info">{MISSING_ROUTE_MESSAGE}</Alert>;
@@ -210,7 +265,16 @@ export function ProjectManagerUserPage(props: ProjectManagerUserPageProps) {
 
     return (
       <Stack spacing={2}>
+        {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
         <UserListItem
+          actionContent={canChangePassword() ? (
+            <EntityActionButton
+              disabled={isChangingPassword}
+              label={CHANGE_PASSWORD_BUTTON_LABEL}
+              onClick={() => setIsChangePasswordModalOpen(true)}
+            />
+          ) : undefined}
+          onNavigate={() => navigateToUser(userResponse.user.id)}
           user={{
             id: userResponse.user.id,
             username: userResponse.user.username,
@@ -240,6 +304,13 @@ export function ProjectManagerUserPage(props: ProjectManagerUserPageProps) {
         </Typography>
       </div>
       {renderContent()}
+      <UserPasswordChangeModal
+        isBusy={isChangingPassword}
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        onSubmit={handleChangePassword}
+        requireCurrentPassword={requiresCurrentPassword()}
+      />
     </Stack>
   );
 }

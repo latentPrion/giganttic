@@ -7,7 +7,7 @@ import {
   type NestFastifyApplication,
 } from "@nestjs/platform-fastify";
 import { Test } from "@nestjs/testing";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AppModule } from "../backend/app.module.js";
@@ -25,8 +25,10 @@ import {
   teams,
   teamsUsers,
   users,
+  usersCredentialTypes,
   usersOrganizations,
   usersOrganizationsOrganizationRoles,
+  usersPasswordCredentials,
   usersProjectsProjectRoles,
   usersSessions,
   usersSystemRoles,
@@ -93,6 +95,46 @@ describe("backend auth api", () => {
     });
 
     expect(response.statusCode).toBe(201);
+    return parseJson(response.payload);
+  }
+
+  async function registerUser(seed: {
+    email: string;
+    password: string;
+    username: string;
+  }): Promise<{ user: { id: number; username: string } }> {
+    const response = await app.inject({
+      method: "POST",
+      payload: seed,
+      url: "/stc-proj-mgmt/api/auth/register",
+    });
+
+    expect(response.statusCode).toBe(201);
+    return parseJson(response.payload);
+  }
+
+  async function changePassword(
+    accessToken: string,
+    userId: number,
+    payload: {
+      currentPassword?: string;
+      newPassword: string;
+      revokeSessions: boolean;
+    },
+  ): Promise<{
+    revokedSessionIds: string[];
+    updatedUserId: number;
+  }> {
+    const response = await app.inject({
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+      method: "POST",
+      payload,
+      url: `/stc-proj-mgmt/api/users/${userId}/password`,
+    });
+
+    expect(response.statusCode).toBe(200);
     return parseJson(response.payload);
   }
 
@@ -473,6 +515,266 @@ describe("backend auth api", () => {
       url: "/stc-proj-mgmt/api/auth/session/revoke",
     });
     expect(badRevokePayload.statusCode).toBe(400);
+
+    const badPasswordChangePayload = await app.inject({
+      headers: {
+        authorization: `Bearer ${loginBody.accessToken}`,
+      },
+      method: "POST",
+      payload: {
+        currentPassword: "",
+        newPassword: "",
+      },
+      url: `/stc-proj-mgmt/api/users/${loginBody.user.id}/password`,
+    });
+    expect(badPasswordChangePayload.statusCode).toBe(400);
+  });
+
+  it("lets a user change their own password and keep all sessions when revokeSessions is false", async () => {
+    await registerUser({
+      email: "self-change@example.com",
+      password: "secret123",
+      username: "selfchangeuser",
+    });
+    const firstLogin = await loginAs("selfchangeuser", { password: "secret123" });
+    const secondLogin = await loginAs("selfchangeuser", { password: "secret123" });
+
+    const changeBody = await changePassword(secondLogin.accessToken, secondLogin.user.id, {
+      currentPassword: "secret123",
+      newPassword: "newsecret456",
+      revokeSessions: false,
+    });
+
+    expect(changeBody.updatedUserId).toBe(secondLogin.user.id);
+    expect(changeBody.revokedSessionIds).toEqual([]);
+
+    const firstSessionStillWorks = await app.inject({
+      headers: { authorization: `Bearer ${firstLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    const secondSessionStillWorks = await app.inject({
+      headers: { authorization: `Bearer ${secondLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+
+    expect(firstSessionStillWorks.statusCode).toBe(200);
+    expect(secondSessionStillWorks.statusCode).toBe(200);
+
+    const oldPasswordLogin = await app.inject({
+      method: "POST",
+      payload: {
+        password: "secret123",
+        username: "selfchangeuser",
+      },
+      url: "/stc-proj-mgmt/api/auth/login",
+    });
+    expect(oldPasswordLogin.statusCode).toBe(401);
+
+    const newPasswordLogin = await app.inject({
+      method: "POST",
+      payload: {
+        password: "newsecret456",
+        username: "selfchangeuser",
+      },
+      url: "/stc-proj-mgmt/api/auth/login",
+    });
+    expect(newPasswordLogin.statusCode).toBe(201);
+  });
+
+  it("revokes all sessions when a user changes their own password with revokeSessions enabled", async () => {
+    await registerUser({
+      email: "self-revoke@example.com",
+      password: "secret123",
+      username: "selfrevokeuser",
+    });
+    const firstLogin = await loginAs("selfrevokeuser", { password: "secret123" });
+    const secondLogin = await loginAs("selfrevokeuser", { password: "secret123" });
+
+    const changeBody = await changePassword(secondLogin.accessToken, secondLogin.user.id, {
+      currentPassword: "secret123",
+      newPassword: "newsecret456",
+      revokeSessions: true,
+    });
+
+    expect(changeBody.revokedSessionIds).toEqual(
+      expect.arrayContaining([firstLogin.session.id, secondLogin.session.id]),
+    );
+
+    const firstSessionResponse = await app.inject({
+      headers: { authorization: `Bearer ${firstLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    const secondSessionResponse = await app.inject({
+      headers: { authorization: `Bearer ${secondLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+
+    expect(firstSessionResponse.statusCode).toBe(401);
+    expect(secondSessionResponse.statusCode).toBe(401);
+  });
+
+  it("requires the current password for self-service changes and rejects wrong values", async () => {
+    await registerUser({
+      email: "self-verify@example.com",
+      password: "secret123",
+      username: "selfverifyuser",
+    });
+    const login = await loginAs("selfverifyuser", { password: "secret123" });
+
+    const missingCurrentPassword = await app.inject({
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      method: "POST",
+      payload: {
+        newPassword: "newsecret456",
+        revokeSessions: false,
+      },
+      url: `/stc-proj-mgmt/api/users/${login.user.id}/password`,
+    });
+    expect(missingCurrentPassword.statusCode).toBe(401);
+
+    const wrongCurrentPassword = await app.inject({
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      method: "POST",
+      payload: {
+        currentPassword: "wrong-password",
+        newPassword: "newsecret456",
+        revokeSessions: false,
+      },
+      url: `/stc-proj-mgmt/api/users/${login.user.id}/password`,
+    });
+    expect(wrongCurrentPassword.statusCode).toBe(401);
+  });
+
+  it("lets an admin change another user's password and optionally revoke all target sessions", async () => {
+    await registerUser({
+      email: "admin-target@example.com",
+      password: "secret123",
+      username: "admintargetuser",
+    });
+    const adminLogin = await loginAs("testadminuser");
+    const targetFirstLogin = await loginAs("admintargetuser", { password: "secret123" });
+    const targetSecondLogin = await loginAs("admintargetuser", { password: "secret123" });
+
+    const keepSessionsBody = await changePassword(adminLogin.accessToken, targetFirstLogin.user.id, {
+      newPassword: "newsecret456",
+      revokeSessions: false,
+    });
+    expect(keepSessionsBody.revokedSessionIds).toEqual([]);
+
+    const targetSessionStillWorks = await app.inject({
+      headers: { authorization: `Bearer ${targetFirstLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(targetSessionStillWorks.statusCode).toBe(200);
+
+    const revokeSessionsBody = await changePassword(adminLogin.accessToken, targetFirstLogin.user.id, {
+      newPassword: "adminfinalsecret",
+      revokeSessions: true,
+    });
+    expect(revokeSessionsBody.revokedSessionIds).toEqual(
+      expect.arrayContaining([targetFirstLogin.session.id, targetSecondLogin.session.id]),
+    );
+
+    const revokedTargetSession = await app.inject({
+      headers: { authorization: `Bearer ${targetFirstLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(revokedTargetSession.statusCode).toBe(401);
+
+    const newPasswordLogin = await app.inject({
+      method: "POST",
+      payload: {
+        password: "adminfinalsecret",
+        username: "admintargetuser",
+      },
+      url: "/stc-proj-mgmt/api/auth/login",
+    });
+    expect(newPasswordLogin.statusCode).toBe(201);
+  });
+
+  it("forbids non-admin users from changing another user's password", async () => {
+    await registerUser({
+      email: "password-actor@example.com",
+      password: "secret123",
+      username: "passwordactoruser",
+    });
+    await registerUser({
+      email: "password-target@example.com",
+      password: "secret123",
+      username: "passwordtargetuser",
+    });
+    const actorLogin = await loginAs("passwordactoruser", { password: "secret123" });
+    const targetLogin = await loginAs("passwordtargetuser", { password: "secret123" });
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${actorLogin.accessToken}` },
+      method: "POST",
+      payload: {
+        newPassword: "newsecret456",
+        revokeSessions: false,
+      },
+      url: `/stc-proj-mgmt/api/users/${targetLogin.user.id}/password`,
+    });
+
+    expect(response.statusCode).toBe(403);
+  });
+
+  it("returns not found when changing the password of a nonexistent user", async () => {
+    const adminLogin = await loginAs("testadminuser");
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${adminLogin.accessToken}` },
+      method: "POST",
+      payload: {
+        newPassword: "newsecret456",
+        revokeSessions: false,
+      },
+      url: "/stc-proj-mgmt/api/users/999999/password",
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("fails clearly when the target user has no active password credential", async () => {
+    const adminLogin = await loginAs("testadminuser");
+    const registration = await registerUser({
+      email: "nopasswordcredential@example.com",
+      password: "secret123",
+      username: "nopasswordcredentialuser",
+    });
+    const passwordCredentialTypeRows = databaseService.db
+      .select({ id: usersCredentialTypes.id })
+      .from(usersCredentialTypes)
+      .where(eq(usersCredentialTypes.userId, registration.user.id))
+      .all();
+
+    databaseService.db.delete(usersPasswordCredentials)
+      .where(inArray(
+        usersPasswordCredentials.userCredentialTypeId,
+        passwordCredentialTypeRows.map((row) => row.id),
+      ))
+      .run();
+
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${adminLogin.accessToken}` },
+      method: "POST",
+      payload: {
+        newPassword: "newsecret456",
+        revokeSessions: false,
+      },
+      url: `/stc-proj-mgmt/api/users/${registration.user.id}/password`,
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(parseJson<{ message: string }>(response.payload).message).toBe(
+      "User does not have an active password credential",
+    );
   });
 
   it("rejects missing and malformed bearer auth headers", async () => {

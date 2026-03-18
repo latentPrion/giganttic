@@ -35,6 +35,7 @@ import {
   listIndirectProjectManagerUserIds,
   listOrganizationIdsForProject,
   listOrganizationProjectManagerUserIdsForProject,
+  listProjectIdsVisibleByMembership,
   listTeamIdsForProject,
   PROJECT_MANAGER_ROLE_CODE,
   PROJECT_OWNER_ROLE_CODE,
@@ -876,21 +877,7 @@ export class ProjectsService {
   }
 
   private listAccessibleProjectIds(userId: number): number[] {
-    return [...new Set([
-      ...this.databaseService.db
-        .select({ projectId: projectsUsers.projectId })
-        .from(projectsUsers)
-        .where(eq(projectsUsers.userId, userId))
-        .all()
-        .map((row) => row.projectId),
-      ...this.databaseService.db
-        .select({ projectId: projectsTeams.projectId })
-        .from(projectsTeams)
-        .innerJoin(teamsUsers, eq(teamsUsers.teamId, projectsTeams.teamId))
-        .where(eq(teamsUsers.userId, userId))
-        .all()
-        .map((row) => row.projectId),
-    ])];
+    return listProjectIdsVisibleByMembership(this.databaseService.db, userId);
   }
 
   private listProjectMembers(projectId: number): ProjectMember[] {

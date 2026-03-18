@@ -224,6 +224,85 @@ export function listProjectIdsForOrganization(
   return uniqueNumberValues([...directIds, ...viaTeams]);
 }
 
+export function listOrganizationIdsVisibleByMembership(
+  database: AppDatabase,
+  userId: number,
+): number[] {
+  const directOrganizationIds = database
+    .select({ organizationId: usersOrganizations.organizationId })
+    .from(usersOrganizations)
+    .where(eq(usersOrganizations.userId, userId))
+    .all()
+    .map((row) => row.organizationId);
+  const teamDerivedOrganizationIds = database
+    .select({ organizationId: organizationsTeams.organizationId })
+    .from(organizationsTeams)
+    .innerJoin(teamsUsers, eq(teamsUsers.teamId, organizationsTeams.teamId))
+    .where(eq(teamsUsers.userId, userId))
+    .all()
+    .map((row) => row.organizationId);
+  const roleVisibleOrganizationIds = database
+    .select({ organizationId: usersOrganizationsOrganizationRoles.organizationId })
+    .from(usersOrganizationsOrganizationRoles)
+    .where(eq(usersOrganizationsOrganizationRoles.userId, userId))
+    .all()
+    .map((row) => row.organizationId);
+
+  return uniqueNumberValues([
+    ...directOrganizationIds,
+    ...teamDerivedOrganizationIds,
+    ...roleVisibleOrganizationIds,
+  ]);
+}
+
+export function listTeamIdsVisibleByMembership(
+  database: AppDatabase,
+  userId: number,
+): number[] {
+  const directTeamIds = database
+    .select({ teamId: teamsUsers.teamId })
+    .from(teamsUsers)
+    .where(eq(teamsUsers.userId, userId))
+    .all()
+    .map((row) => row.teamId);
+  const roleVisibleTeamIds = database
+    .select({ teamId: usersTeamsTeamRoles.teamId })
+    .from(usersTeamsTeamRoles)
+    .where(eq(usersTeamsTeamRoles.userId, userId))
+    .all()
+    .map((row) => row.teamId);
+  const organizationDerivedTeamIds = listOrganizationIdsVisibleByMembership(database, userId)
+    .flatMap((organizationId) => listTeamIdsForOrganization(database, organizationId));
+
+  return uniqueNumberValues([
+    ...directTeamIds,
+    ...roleVisibleTeamIds,
+    ...organizationDerivedTeamIds,
+  ]);
+}
+
+export function listProjectIdsVisibleByMembership(
+  database: AppDatabase,
+  userId: number,
+): number[] {
+  const directProjectIds = database
+    .select({ projectId: projectsUsers.projectId })
+    .from(projectsUsers)
+    .where(eq(projectsUsers.userId, userId))
+    .all()
+    .map((row) => row.projectId);
+  const teamDerivedProjectIds = listTeamIdsVisibleByMembership(database, userId)
+    .flatMap((teamId) => listProjectIdsForTeam(database, teamId));
+  const organizationDerivedProjectIds = listOrganizationIdsVisibleByMembership(database, userId)
+    .flatMap((organizationId) => listProjectIdsForOrganization(database, organizationId));
+
+  return uniqueNumberValues([
+    ...directProjectIds,
+    ...teamDerivedProjectIds,
+    ...organizationDerivedProjectIds,
+  ]);
+}
+
 export function listDirectProjectManagerUserIds(
   database: AppDatabase,
   projectId: number,

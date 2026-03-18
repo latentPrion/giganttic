@@ -40,6 +40,21 @@ async function pathExists(targetPath: string) {
 }
 
 describe("projects crud api", () => {
+  function createOrganization(
+    accessToken: string,
+    payload: {
+      description?: string | null;
+      name: string;
+    },
+  ) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "POST",
+      payload,
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+  }
+
   function createTeam(
     accessToken: string,
     payload: {
@@ -85,6 +100,54 @@ describe("projects crud api", () => {
 
   afterAll(async () => {
     await harness.cleanup();
+  });
+
+  it("lists projects visible through organization membership in the lobby endpoint", async () => {
+    const owner = await harness.registerUser("project-list-org-owner");
+    const viewer = await harness.registerUser("project-list-org-viewer");
+    const organizationResponse = await createOrganization(owner.accessToken, {
+      name: "Project List Org",
+    });
+    const projectResponse = await createProject(owner.accessToken, {
+      name: "Project List Visible Project",
+    });
+    const organization = harness.parseJson<{ organization: { id: number } }>(
+      organizationResponse.payload,
+    ).organization;
+    const project = harness.parseJson<{ project: { id: number } }>(
+      projectResponse.payload,
+    ).project;
+
+    const organizationMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: owner.user.id },
+          { userId: viewer.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const projectAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { organizationId: organization.id },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/organizations`,
+    });
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(viewer.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects",
+    });
+    const payload = harness.parseJson<{ projects: Array<{ id: number; name: string }> }>(
+      listResponse.payload,
+    );
+
+    expect(organizationMembershipResponse.statusCode).toBe(200);
+    expect(projectAssociationResponse.statusCode).toBe(200);
+    expect(listResponse.statusCode).toBe(200);
+    expect(payload.projects.map((entry) => entry.name)).toContain("Project List Visible Project");
   });
 
   it("allows any authenticated user to create a project and makes the creator a project owner manager member", async () => {

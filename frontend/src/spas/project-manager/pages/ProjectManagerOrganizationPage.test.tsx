@@ -22,7 +22,9 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
     assignOrganizationTeam: vi.fn(),
     associateProjectOrganization: vi.fn(),
     createProject: vi.fn(),
+    createTeam: vi.fn(),
     deleteProject: vi.fn(),
+    deleteTeam: vi.fn(),
     getOrganization: vi.fn(),
     listTeams: vi.fn(),
     listUsers: vi.fn(),
@@ -77,7 +79,9 @@ describe("ProjectManagerOrganizationPage", () => {
     lobbyApiMock.assignOrganizationTeam.mockReset();
     lobbyApiMock.associateProjectOrganization.mockReset();
     lobbyApiMock.createProject.mockReset();
+    lobbyApiMock.createTeam.mockReset();
     lobbyApiMock.deleteProject.mockReset();
+    lobbyApiMock.deleteTeam.mockReset();
     lobbyApiMock.getOrganization.mockReset();
     lobbyApiMock.listTeams.mockReset();
     lobbyApiMock.listUsers.mockReset();
@@ -140,6 +144,15 @@ describe("ProjectManagerOrganizationPage", () => {
         updatedAt: DEFAULT_TIMESTAMP,
       },
     });
+    lobbyApiMock.createTeam.mockResolvedValue({
+      team: {
+        createdAt: DEFAULT_TIMESTAMP,
+        description: "Created team",
+        id: 55,
+        name: "Created Team",
+        updatedAt: DEFAULT_TIMESTAMP,
+      },
+    });
     lobbyApiMock.associateProjectOrganization.mockResolvedValue({
       organizations: [{
         createdAt: DEFAULT_TIMESTAMP,
@@ -196,6 +209,38 @@ describe("ProjectManagerOrganizationPage", () => {
       );
     });
     expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=55");
+  });
+
+  it("creates a team and associates it to the viewed organization when the current user is an organization manager", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerOrganizationPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        organizationId={9}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Create Team" }));
+    await user.type(await screen.findByLabelText("Name"), "Created Team");
+    await user.click(screen.getByRole("button", { name: "Create Team" }));
+
+    await waitFor(() => {
+      expect(lobbyApiMock.createTeam).toHaveBeenCalledWith(DEFAULT_TOKEN, {
+        description: null,
+        name: "Created Team",
+      });
+    });
+    await waitFor(() => {
+      expect(lobbyApiMock.assignOrganizationTeam).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        9,
+        {
+          teamId: 55,
+        },
+      );
+    });
   });
 
   it("navigates to the PM user route from an organization member row", async () => {
@@ -284,6 +329,7 @@ describe("ProjectManagerOrganizationPage", () => {
     expect(await screen.findByText("Org 9")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add Member User" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Member Team" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create Team" })).not.toBeInTheDocument();
   });
 
   it("removes a member user and a member team when the current user can manage the organization", async () => {

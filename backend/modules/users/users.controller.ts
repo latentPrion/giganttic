@@ -1,9 +1,13 @@
 import {
+  Body,
   Controller,
   Delete,
+  HttpCode,
+  HttpStatus,
   Inject,
   Get,
   Param,
+  Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -12,6 +16,8 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { BearerAuthGuard } from "../auth/auth.guard.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import {
+  changeUserPasswordRequestSchema,
+  changeUserPasswordResponseSchema,
   deleteUserResponseSchema,
   getUserResponseSchema,
   listUsersResponseSchema,
@@ -40,6 +46,24 @@ export class UsersController {
 
     return getUserResponseSchema.parse(
       await this.usersService.getUser(request.authContext!, userId),
+    );
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(":userId/password")
+  async changeUserPassword(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(userIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(changeUserPasswordRequestSchema)) body: unknown,
+  ) {
+    const { userId } = userIdParamSchema.parse(params);
+
+    return changeUserPasswordResponseSchema.parse(
+      await this.usersService.changeUserPassword(
+        request.authContext!,
+        userId,
+        body as never,
+      ),
     );
   }
 

@@ -74,6 +74,22 @@ describe("users delete api", () => {
     });
   }
 
+  function grantOrganizationRole(
+    accessToken: string,
+    organizationId: number,
+    payload: {
+      roleCode: string;
+      userId: number;
+    },
+  ) {
+    return harness.app.inject({
+      headers: harness.createAuthHeaders(accessToken),
+      method: "POST",
+      payload,
+      url: `/stc-proj-mgmt/api/organizations/${organizationId}/roles/grant`,
+    });
+  }
+
   beforeAll(async () => {
     await harness.setup();
   });
@@ -82,26 +98,106 @@ describe("users delete api", () => {
     await harness.cleanup();
   });
 
-  it("returns a direct user profile with projects teams and organizations", async () => {
-    const creator = await harness.registerUser("users-profile");
-    const projectCreateResponse = await createProject(creator.accessToken, {
-      name: "Profile Project",
+  it("returns a user profile with projects and teams visible through membership associations", async () => {
+    const owner = await harness.registerUser("users-profile-owner");
+    const viewer = await harness.registerUser("users-profile-viewer");
+    const directProjectResponse = await createProject(owner.accessToken, {
+      name: "Direct Profile Project",
     });
-    const teamCreateResponse = await createTeam(creator.accessToken, {
-      name: "Profile Team",
+    const teamResponse = await createTeam(owner.accessToken, {
+      name: "Visible Profile Team",
     });
-    const organizationCreateResponse = await createOrganization(creator.accessToken, {
+    const teamProjectResponse = await createProject(owner.accessToken, {
+      name: "Team Visible Project",
+    });
+    const organizationResponse = await createOrganization(owner.accessToken, {
       name: "Profile Organization",
     });
+    const organizationProjectResponse = await createProject(owner.accessToken, {
+      name: "Organization Visible Project",
+    });
+    const directProject = harness.parseJson<{ project: { id: number } }>(directProjectResponse.payload).project;
+    const team = harness.parseJson<{ team: { id: number } }>(teamResponse.payload).team;
+    const teamProject = harness.parseJson<{ project: { id: number } }>(teamProjectResponse.payload).project;
+    const organization = harness.parseJson<{ organization: { id: number } }>(organizationResponse.payload).organization;
+    const organizationProject = harness.parseJson<{ project: { id: number } }>(
+      organizationProjectResponse.payload,
+    ).project;
 
-    expect(projectCreateResponse.statusCode).toBe(201);
-    expect(teamCreateResponse.statusCode).toBe(201);
-    expect(organizationCreateResponse.statusCode).toBe(201);
+    expect(directProjectResponse.statusCode).toBe(201);
+    expect(teamResponse.statusCode).toBe(201);
+    expect(teamProjectResponse.statusCode).toBe(201);
+    expect(organizationResponse.statusCode).toBe(201);
+    expect(organizationProjectResponse.statusCode).toBe(201);
+
+    const directProjectMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: owner.user.id,
+          },
+          {
+            roleCodes: [],
+            userId: viewer.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${directProject.id}/members`,
+    });
+    const teamMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+            userId: owner.user.id,
+          },
+          {
+            roleCodes: [],
+            userId: viewer.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/teams/${team.id}/members`,
+    });
+    const projectTeamAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/projects/${teamProject.id}/teams`,
+    });
+    const organizationMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: owner.user.id },
+          { userId: viewer.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const organizationProjectAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { organizationId: organization.id },
+      url: `/stc-proj-mgmt/api/projects/${organizationProject.id}/organizations`,
+    });
+
+    expect(directProjectMembershipResponse.statusCode).toBe(200);
+    expect(teamMembershipResponse.statusCode).toBe(200);
+    expect(projectTeamAssociationResponse.statusCode).toBe(200);
+    expect(organizationMembershipResponse.statusCode).toBe(200);
+    expect(organizationProjectAssociationResponse.statusCode).toBe(200);
 
     const getUserResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(creator.accessToken),
+      headers: harness.createAuthHeaders(viewer.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/users/${creator.user.id}`,
+      url: `/stc-proj-mgmt/api/users/${viewer.user.id}`,
     });
     const payload = harness.parseJson<{
       organizations: Array<{ id: number; name: string }>;
@@ -112,14 +208,57 @@ describe("users delete api", () => {
 
     expect(getUserResponse.statusCode).toBe(200);
     expect(payload.user).toEqual(expect.objectContaining({
-      id: creator.user.id,
+      id: viewer.user.id,
       isActive: true,
-      username: creator.user.username,
+      username: viewer.user.username,
     }));
-    expect(payload.projects.map((project) => project.name)).toContain("Profile Project");
-    expect(payload.teams.map((team) => team.name)).toContain("Profile Team");
+    expect(payload.projects.map((project) => project.name)).toEqual(expect.arrayContaining([
+      "Direct Profile Project",
+      "Team Visible Project",
+      "Organization Visible Project",
+    ]));
+    expect(payload.teams.map((teamRecord) => teamRecord.name)).toContain("Visible Profile Team");
     expect(payload.organizations.map((organization) => organization.name))
       .toContain("Profile Organization");
+  });
+
+  it("includes projects visible through organization roles on the user profile", async () => {
+    const owner = await harness.registerUser("users-profile-org-role-owner");
+    const viewer = await harness.registerUser("users-profile-org-role-viewer");
+    const organizationResponse = await createOrganization(owner.accessToken, {
+      name: "Role Visible Organization",
+    });
+    const projectResponse = await createProject(owner.accessToken, {
+      name: "Role Visible Project",
+    });
+    const organization = harness.parseJson<{ organization: { id: number } }>(
+      organizationResponse.payload,
+    ).organization;
+    const project = harness.parseJson<{ project: { id: number } }>(projectResponse.payload).project;
+
+    const roleGrantResponse = await grantOrganizationRole(owner.accessToken, organization.id, {
+      roleCode: "GGTC_ORGANIZATIONROLE_PROJECT_MANAGER",
+      userId: viewer.user.id,
+    });
+    const projectAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { organizationId: organization.id },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/organizations`,
+    });
+    const getUserResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(viewer.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/users/${viewer.user.id}`,
+    });
+    const payload = harness.parseJson<{
+      projects: Array<{ id: number; name: string }>;
+    }>(getUserResponse.payload);
+
+    expect(roleGrantResponse.statusCode).toBe(200);
+    expect(projectAssociationResponse.statusCode).toBe(200);
+    expect(getUserResponse.statusCode).toBe(200);
+    expect(payload.projects.map((entry) => entry.name)).toContain("Role Visible Project");
   });
 
   it("allows deleting a user after project and team management have been transferred", async () => {

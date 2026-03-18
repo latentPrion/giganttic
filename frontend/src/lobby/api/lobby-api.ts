@@ -14,6 +14,8 @@ import {
   getTeamResponseSchema,
   getUserResponseSchema,
   assignOrganizationTeamRequestSchema,
+  changeUserPasswordRequestSchema,
+  changeUserPasswordResponseSchema,
   listUsersResponseSchema,
   listOrganizationsResponseSchema,
   listProjectsResponseSchema,
@@ -47,6 +49,8 @@ import {
   type GetTeamResponse,
   type GetUserResponse,
   type AssignOrganizationTeamRequest,
+  type ChangeUserPasswordRequest,
+  type ChangeUserPasswordResponse,
   type ListUsersResponse,
   type ListOrganizationsResponse,
   type ListProjectsResponse,
@@ -197,6 +201,21 @@ export const lobbyApi = {
       method: "GET",
       path: createUserPath(userId),
       responseSchema: getUserResponseSchema,
+      token,
+    });
+  },
+
+  async changeUserPassword(
+    token: string,
+    userId: number,
+    payload: ChangeUserPasswordRequest,
+  ): Promise<ChangeUserPasswordResponse> {
+    return await requestJson({
+      body: payload,
+      method: "POST",
+      path: `${createUserPath(userId)}/password`,
+      requestSchema: changeUserPasswordRequestSchema,
+      responseSchema: changeUserPasswordResponseSchema,
       token,
     });
   },

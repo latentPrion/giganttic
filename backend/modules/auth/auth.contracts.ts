@@ -66,3 +66,9 @@ export type SessionQuery = z.infer<typeof sessionQuerySchema>;
 export type RevokeSessionsRequest = z.infer<typeof revokeSessionsRequestSchema>;
 export type AuthUserResponse = z.infer<typeof authUserSchema>;
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+
+export interface ActivePasswordCredentialRecord {
+  passwordCredentialId: number;
+  passwordHash: string;
+  userCredentialTypeId: number;
+}

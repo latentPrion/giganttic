@@ -42,6 +42,8 @@ const CLOSED_REASON_OPTIONS: ClosedReason[] = [
   "ISSUE_CLOSED_REASON_CANTFIX",
 ];
 const CLOSED_STATUS = "ISSUE_STATUS_CLOSED";
+const ISSUE_PROGRESS_PERCENTAGE_MAXIMUM = 100;
+const ISSUE_PROGRESS_PERCENTAGE_MINIMUM = 0;
 const ISSUE_PRIORITY_OPTIONS = createIssuePriorityOptions();
 
 function createIssueStatusLabel(status: IssueStatus): string {
@@ -106,6 +108,10 @@ export function IssueFormFields(props: IssueFormFieldsProps) {
         ))}
       </TextField>
       <TextField
+        inputProps={{
+          max: ISSUE_PROGRESS_PERCENTAGE_MAXIMUM,
+          min: ISSUE_PROGRESS_PERCENTAGE_MINIMUM,
+        }}
         label="Progress Percentage"
         onChange={(event) => props.onFieldChange("progressPercentage", event.target.value)}
         type="number"

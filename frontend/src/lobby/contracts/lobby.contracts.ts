@@ -170,6 +170,17 @@ export const getUserResponseSchema = z.object({
   user: userProfileSchema,
 });
 
+export const changeUserPasswordRequestSchema = z.object({
+  currentPassword: z.string().min(1).optional(),
+  newPassword: z.string().min(1),
+  revokeSessions: z.boolean(),
+});
+
+export const changeUserPasswordResponseSchema = z.object({
+  revokedSessionIds: z.array(z.string()),
+  updatedUserId: z.number().int().positive(),
+});
+
 export const listUsersResponseSchema = z.object({
   users: z.array(userProfileSchema),
 });
@@ -231,6 +242,8 @@ export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
 export type CreateTeamResponse = z.infer<typeof createTeamResponseSchema>;
 export type CreateOrganizationRequest = z.infer<typeof createOrganizationRequestSchema>;
 export type CreateOrganizationResponse = z.infer<typeof createOrganizationResponseSchema>;
+export type ChangeUserPasswordRequest = z.infer<typeof changeUserPasswordRequestSchema>;
+export type ChangeUserPasswordResponse = z.infer<typeof changeUserPasswordResponseSchema>;
 export type DeleteOrganizationResponse = z.infer<typeof deleteOrganizationResponseSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type DeleteTeamResponse = z.infer<typeof deleteTeamResponseSchema>;

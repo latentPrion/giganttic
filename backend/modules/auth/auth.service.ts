@@ -32,6 +32,7 @@ import {
 } from "../../config/backend-config.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
+  type ActivePasswordCredentialRecord,
   type AuthUserResponse,
   type LoginRequest,
   type RegisterRequest,
@@ -50,7 +51,7 @@ export class AuthService {
   ) {}
 
   async register(payload: RegisterRequest): Promise<{ user: AuthUserResponse }> {
-    const passwordHash = await argon2.hash(payload.password);
+    const passwordHash = await this.hashPassword(payload.password);
 
     try {
       const createdUser = this.databaseService.db.transaction((tx) => {
@@ -148,7 +149,7 @@ export class AuthService {
       throw new UnauthorizedException("User is not active");
     }
 
-    const isPasswordValid = await argon2.verify(
+    const isPasswordValid = await this.verifyPassword(
       credentialRow.passwordHash,
       payload.password,
     );
@@ -320,6 +321,41 @@ export class AuthService {
       ipAddress: normalizedIp,
       location: location ?? null,
     };
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    return await argon2.hash(password);
+  }
+
+  async verifyPassword(passwordHash: string, password: string): Promise<boolean> {
+    return await argon2.verify(passwordHash, password);
+  }
+
+  getActivePasswordCredential(
+    userId: number,
+  ): ActivePasswordCredentialRecord | null {
+    return this.databaseService.db
+      .select({
+        passwordCredentialId: usersPasswordCredentials.id,
+        passwordHash: usersPasswordCredentials.passwordHash,
+        userCredentialTypeId: usersCredentialTypes.id,
+      })
+      .from(usersCredentialTypes)
+      .innerJoin(
+        usersPasswordCredentials,
+        eq(usersPasswordCredentials.userCredentialTypeId, usersCredentialTypes.id),
+      )
+      .where(
+        and(
+          eq(usersCredentialTypes.userId, userId),
+          eq(
+            usersCredentialTypes.credentialTypeCode,
+            credentialTypeCodes.usernamePassword,
+          ),
+          isNull(usersCredentialTypes.revokedAt),
+        ),
+      )
+      .get() ?? null;
   }
 
   private buildAuthUser(userId: number): AuthUserResponse {

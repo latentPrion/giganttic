@@ -102,9 +102,9 @@ interface ProjectSectionContentProps {
 function ProjectSectionContent(props: ProjectSectionContentProps) {
   if (props.projects.length === 0) {
     return (
-      <Typography color="text.secondary" variant="body2">
-        You do not have any associated projects yet.
-      </Typography>
+        <Typography color="text.secondary" variant="body2">
+        You do not have any visible projects yet.
+        </Typography>
     );
   }
 
@@ -151,9 +151,9 @@ interface TeamSectionContentProps {
 function TeamSectionContent(props: TeamSectionContentProps) {
   if (props.teams.length === 0) {
     return (
-      <Typography color="text.secondary" variant="body2">
-        You do not have any associated teams yet.
-      </Typography>
+        <Typography color="text.secondary" variant="body2">
+        You do not have any visible teams yet.
+        </Typography>
     );
   }
 
@@ -200,9 +200,9 @@ interface OrganizationSectionContentProps {
 function OrganizationSectionContent(props: OrganizationSectionContentProps) {
   if (props.organizations.length === 0) {
     return (
-      <Typography color="text.secondary" variant="body2">
-        You do not have any associated organizations yet.
-      </Typography>
+        <Typography color="text.secondary" variant="body2">
+        You do not have any visible organizations yet.
+        </Typography>
     );
   }
 

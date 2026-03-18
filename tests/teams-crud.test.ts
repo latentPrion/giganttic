@@ -83,6 +83,52 @@ describe("teams crud api", () => {
     await harness.cleanup();
   });
 
+  it("lists teams visible through organization membership in the lobby endpoint", async () => {
+    const owner = await harness.registerUser("team-list-org-owner");
+    const viewer = await harness.registerUser("team-list-org-viewer");
+    const organizationResponse = await createOrganization(owner.accessToken, {
+      name: "Team List Org",
+    });
+    const teamResponse = await createTeam(owner.accessToken, {
+      name: "Team List Visible Team",
+    });
+    const organization = harness.parseJson<{ organization: { id: number } }>(
+      organizationResponse.payload,
+    ).organization;
+    const team = harness.parseJson<{ team: { id: number } }>(teamResponse.payload).team;
+
+    const organizationMembershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          { userId: owner.user.id },
+          { userId: viewer.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/users`,
+    });
+    const organizationTeamResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { teamId: team.id },
+      url: `/stc-proj-mgmt/api/organizations/${organization.id}/teams`,
+    });
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(viewer.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/teams",
+    });
+    const payload = harness.parseJson<{ teams: Array<{ id: number; name: string }> }>(
+      listResponse.payload,
+    );
+
+    expect(organizationMembershipResponse.statusCode).toBe(200);
+    expect(organizationTeamResponse.statusCode).toBe(200);
+    expect(listResponse.statusCode).toBe(200);
+    expect(payload.teams.map((entry) => entry.name)).toContain("Team List Visible Team");
+  });
+
   it("allows any authenticated user to create a team and makes the creator a team manager member", async () => {
     const creator = await harness.registerUser("team-creator");
     const response = await createTeam(creator.accessToken, {

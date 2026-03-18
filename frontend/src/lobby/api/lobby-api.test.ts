@@ -112,6 +112,37 @@ describe("lobbyApi", () => {
     );
   });
 
+  it("changes a user's password with the typed revoke toggle payload", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({
+        revokedSessionIds: ["session-1"],
+        updatedUserId: 15,
+      }),
+    );
+
+    await lobbyApi.changeUserPassword(TEST_TOKEN, 15, {
+      currentPassword: "old-secret",
+      newPassword: "new-secret",
+      revokeSessions: true,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/users/15/password",
+      expect.objectContaining({
+        body: JSON.stringify({
+          currentPassword: "old-secret",
+          newPassword: "new-secret",
+          revokeSessions: true,
+        }),
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${TEST_TOKEN}`,
+          "Content-Type": "application/json",
+        }),
+        method: "POST",
+      }),
+    );
+  });
+
   it("loads a project summary with members", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       createJsonResponse({

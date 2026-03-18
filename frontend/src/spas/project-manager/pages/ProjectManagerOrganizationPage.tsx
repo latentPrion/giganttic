@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { EntityActionButton } from "../../../common/components/entity-actions/EntityActionButton.js";
 import { ProjectCreateButton } from "../../../common/components/entity-actions/ProjectCreateButton.js";
+import { TeamCreateButton } from "../../../common/components/entity-actions/TeamCreateButton.js";
 import { TeamDeleteButton } from "../../../common/components/entity-actions/TeamDeleteButton.js";
 import { UserDeleteButton } from "../../../common/components/entity-actions/UserDeleteButton.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
@@ -21,8 +22,10 @@ import { TeamListItem } from "../../../common/components/entity-list/TeamListIte
 import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { ProjectCreateModal } from "../../../lobby/components/project/ProjectCreateModal.js";
+import { TeamCreateModal } from "../../../lobby/components/team/TeamCreateModal.js";
 import type {
   CreateProjectRequest,
+  CreateTeamRequest,
   GetOrganizationResponse,
   LobbyProject,
   LobbyTeam,
@@ -48,6 +51,7 @@ const ADD_MEMBER_TEAM_LABEL = "Add Member Team";
 const ADD_MEMBER_USER_LABEL = "Add Member User";
 const ASSOCIATE_TEAM_BUSY_KEY_SUFFIX = "team:associate";
 const ASSOCIATE_USER_BUSY_KEY_SUFFIX = "user:associate";
+const CREATE_TEAM_BUSY_KEY_SUFFIX = "team:create";
 const DEFAULT_ERROR_MESSAGE = "Unable to load that organization right now.";
 const LIST_ITEM_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const MISSING_ROUTE_MESSAGE = "Provide a valid organizationId to view an organization.";
@@ -72,6 +76,10 @@ function createAssociateTeamBusyKey(organizationId: number | null): string {
 
 function createAssociateUserBusyKey(organizationId: number | null): string {
   return `organization:${organizationId ?? "unknown"}:${ASSOCIATE_USER_BUSY_KEY_SUFFIX}`;
+}
+
+function createCreateTeamBusyKey(organizationId: number | null): string {
+  return `organization:${organizationId ?? "unknown"}:${CREATE_TEAM_BUSY_KEY_SUFFIX}`;
 }
 
 function createSelectedOrganizationLabel(organizationId: number | null): string {
@@ -139,6 +147,22 @@ function canAddOrganizationTeams(
 
   return response.organizationManagers.some((manager) => manager.userId === currentUserId) ||
     response.organizationTeamManagers.some((manager) => manager.userId === currentUserId);
+}
+
+function canCreateOrganizationTeams(
+  currentUserId: number | undefined,
+  currentUserRoles: readonly string[] | undefined,
+  response: GetOrganizationResponse | null,
+): boolean {
+  if (hasSystemAdminRole(currentUserRoles)) {
+    return true;
+  }
+
+  if (!response || currentUserId === undefined) {
+    return false;
+  }
+
+  return response.organizationManagers.some((manager) => manager.userId === currentUserId);
 }
 
 function createOrganizationUsersPayload(
@@ -283,6 +307,7 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
   const [isAddTeamModalOpen, setIsAddTeamModalOpen] = useState(false);
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(props.organizationId !== null);
   const [organizationResponse, setOrganizationResponse] = useState<GetOrganizationResponse | null>(null);
 
@@ -295,6 +320,11 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
     [availableUsers, organizationResponse],
   );
   const allowAddOrganizationTeams = canAddOrganizationTeams(
+    props.currentUserId,
+    props.currentUserRoles,
+    organizationResponse,
+  );
+  const allowCreateOrganizationTeams = canCreateOrganizationTeams(
     props.currentUserId,
     props.currentUserRoles,
     organizationResponse,
@@ -405,6 +435,39 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
       setOrganizationResponse((current) => current ? { ...current, teams: response.teams } : current);
     } catch (error) {
       throw new Error(buildErrorMessage(error, "Unable to add that member team."));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleCreateTeam(payload: CreateTeamRequest): Promise<LobbyTeam> {
+    if (props.organizationId === null) {
+      throw new Error(DEFAULT_ERROR_MESSAGE);
+    }
+
+    const actionKey = createCreateTeamBusyKey(props.organizationId);
+    setBusyKey(actionKey);
+    setErrorMessage(null);
+
+    let createdTeam: LobbyTeam | null = null;
+
+    try {
+      const createdResponse = await lobbyApi.createTeam(props.token, payload);
+      createdTeam = createdResponse.team;
+      const assignedResponse = await lobbyApi.assignOrganizationTeam(props.token, props.organizationId, {
+        teamId: createdTeam.id,
+      });
+      setOrganizationResponse((current) => current ? { ...current, teams: assignedResponse.teams } : current);
+      return createdTeam;
+    } catch (error) {
+      if (createdTeam !== null) {
+        try {
+          await lobbyApi.deleteTeam(props.token, createdTeam.id);
+        } catch {
+          // Best-effort cleanup only.
+        }
+      }
+      throw error;
     } finally {
       setBusyKey(null);
     }
@@ -574,12 +637,22 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
         {renderTeamsSection(
           organizationResponse.teams,
           navigateToTeam,
-          allowAddOrganizationTeams ? (
-            <EntityActionButton
-              disabled={busyKey === createAssociateTeamBusyKey(props.organizationId)}
-              label={ADD_MEMBER_TEAM_LABEL}
-              onClick={openAddTeamModal}
-            />
+          allowAddOrganizationTeams || allowCreateOrganizationTeams ? (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              {allowCreateOrganizationTeams ? (
+                <TeamCreateButton
+                  disabled={busyKey === createCreateTeamBusyKey(props.organizationId)}
+                  onClick={() => setIsCreateTeamModalOpen(true)}
+                />
+              ) : null}
+              {allowAddOrganizationTeams ? (
+                <EntityActionButton
+                  disabled={busyKey === createAssociateTeamBusyKey(props.organizationId)}
+                  label={ADD_MEMBER_TEAM_LABEL}
+                  onClick={openAddTeamModal}
+                />
+              ) : null}
+            </Stack>
           ) : undefined,
           allowAddOrganizationTeams ? (team) => (
             <TeamDeleteButton
@@ -622,6 +695,12 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
         isOpen={isCreateProjectModalOpen}
         onClose={() => setIsCreateProjectModalOpen(false)}
         onCreate={handleCreateProject}
+      />
+      <TeamCreateModal
+        isBusy={busyKey === createCreateTeamBusyKey(props.organizationId)}
+        isOpen={isCreateTeamModalOpen}
+        onClose={() => setIsCreateTeamModalOpen(false)}
+        onCreate={handleCreateTeam}
       />
       <EntityAssociationModal
         emptyMessage="No additional visible teams are available to add."

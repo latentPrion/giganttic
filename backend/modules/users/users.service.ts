@@ -4,8 +4,9 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   organizationsTeams,
@@ -16,6 +17,7 @@ import {
   teamsUsers,
   users,
   usersCredentialTypes,
+  usersPasswordCredentials,
   usersOrganizations,
   usersOrganizationsOrganizationRoles,
   usersSessions,
@@ -32,6 +34,8 @@ import {
   listEffectiveTeamManagerUserIds,
   listProjectIdsForOrganization,
   listProjectIdsForTeam,
+  listProjectIdsVisibleByMembership,
+  listTeamIdsVisibleByMembership,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
   uniqueNumberValues,
@@ -46,7 +50,10 @@ import {
   BLOCKING_OBJECT_REASON_LAST_OWNER,
   createBlockingConflictException,
 } from "../access-control/blocking-conflicts.js";
+import { AuthService } from "../auth/auth.service.js";
 import type {
+  ChangeUserPasswordRequest,
+  ChangeUserPasswordResponse,
   DeleteUserResponse,
   GetUserResponse,
   ListUsersResponse,
@@ -57,12 +64,17 @@ const LAST_PROJECT_MANAGER_DELETE_MESSAGE =
   "User delete would remove the last effective project manager";
 const LAST_TEAM_MANAGER_DELETE_MESSAGE =
   "User delete would remove the last effective team manager";
+const CURRENT_PASSWORD_INVALID_MESSAGE = "Invalid current password";
+const CURRENT_PASSWORD_REQUIRED_MESSAGE = "Current password is required";
+const PASSWORD_CREDENTIAL_MISSING_MESSAGE = "User does not have an active password credential";
 
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(AuthService)
+    private readonly authService: AuthService,
   ) {}
 
   async getUser(
@@ -125,6 +137,70 @@ export class UsersService {
     };
   }
 
+  async changeUserPassword(
+    authContext: AuthContext,
+    userId: number,
+    payload: ChangeUserPasswordRequest,
+  ): Promise<ChangeUserPasswordResponse> {
+    this.assertUserExists(userId);
+    this.assertCanChangeUserPassword(authContext, userId);
+
+    const passwordCredential = this.authService.getActivePasswordCredential(userId);
+    if (!passwordCredential) {
+      throw new ConflictException(PASSWORD_CREDENTIAL_MISSING_MESSAGE);
+    }
+
+    const isSelfService = authContext.userId === userId;
+    if (isSelfService) {
+      await this.assertCurrentPasswordMatches(passwordCredential.passwordHash, payload.currentPassword);
+    }
+
+    const passwordHash = await this.authService.hashPassword(payload.newPassword);
+    const revocationTimestamp = new Date();
+    const revokedSessionIds = this.databaseService.db.transaction((tx) => {
+      tx.update(usersPasswordCredentials)
+        .set({
+          passwordHash,
+          passwordUpdatedAt: revocationTimestamp,
+          updatedAt: revocationTimestamp,
+        })
+        .where(eq(usersPasswordCredentials.id, passwordCredential.passwordCredentialId))
+        .run();
+
+      if (!payload.revokeSessions) {
+        return [];
+      }
+
+      const revocableSessionRows = tx.select({ id: usersSessions.id })
+        .from(usersSessions)
+        .where(
+          and(
+            eq(usersSessions.userId, userId),
+            isNull(usersSessions.revokedAt),
+          ),
+        )
+        .all();
+      const revocableSessionIds = revocableSessionRows.map((row) => row.id);
+
+      if (revocableSessionIds.length > 0) {
+        tx.update(usersSessions)
+          .set({
+            revokedAt: revocationTimestamp,
+            updatedAt: revocationTimestamp,
+          })
+          .where(inArray(usersSessions.id, revocableSessionIds))
+          .run();
+      }
+
+      return revocableSessionIds;
+    });
+
+    return {
+      revokedSessionIds,
+      updatedUserId: userId,
+    };
+  }
+
   async deleteUser(
     authContext: AuthContext,
     userId: number,
@@ -173,6 +249,14 @@ export class UsersService {
     }
 
     throw new ForbiddenException("Not permitted to delete that user");
+  }
+
+  private assertCanChangeUserPassword(authContext: AuthContext, userId: number): void {
+    if (authContext.userId === userId || hasSystemAdminRole(authContext)) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to change that user's password");
   }
 
   private assertCanViewUser(authContext: AuthContext): void {
@@ -252,7 +336,26 @@ export class UsersService {
     }
   }
 
+  private async assertCurrentPasswordMatches(
+    passwordHash: string,
+    currentPassword: string | undefined,
+  ): Promise<void> {
+    if (!currentPassword) {
+      throw new UnauthorizedException(CURRENT_PASSWORD_REQUIRED_MESSAGE);
+    }
+
+    const isValid = await this.authService.verifyPassword(passwordHash, currentPassword);
+    if (!isValid) {
+      throw new UnauthorizedException(CURRENT_PASSWORD_INVALID_MESSAGE);
+    }
+  }
+
   private listUserProjects(userId: number): GetUserResponse["projects"] {
+    const visibleProjectIds = listProjectIdsVisibleByMembership(this.databaseService.db, userId);
+    if (visibleProjectIds.length === 0) {
+      return [];
+    }
+
     return this.databaseService.db
       .select({
         createdAt: projects.createdAt,
@@ -261,10 +364,10 @@ export class UsersService {
         name: projects.name,
         updatedAt: projects.updatedAt,
       })
-      .from(projectsUsers)
-      .innerJoin(projects, eq(projects.id, projectsUsers.projectId))
-      .where(eq(projectsUsers.userId, userId))
+      .from(projects)
+      .where(inArray(projects.id, visibleProjectIds))
       .all()
+      .sort((left, right) => left.id - right.id)
       .map((row) => ({
         createdAt: row.createdAt.toISOString(),
         description: row.description,
@@ -275,6 +378,11 @@ export class UsersService {
   }
 
   private listUserTeams(userId: number): GetUserResponse["teams"] {
+    const visibleTeamIds = listTeamIdsVisibleByMembership(this.databaseService.db, userId);
+    if (visibleTeamIds.length === 0) {
+      return [];
+    }
+
     return this.databaseService.db
       .select({
         createdAt: teams.createdAt,
@@ -283,10 +391,10 @@ export class UsersService {
         name: teams.name,
         updatedAt: teams.updatedAt,
       })
-      .from(teamsUsers)
-      .innerJoin(teams, eq(teams.id, teamsUsers.teamId))
-      .where(eq(teamsUsers.userId, userId))
+      .from(teams)
+      .where(inArray(teams.id, visibleTeamIds))
       .all()
+      .sort((left, right) => left.id - right.id)
       .map((row) => ({
         createdAt: row.createdAt.toISOString(),
         description: row.description,

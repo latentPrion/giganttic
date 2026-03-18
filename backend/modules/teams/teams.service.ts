@@ -33,6 +33,7 @@ import {
   listDirectProjectManagerUserIds,
   listEffectiveTeamManagerUserIds,
   listProjectIdsForTeam,
+  listTeamIdsVisibleByMembership,
   listTeamIdsForProject,
   listTeamProjectManagerUserIds,
   ORGANIZATION_PROJECT_MANAGER_ROLE_CODE,
@@ -179,35 +180,10 @@ export class TeamsService {
   }
 
   listTeams(authContext: AuthContext): ListTeamsResponse {
-    const membershipTeamIds = this.databaseService.db
-      .select({ teamId: teamsUsers.teamId })
-      .from(teamsUsers)
-      .where(eq(teamsUsers.userId, authContext.userId))
-      .all()
-      .map((row) => row.teamId);
-    const roleTeamIds = this.databaseService.db
-      .select({ teamId: usersTeamsTeamRoles.teamId })
-      .from(usersTeamsTeamRoles)
-      .where(eq(usersTeamsTeamRoles.userId, authContext.userId))
-      .all()
-      .map((row) => row.teamId);
-    const organizationMembershipTeamIds = this.databaseService.db
-      .select({ teamId: organizationsTeams.teamId })
-      .from(organizationsTeams)
-      .innerJoin(
-        usersOrganizations,
-        eq(usersOrganizations.organizationId, organizationsTeams.organizationId),
-      )
-      .where(eq(usersOrganizations.userId, authContext.userId))
-      .all()
-      .map((row) => row.teamId);
-    const teamIds = [
-      ...new Set([
-        ...membershipTeamIds,
-        ...roleTeamIds,
-        ...organizationMembershipTeamIds,
-      ]),
-    ];
+    const teamIds = listTeamIdsVisibleByMembership(
+      this.databaseService.db,
+      authContext.userId,
+    );
 
     if (teamIds.length === 0) {
       return { teams: [] };
