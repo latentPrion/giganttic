@@ -496,7 +496,8 @@ describe("app routing", () => {
     });
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
-    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
+    expect(screen.getByText("Selected project: None")).toBeVisible();
+    expect(screen.getByText("Select a valid project to view its gantt chart.")).toBeVisible();
   });
 
   it("renders a safe fallback when the PM kanban route is missing projectId", async () => {

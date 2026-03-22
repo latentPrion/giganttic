@@ -13,7 +13,6 @@ import { ApiError } from "../../../common/api/api-error.js";
 import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { appTheme } from "../../../theme/app-theme.js";
-import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
 const TEST_TOKEN = "test-token";
@@ -212,18 +211,36 @@ describe("ProjectManagerGanttPage", () => {
     ]);
   });
 
-  it("uses default chart XML when the backend has no chart file", async () => {
+  it("shows a missing-chart message when the backend has no chart file", async () => {
     getProjectChartOrNullMock.mockResolvedValue(null);
 
     renderWithTheme(
       <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
     );
 
+    expect(
+      await screen.findByText("No gantt chart exists for this project yet."),
+    ).toBeVisible();
+    expect(mockGantt.parse).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Create" })).toBeVisible();
+  });
+
+  it("creates a default chart after clicking Create when no chart exists", async () => {
+    const user = userEvent.setup();
+    getProjectChartOrNullMock.mockResolvedValue(null);
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Create" }));
+
     await waitFor(() => {
-      expect(mockGantt.parse).toHaveBeenCalledWith(DEFAULT_PROJECT_CHART_XML, "xml");
+      expect(putProjectChartMock).toHaveBeenCalledTimes(1);
+      expect(mockGantt.parse).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByRole("button", { name: "Create" })).toBeVisible();
+    expect(screen.queryByText("No gantt chart exists for this project yet.")).not.toBeInTheDocument();
   });
 
   it("shows a generic error message when the backend returns a non-404 failure", async () => {

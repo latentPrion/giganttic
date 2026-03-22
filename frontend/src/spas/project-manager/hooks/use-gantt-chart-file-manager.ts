@@ -65,10 +65,7 @@ export function useGanttChartFileManager(options: {
         setChartSource(loaded);
       } else {
         setHasServerChart(false);
-        setChartSource({
-          content: DEFAULT_PROJECT_CHART_XML,
-          type: "xml",
-        });
+        setChartSource(null);
       }
     } catch (error) {
       setLoadErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR));
@@ -100,10 +97,7 @@ export function useGanttChartFileManager(options: {
     if (projectId === null) {
       return;
     }
-    const xml = ganttRef.current?.getSerializedXml();
-    if (xml === undefined) {
-      return;
-    }
+    const xml = ganttRef.current?.getSerializedXml() ?? DEFAULT_PROJECT_CHART_XML;
 
     setIsPersisting(true);
     setPersistErrorMessage(null);
@@ -112,6 +106,10 @@ export function useGanttChartFileManager(options: {
       lastSavedXmlRef.current = xml;
       setIsDirty(false);
       setHasServerChart(true);
+      setChartSource({
+        content: xml,
+        type: "xml",
+      });
     } catch (error) {
       setPersistErrorMessage(getApiErrorMessage(error, SAVE_ERROR));
     } finally {

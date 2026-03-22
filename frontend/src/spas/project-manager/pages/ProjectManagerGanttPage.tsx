@@ -30,13 +30,14 @@ interface ProjectManagerGanttPageProps {
 
 const DEFAULT_DISPLAY_MODE: GanttDisplayMode = "both";
 const LOADING_MESSAGE = "Loading gantt chart...";
+const MISSING_CHART_MESSAGE = "No gantt chart exists for this project yet.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Manager Gantt";
-const SAMPLE_PROJECT_LABEL = "Sample chart";
+const SELECT_PROJECT_MESSAGE = "Select a valid project to view its gantt chart.";
 const UNSAVED_CHANGES_LABEL = "Unsaved changes";
 
 function createSelectedProjectLabel(projectId: number | null): string {
-  return projectId === null ? SAMPLE_PROJECT_LABEL : `${projectId}`;
+  return projectId === null ? "None" : `${projectId}`;
 }
 
 function renderGanttContainer(
@@ -252,10 +253,16 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
         {!isLoading && loadErrorMessage && (
           <Alert severity="error">{loadErrorMessage}</Alert>
         )}
+        {!isLoading && !loadErrorMessage && props.projectId === null && (
+          <Alert severity="info">{SELECT_PROJECT_MESSAGE}</Alert>
+        )}
         {!isLoading && !loadErrorMessage && persistErrorMessage && (
           <Alert onClose={() => clearPersistError()} severity="error">
             {persistErrorMessage}
           </Alert>
+        )}
+        {!isLoading && !loadErrorMessage && props.projectId !== null && chartSource === null && (
+          <Alert severity="info">{MISSING_CHART_MESSAGE}</Alert>
         )}
         {!isLoading && !loadErrorMessage && chartSource && (
           renderGanttContainer(

@@ -30,6 +30,7 @@ const GANTT_SURFACE_BACKGROUND = "#ffffff";
 const GANTT_GRID_PADDING_WIDTH = 32;
 const GANTT_HORIZONTAL_SCROLLBAR_HEIGHT = 20;
 const GANTT_LAYOUT_CSS_CLASS = "gantt_container";
+const GANTT_SERIALIZATION_FORMAT = "xml";
 const GANTT_TIMELINE_GRAVITY = 2;
 const GANTT_GRID_WIDTH =
   GANTT_NAME_COLUMN_WIDTH + GANTT_START_COLUMN_WIDTH + GANTT_DURATION_COLUMN_WIDTH
@@ -251,7 +252,7 @@ function initializeMountedGantt(
 
   const eventIds = attachEditorEvents(ganttInstance, onEditorChange);
 
-  const serialized = ganttInstance.serialize();
+  const serialized = serializeGanttXml(ganttInstance);
   onBaselineReady?.(serialized);
 
   return eventIds;
@@ -265,6 +266,10 @@ function cleanupMountedGantt(
   detachEditorEvents(ganttInstance, eventIds);
   ganttInstance.clearAll();
   containerElement.replaceChildren();
+}
+
+function serializeGanttXml(ganttInstance: ReturnType<typeof getDhtmlxGantt>): string {
+  return ganttInstance.serialize(GANTT_SERIALIZATION_FORMAT) as string;
 }
 
 export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
@@ -285,7 +290,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
         if (!ganttInstance) {
           return "";
         }
-        return ganttInstance.serialize();
+        return serializeGanttXml(ganttInstance);
       },
     }));
 

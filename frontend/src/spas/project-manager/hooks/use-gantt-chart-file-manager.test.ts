@@ -68,10 +68,7 @@ describe("useGanttChartFileManager", () => {
     });
 
     expect(result.current.hasServerChart).toBe(false);
-    expect(result.current.chartSource).toEqual({
-      content: DEFAULT_PROJECT_CHART_XML,
-      type: "xml",
-    });
+    expect(result.current.chartSource).toBeNull();
   });
 
   it("sets loadErrorMessage when chart load fails", async () => {
@@ -327,11 +324,9 @@ describe("useGanttChartFileManager", () => {
     expect(ganttApiMock.putProjectChart).not.toHaveBeenCalled();
   });
 
-  it("does not call putProjectChart when gantt ref has no serializer", async () => {
-    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
-      content: SERVER_XML,
-      type: "xml",
-    });
+  it("creates a default chart when no server chart exists yet", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue(null);
+    ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
     const ganttRef = { current: null };
 
     const { result } = renderHook(() =>
@@ -350,7 +345,16 @@ describe("useGanttChartFileManager", () => {
       await result.current.persistChart();
     });
 
-    expect(ganttApiMock.putProjectChart).not.toHaveBeenCalled();
+    expect(ganttApiMock.putProjectChart).toHaveBeenCalledWith(
+      "tok-i",
+      8,
+      DEFAULT_PROJECT_CHART_XML,
+    );
+    expect(result.current.chartSource).toEqual({
+      content: DEFAULT_PROJECT_CHART_XML,
+      type: "xml",
+    });
+    expect(result.current.hasServerChart).toBe(true);
   });
 
   it("sets isPersisting true while putProjectChart is in flight", async () => {
