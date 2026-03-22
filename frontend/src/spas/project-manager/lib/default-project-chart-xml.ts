@@ -1,0 +1,9 @@
+/**
+ * Default DHTMLX Gantt XML for new charts. Aligns with backend
+ * `createDefaultProjectChartXml` (project-chart-files.js).
+ */
+export const DEFAULT_PROJECT_CHART_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="1" open="1" parent="0" progress="0" start_date="2026-03-01 09:00" duration="3"><![CDATA[Edit your new Gantt chart]]></task>
+</data>
+`;

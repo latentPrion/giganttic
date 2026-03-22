@@ -1,67 +1,55 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
+  Button,
+  Chip,
   CircularProgress,
   Stack,
   Typography,
 } from "@mui/material";
 
-import {
-  getApiErrorMessage,
-  isApiError,
-} from "../../../common/api/api-error.js";
+import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
 import { GanttChart } from "../components/GanttChart.js";
 import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js";
 import { GanttDownloadSplitButton } from "../components/GanttDownloadSplitButton.js";
-import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
+import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
+import { canEditProject } from "../lib/project-edit-permissions.js";
+import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
 interface ProjectManagerGanttPageProps {
+  currentUserId?: number;
+  currentUserRoles?: string[];
   projectId: number | null;
   token: string;
 }
 
 const DEFAULT_DISPLAY_MODE: GanttDisplayMode = "both";
-const DEFAULT_ERROR_MESSAGE = "Unable to load that gantt chart right now.";
 const LOADING_MESSAGE = "Loading gantt chart...";
-const MISSING_CHART_MESSAGE = "No gantt chart file exists for this project yet.";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Manager Gantt";
 const SAMPLE_PROJECT_LABEL = "Sample chart";
+const UNSAVED_CHANGES_LABEL = "Unsaved changes";
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? SAMPLE_PROJECT_LABEL : `${projectId}`;
 }
 
 function renderGanttContainer(
-  chartSource: GanttChartSource | null,
-  errorMessage: string | null,
-  isLoading: boolean,
+  chartRef: React.RefObject<GanttChartHandle | null>,
+  canEdit: boolean,
+  chartSource: GanttChartSource,
   displayMode: GanttDisplayMode,
   isControlPanelExpanded: boolean,
+  onBaselineReady: (serializedXml: string) => void,
   onDisplayModeChange: (nextValue: GanttDisplayMode) => void,
+  onEditorChange: () => void,
   onToggleExpanded: () => void,
 ) {
-  if (isLoading) {
-    return (
-      <Stack alignItems="center" direction="row" spacing={1.5}>
-        <CircularProgress size={20} />
-        <Typography>{LOADING_MESSAGE}</Typography>
-      </Stack>
-    );
-  }
-
-  if (errorMessage) {
-    return <Alert severity="error">{errorMessage}</Alert>;
-  }
-
-  if (chartSource === null) {
-    return <Alert severity="info">{MISSING_CHART_MESSAGE}</Alert>;
-  }
-
   return (
     <Box
       sx={{
@@ -74,7 +62,14 @@ function renderGanttContainer(
         overflow: "hidden",
       }}
     >
-      <GanttChart chartSource={chartSource} displayMode={displayMode} />
+      <GanttChart
+        ref={chartRef}
+        chartSource={chartSource}
+        displayMode={displayMode}
+        interactionsEnabled={canEdit}
+        onBaselineReady={onBaselineReady}
+        onEditorChange={onEditorChange}
+      />
       <GanttChartControlPanel
         displayMode={displayMode}
         isExpanded={isControlPanelExpanded}
@@ -87,7 +82,12 @@ function renderGanttContainer(
 
 function renderNavigationActions(
   chartSource: GanttChartSource | null,
+  canEdit: boolean,
+  hasServerChart: boolean,
+  isDirty: boolean,
   isLoading: boolean,
+  isPersisting: boolean,
+  onPersist: () => void,
   projectId: number | null,
   token: string,
 ) {
@@ -96,73 +96,111 @@ function renderNavigationActions(
   }
 
   return (
-    <GanttDownloadSplitButton
-      chartSource={chartSource}
-      isLoadingChart={isLoading}
-      projectId={projectId}
-      token={token}
-    />
+    <Stack alignItems="center" direction="row" flexWrap="wrap" spacing={1}>
+      <GanttDownloadSplitButton
+        chartSource={chartSource}
+        isLoadingChart={isLoading}
+        projectId={projectId}
+        token={token}
+      />
+      {canEdit && (
+        <>
+          {isDirty && (
+            <Chip
+              color="warning"
+              label={UNSAVED_CHANGES_LABEL}
+              size="small"
+              variant="outlined"
+            />
+          )}
+          <Button
+            disabled={isPersisting || isLoading}
+            onClick={() => {
+              void onPersist();
+            }}
+            size="small"
+            variant="contained"
+          >
+            {hasServerChart ? "Save" : "Create"}
+          </Button>
+        </>
+      )}
+    </Stack>
   );
 }
 
 export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
-  const [chartSource, setChartSource] = useState<GanttChartSource | null>(null);
   const [displayMode, setDisplayMode] = useState<GanttDisplayMode>(DEFAULT_DISPLAY_MODE);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true);
-  const [isLoading, setIsLoading] = useState(props.projectId !== null);
+  const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
+  const ganttRef = useRef<GanttChartHandle | null>(null);
+
+  const fileManager = useGanttChartFileManager({
+    ganttRef,
+    projectId: props.projectId,
+    token: props.token,
+  });
+
+  const {
+    chartSource,
+    clearPersistError,
+    hasServerChart,
+    isDirty,
+    isLoading,
+    isPersisting,
+    loadErrorMessage,
+    persistChart,
+    persistErrorMessage,
+    setDirtyFromEditor,
+    setInitialBaseline,
+  } = fileManager;
 
   useEffect(() => {
     const { projectId, token } = props;
 
     if (projectId === null) {
-      setChartSource(null);
-      setErrorMessage(null);
-      setIsLoading(false);
+      setProjectResponse(null);
       return;
     }
-    const resolvedProjectId = projectId;
 
     let isMounted = true;
 
-    async function loadChart(): Promise<void> {
-      setChartSource(null);
-      setErrorMessage(null);
-      setIsLoading(true);
-
+    async function loadProject(): Promise<void> {
       try {
-        const nextChartSource = await ganttApi.getProjectChart(
-          token,
-          resolvedProjectId,
-        );
-
+        const response = await lobbyApi.getProject(token, projectId);
         if (isMounted) {
-          setChartSource(nextChartSource);
+          setProjectResponse(response);
         }
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        if (isApiError(error) && error.kind === "http" && error.status === 404) {
-          setChartSource(null);
-          return;
-        }
-
-        setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
-      } finally {
+      } catch {
         if (isMounted) {
-          setIsLoading(false);
+          setProjectResponse(null);
         }
       }
     }
 
-    void loadChart();
+    void loadProject();
 
     return () => {
       isMounted = false;
     };
   }, [props.projectId, props.token]);
+
+  const onBaselineReady = useCallback(
+    (serializedXml: string) => {
+      setInitialBaseline(serializedXml);
+    },
+    [setInitialBaseline],
+  );
+
+  const onEditorChange = useCallback(() => {
+    setDirtyFromEditor();
+  }, [setDirtyFromEditor]);
+
+  const canEdit = canEditProject(
+    props.currentUserId,
+    props.currentUserRoles,
+    projectResponse,
+  );
 
   function toggleControlPanelExpanded(): void {
     setIsControlPanelExpanded((current) => !current);
@@ -186,7 +224,12 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
           <ProjectManagerProjectNavigation
             actions={renderNavigationActions(
               chartSource,
+              canEdit,
+              hasServerChart,
+              isDirty,
               isLoading,
+              isPersisting,
+              persistChart,
               props.projectId,
               props.token,
             )}
@@ -200,14 +243,32 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             Selected project: {createSelectedProjectLabel(props.projectId)}
           </Typography>
         </Stack>
-        {renderGanttContainer(
-          chartSource,
-          errorMessage,
-          isLoading,
-          displayMode,
-          isControlPanelExpanded,
-          setDisplayMode,
-          toggleControlPanelExpanded,
+        {isLoading && (
+          <Stack alignItems="center" direction="row" spacing={1.5}>
+            <CircularProgress size={20} />
+            <Typography>{LOADING_MESSAGE}</Typography>
+          </Stack>
+        )}
+        {!isLoading && loadErrorMessage && (
+          <Alert severity="error">{loadErrorMessage}</Alert>
+        )}
+        {!isLoading && !loadErrorMessage && persistErrorMessage && (
+          <Alert onClose={() => clearPersistError()} severity="error">
+            {persistErrorMessage}
+          </Alert>
+        )}
+        {!isLoading && !loadErrorMessage && chartSource && (
+          renderGanttContainer(
+            ganttRef,
+            canEdit,
+            chartSource,
+            displayMode,
+            isControlPanelExpanded,
+            onBaselineReady,
+            setDisplayMode,
+            onEditorChange,
+            toggleControlPanelExpanded,
+          )
         )}
       </Stack>
     </Box>

@@ -74,6 +74,7 @@ import type {
   UpdateProjectRequest,
   UpdateProjectTeamsResponse,
   UpdateProjectRoleAssignmentResponse,
+  UpdateProjectChartResponse,
 } from "./projects.contracts.js";
 
 const LAST_PROJECT_MANAGER_MESSAGE =
@@ -237,6 +238,19 @@ export class ProjectsService {
     }
 
     return chartXml;
+  }
+
+  updateProjectChart(
+    authContext: AuthContext,
+    projectId: number,
+    xml: string,
+  ): UpdateProjectChartResponse {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+
+    this.projectChartsService.writeProjectChart(projectId, xml);
+
+    return { ok: true };
   }
 
   private createMsProjectExportCapabilities() {

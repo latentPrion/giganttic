@@ -46,6 +46,7 @@ import type {
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { EntityAssociationModal } from "../components/projects/EntityAssociationModal.js";
 import { ProjectDetailsCard } from "../components/projects/ProjectDetailsCard.js";
+import { canEditProject } from "../lib/project-edit-permissions.js";
 import {
   createProjectIssuesRoute,
   createProjectManagerOrganizationRoute,
@@ -174,20 +175,6 @@ function canDeleteProject(
     (member) =>
       member.userId === currentUserId &&
       hasRoleCode(member, "GGTC_PROJECTROLE_PROJECT_OWNER"),
-  );
-}
-
-function canEditProject(
-  currentUserId: number | undefined,
-  currentUserRoles: readonly string[] | undefined,
-  response: GetProjectResponse | null,
-): boolean {
-  if (!response || currentUserId === undefined) {
-    return currentUserRoles?.includes(SYSTEM_ADMIN_ROLE_CODE) ?? false;
-  }
-
-  return canDeleteProject(currentUserId, currentUserRoles, response) || response.projectManagers.some(
-    (projectManager) => projectManager.userId === currentUserId,
   );
 }
 

@@ -1,0 +1,140 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { ganttApi } from "../api/gantt-api.js";
+import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
+import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
+import type { GanttChartSource } from "../models/gantt-chart-source.js";
+
+export interface UseGanttChartFileManagerResult {
+  chartSource: GanttChartSource | null;
+  clearPersistError: () => void;
+  hasServerChart: boolean;
+  isDirty: boolean;
+  isLoading: boolean;
+  isPersisting: boolean;
+  loadErrorMessage: string | null;
+  persistChart: () => Promise<void>;
+  persistErrorMessage: string | null;
+  reloadChart: () => Promise<void>;
+  setDirtyFromEditor: () => void;
+  setInitialBaseline: (serializedXml: string) => void;
+}
+
+const DEFAULT_ERROR = "Unable to load that gantt chart right now.";
+const SAVE_ERROR = "Unable to save the gantt chart right now.";
+
+export function useGanttChartFileManager(options: {
+  ganttRef: React.RefObject<GanttChartHandle | null>;
+  projectId: number | null;
+  token: string;
+}): UseGanttChartFileManagerResult {
+  const { ganttRef, projectId, token } = options;
+  const [chartSource, setChartSource] = useState<GanttChartSource | null>(null);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  const [persistErrorMessage, setPersistErrorMessage] = useState<string | null>(null);
+  const [hasServerChart, setHasServerChart] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isLoading, setIsLoading] = useState(projectId !== null);
+  const [isPersisting, setIsPersisting] = useState(false);
+  const lastSavedXmlRef = useRef<string | null>(null);
+
+  const loadChart = useCallback(async () => {
+    if (projectId === null) {
+      setChartSource(null);
+      setLoadErrorMessage(null);
+      setPersistErrorMessage(null);
+      setHasServerChart(false);
+      lastSavedXmlRef.current = null;
+      setIsDirty(false);
+      setIsLoading(false);
+      return;
+    }
+
+    setChartSource(null);
+    setLoadErrorMessage(null);
+    setPersistErrorMessage(null);
+    setIsLoading(true);
+    lastSavedXmlRef.current = null;
+    setIsDirty(false);
+
+    try {
+      const loaded = await ganttApi.getProjectChartOrNull(token, projectId);
+      if (loaded) {
+        setHasServerChart(true);
+        setChartSource(loaded);
+      } else {
+        setHasServerChart(false);
+        setChartSource({
+          content: DEFAULT_PROJECT_CHART_XML,
+          type: "xml",
+        });
+      }
+    } catch (error) {
+      setLoadErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR));
+      setChartSource(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, token]);
+
+  useEffect(() => {
+    void loadChart();
+  }, [loadChart]);
+
+  const setInitialBaseline = useCallback((serializedXml: string) => {
+    lastSavedXmlRef.current = serializedXml;
+    setIsDirty(false);
+  }, []);
+
+  const setDirtyFromEditor = useCallback(() => {
+    const current = ganttRef.current?.getSerializedXml();
+    const baseline = lastSavedXmlRef.current;
+    if (current === undefined || baseline === null) {
+      return;
+    }
+    setIsDirty(current !== baseline);
+  }, [ganttRef]);
+
+  const persistChart = useCallback(async () => {
+    if (projectId === null) {
+      return;
+    }
+    const xml = ganttRef.current?.getSerializedXml();
+    if (xml === undefined) {
+      return;
+    }
+
+    setIsPersisting(true);
+    setPersistErrorMessage(null);
+    try {
+      await ganttApi.putProjectChart(token, projectId, xml);
+      lastSavedXmlRef.current = xml;
+      setIsDirty(false);
+      setHasServerChart(true);
+    } catch (error) {
+      setPersistErrorMessage(getApiErrorMessage(error, SAVE_ERROR));
+    } finally {
+      setIsPersisting(false);
+    }
+  }, [ganttRef, projectId, token]);
+
+  const clearPersistError = useCallback(() => {
+    setPersistErrorMessage(null);
+  }, []);
+
+  return {
+    chartSource,
+    clearPersistError,
+    hasServerChart,
+    isDirty,
+    isLoading,
+    isPersisting,
+    loadErrorMessage,
+    persistChart,
+    persistErrorMessage,
+    reloadChart: loadChart,
+    setDirtyFromEditor,
+    setInitialBaseline,
+  };
+}

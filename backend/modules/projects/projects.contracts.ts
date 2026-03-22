@@ -171,6 +171,16 @@ export const getProjectChartExportCapabilitiesResponseSchema = z.object({
   }),
 });
 
+const PROJECT_CHART_XML_MAX_LENGTH = 16_000_000;
+
+export const updateProjectChartRequestSchema = z.object({
+  xml: z.string().min(1).max(PROJECT_CHART_XML_MAX_LENGTH),
+});
+
+export const updateProjectChartResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
 export const createProjectResponseSchema = z.object({
   project: projectSchema,
 });
@@ -259,4 +269,10 @@ export type UpdateProjectTeamsRequest = z.infer<
 >;
 export type UpdateProjectTeamsResponse = z.infer<
   typeof updateProjectTeamsResponseSchema
+>;
+export type UpdateProjectChartRequest = z.infer<
+  typeof updateProjectChartRequestSchema
+>;
+export type UpdateProjectChartResponse = z.infer<
+  typeof updateProjectChartResponseSchema
 >;

@@ -33,3 +33,15 @@ export type GanttExportMode = z.infer<typeof ganttExportModeSchema>;
 export type GetProjectChartExportCapabilitiesResponse = z.infer<
   typeof getProjectChartExportCapabilitiesResponseSchema
 >;
+
+export const updateProjectChartRequestSchema = z.object({
+  xml: z.string().min(1),
+});
+
+export const updateProjectChartResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
+export type UpdateProjectChartResponse = z.infer<
+  typeof updateProjectChartResponseSchema
+>;

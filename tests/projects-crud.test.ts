@@ -404,6 +404,235 @@ describe("projects crud api", () => {
     expect(chartResponse.statusCode).toBe(404);
   });
 
+  const UPDATED_PROJECT_CHART_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="1" open="1" parent="0" progress="0" start_date="2026-03-01 09:00" duration="5"><![CDATA[Updated via PUT]]></task>
+</data>
+`;
+
+  it("persists project chart XML via PUT for a project editor", async () => {
+    const creator = await harness.registerUser("project-chart-put-ok");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Put Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(200);
+    expect(harness.parseJson<{ ok: boolean }>(putResponse.payload)).toEqual({ ok: true });
+
+    const chartPath = harness.createProjectChartPath(createdProjectId);
+    expect(await readFile(chartPath, "utf8")).toBe(UPDATED_PROJECT_CHART_XML);
+
+    const getResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.payload).toBe(UPDATED_PROJECT_CHART_XML);
+  });
+
+  it("creates a project chart file via PUT when the chart file was missing", async () => {
+    const creator = await harness.registerUser("project-chart-put-create");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Recreate Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+    await rm(harness.createProjectChartPath(createdProjectId));
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(200);
+    expect(await readFile(harness.createProjectChartPath(createdProjectId), "utf8")).toBe(
+      UPDATED_PROJECT_CHART_XML,
+    );
+  });
+
+  it("forbids authenticated outsiders from updating a project chart", async () => {
+    const creator = await harness.registerUser("project-chart-put-owner");
+    const outsider = await harness.registerUser("project-chart-put-outsider");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Protected Put Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(403);
+  });
+
+  it("returns 404 when updating a chart for a nonexistent project", async () => {
+    const creator = await harness.registerUser("project-chart-put-unknown");
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(404);
+  });
+
+  it("rejects chart PUT with an empty xml string", async () => {
+    const creator = await harness.registerUser("project-chart-put-empty-xml");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Empty Xml Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: "" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(400);
+  });
+
+  it("rejects chart PUT when the xml field is missing", async () => {
+    const creator = await harness.registerUser("project-chart-put-missing-xml");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Missing Xml Field Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: {},
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(400);
+  });
+
+  it("returns JSON with ok true and application/json for successful chart PUT", async () => {
+    const creator = await harness.registerUser("project-chart-put-json-shape");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Json Shape Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(200);
+    expect(putResponse.headers["content-type"]).toContain("application/json");
+    expect(harness.parseJson<{ ok: boolean }>(putResponse.payload)).toEqual({ ok: true });
+  });
+
+  it("allows a second idempotent chart PUT with the same payload", async () => {
+    const creator = await harness.registerUser("project-chart-put-idempotent");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Idempotent Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const firstPut = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+    const secondPut = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(firstPut.statusCode).toBe(200);
+    expect(secondPut.statusCode).toBe(200);
+    expect(await readFile(harness.createProjectChartPath(createdProjectId), "utf8")).toBe(
+      UPDATED_PROJECT_CHART_XML,
+    );
+  });
+
+  it("forbids a direct project member without manager or owner role from updating the chart", async () => {
+    const owner = await harness.registerUser("project-chart-put-member-owner");
+    const member = await harness.registerUser("project-chart-put-plain-member");
+    const createResponse = await createProject(owner.accessToken, {
+      name: "Member Put Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [
+              "GGTC_PROJECTROLE_PROJECT_MANAGER",
+              "GGTC_PROJECTROLE_PROJECT_OWNER",
+            ],
+            userId: owner.user.id,
+          },
+          {
+            roleCodes: [],
+            userId: member.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const getChartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(member.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+    const putChartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(member.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(getChartResponse.statusCode).toBe(200);
+    expect(putChartResponse.statusCode).toBe(403);
+  });
+
   it("fails project creation when chart materialization cannot be completed", async () => {
     const creator = await harness.registerUser("project-chart-failure");
     const blockedChartsPath = harness.createProjectChartPath(999_999).replace(/\/[^/]+$/, "");
@@ -505,6 +734,15 @@ describe("projects crud api", () => {
       harness.app.inject({
         method: "DELETE",
         url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}`,
+      }),
+      harness.app.inject({
+        method: "GET",
+        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+      }),
+      harness.app.inject({
+        method: "PUT",
+        payload: { xml: "<data/>" },
+        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
       }),
       harness.app.inject({
         method: "POST",

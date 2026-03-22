@@ -26,7 +26,7 @@ vi.mock("../api/issues-api.js", () => ({
 
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
-    getProjectChart: vi.fn(),
+    getProjectChartOrNull: vi.fn(),
   },
 }));
 
@@ -61,7 +61,7 @@ function getColumn(columnName: "Open" | "In Progress" | "Blocked" | "Closed") {
 describe("ProjectManagerKanbanPage", () => {
   beforeEach(() => {
     issuesApiMock.listIssues.mockReset();
-    ganttApiMock.getProjectChart.mockReset();
+    ganttApiMock.getProjectChartOrNull.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
         createIssue({ id: 1, name: "Open issue", status: "ISSUE_STATUS_OPEN" }),
@@ -77,7 +77,7 @@ describe("ProjectManagerKanbanPage", () => {
         }),
       ],
     });
-    ganttApiMock.getProjectChart.mockResolvedValue({
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: ACTIVE_GANTT_XML,
       type: "xml",
     });
@@ -106,12 +106,7 @@ describe("ProjectManagerKanbanPage", () => {
   });
 
   it("continues rendering the issue board when the chart route returns 404", async () => {
-    ganttApiMock.getProjectChart.mockRejectedValue(
-      new ApiError("http", "HTTP 404", {
-        responseBody: "",
-        status: 404,
-      }),
-    );
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue(null);
 
     renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
 
@@ -130,7 +125,7 @@ describe("ProjectManagerKanbanPage", () => {
   });
 
   it("shows an error when chart loading fails with a non-404 status", async () => {
-    ganttApiMock.getProjectChart.mockRejectedValue(
+    ganttApiMock.getProjectChartOrNull.mockRejectedValue(
       new ApiError("http", "HTTP 500", {
         responseBody: "{\"message\":\"Chart load failed\"}",
         status: 500,
@@ -147,7 +142,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     expect(await screen.findByText("Select a valid project to view its kanban board.")).toBeVisible();
     expect(issuesApiMock.listIssues).not.toHaveBeenCalled();
-    expect(ganttApiMock.getProjectChart).not.toHaveBeenCalled();
+    expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
   });
 
   it("loads both issues and chart XML for the selected project", async () => {
@@ -155,7 +150,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     await waitFor(() => {
       expect(issuesApiMock.listIssues).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
-      expect(ganttApiMock.getProjectChart).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+      expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
     });
   });
 });

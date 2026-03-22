@@ -7,7 +7,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { getApiErrorMessage, isApiError } from "../../../common/api/api-error.js";
+import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { KanbanBoard } from "../components/kanban/KanbanBoard.js";
@@ -42,16 +42,11 @@ async function loadGanttTasks(
   token: string,
   projectId: number,
 ): Promise<ParsedGanttKanbanTask[]> {
-  try {
-    const chartSource = await ganttApi.getProjectChart(token, projectId);
-    return parseProjectKanbanTasksFromXml(chartSource.content);
-  } catch (error) {
-    if (isApiError(error) && error.kind === "http" && error.status === 404) {
-      return [];
-    }
-
-    throw error;
+  const chartSource = await ganttApi.getProjectChartOrNull(token, projectId);
+  if (chartSource === null) {
+    return [];
   }
+  return parseProjectKanbanTasksFromXml(chartSource.content);
 }
 
 export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {

@@ -10,8 +10,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import { ApiError } from "../../../common/api/api-error.js";
+import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { appTheme } from "../../../theme/app-theme.js";
+import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
 const TEST_TOKEN = "test-token";
@@ -32,11 +34,14 @@ const mockChartSource = {
   type: "xml" as const,
 };
 const getProjectChartExportCapabilitiesMock = vi.fn();
-const getProjectChartMock = vi.fn();
+const getProjectChartOrNullMock = vi.fn();
+const getProjectMock = vi.fn();
+const putProjectChartMock = vi.fn();
 const createObjectUrlMock = vi.fn(() => "blob:chart-download");
 const revokeObjectUrlMock = vi.fn();
 
 const mockGantt = {
+  attachEvent: vi.fn(() => 1),
   clearAll: vi.fn(),
   config: {
     columns: [] as unknown[],
@@ -44,15 +49,18 @@ const mockGantt = {
     grid_width: 0,
     keep_grid_width: false,
     layout: null as unknown,
+    readonly: false,
     show_chart: true,
     show_grid: true,
   },
   destructor: vi.fn(),
+  detachEvent: vi.fn(),
   exportToMSProject: vi.fn(),
   init: vi.fn(),
   parse: vi.fn(),
   render: vi.fn(),
   resetLayout: vi.fn(),
+  serialize: vi.fn(() => mockChartSource.content),
   setSizes: vi.fn(),
 };
 
@@ -60,20 +68,70 @@ vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
   getDhtmlxGantt: () => mockGantt,
 }));
 
+vi.mock("../../../lobby/api/lobby-api.js", () => ({
+  lobbyApi: {
+    getProject: (...args: unknown[]) => getProjectMock(...args),
+  },
+}));
+
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
     getProjectChartExportCapabilities: (...args: unknown[]) =>
       getProjectChartExportCapabilitiesMock(...args),
-    getProjectChart: (...args: unknown[]) => getProjectChartMock(...args),
+    getProjectChartOrNull: (...args: unknown[]) => getProjectChartOrNullMock(...args),
+    putProjectChart: (...args: unknown[]) => putProjectChartMock(...args),
   },
 }));
+
+function createMockProjectResponse(
+  projectId: number,
+  viewerUserId: number,
+): GetProjectResponse {
+  return {
+    members: [
+      {
+        roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+        userId: viewerUserId,
+        username: "pm-user",
+      },
+    ],
+    organizations: [],
+    project: {
+      createdAt: "2026-01-01T00:00:00.000Z",
+      description: null,
+      id: projectId,
+      journal: null,
+      name: "Test Project",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    projectManagers: [
+      {
+        sourceKinds: ["direct"],
+        userId: viewerUserId,
+        username: "pm-user",
+      },
+    ],
+    teams: [],
+  };
+}
+
+const VIEWER_USER_ID = 9001;
+
+const defaultPageProps = {
+  currentUserId: VIEWER_USER_ID,
+  currentUserRoles: [] as string[],
+};
 
 function renderWithProjectRouter(projectId: number) {
   return render(
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
       <MemoryRouter>
-        <ProjectManagerGanttPage projectId={projectId} token={TEST_TOKEN} />
+        <ProjectManagerGanttPage
+          {...defaultPageProps}
+          projectId={projectId}
+          token={TEST_TOKEN}
+        />
       </MemoryRouter>
     </ThemeProvider>,
   );
@@ -83,8 +141,16 @@ describe("ProjectManagerGanttPage", () => {
   beforeEach(() => {
     getProjectChartExportCapabilitiesMock.mockReset();
     getProjectChartExportCapabilitiesMock.mockResolvedValue(mockCapabilities);
-    getProjectChartMock.mockReset();
-    getProjectChartMock.mockResolvedValue(mockChartSource);
+    getProjectChartOrNullMock.mockReset();
+    getProjectChartOrNullMock.mockResolvedValue(mockChartSource);
+    getProjectMock.mockReset();
+    getProjectMock.mockImplementation(async (_token: string, projectId: number) =>
+      createMockProjectResponse(projectId, VIEWER_USER_ID),
+    );
+    putProjectChartMock.mockReset();
+    putProjectChartMock.mockResolvedValue({ ok: true });
+    mockGantt.attachEvent.mockReset();
+    mockGantt.attachEvent.mockReturnValue(1);
     mockGantt.clearAll.mockReset();
     mockGantt.config.columns = [];
     mockGantt.config.date_format = "";
@@ -94,11 +160,14 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.config.show_chart = true;
     mockGantt.config.show_grid = true;
     mockGantt.destructor.mockReset();
+    mockGantt.detachEvent.mockReset();
     mockGantt.exportToMSProject.mockReset();
     mockGantt.init.mockReset();
     mockGantt.parse.mockReset();
     mockGantt.render.mockReset();
     mockGantt.resetLayout.mockReset();
+    mockGantt.serialize.mockReset();
+    mockGantt.serialize.mockReturnValue(mockChartSource.content);
     mockGantt.setSizes.mockReset();
     createObjectUrlMock.mockClear();
     revokeObjectUrlMock.mockClear();
@@ -107,7 +176,9 @@ describe("ProjectManagerGanttPage", () => {
   });
 
   it("renders the gantt container and bottom control panel", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     expect(screen.getByText("Project Manager Gantt")).toBeVisible();
     expect(screen.getByText("Selected project: 42")).toBeVisible();
@@ -119,18 +190,21 @@ describe("ProjectManagerGanttPage", () => {
     expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
     expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Download\b/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
     expect(screen.getByText("MS Project XML")).toBeVisible();
   });
 
   it("loads gantt XML from the backend chart api on first render", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.parse).toHaveBeenCalledTimes(1);
     });
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
-    expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+    expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
     expect(getProjectChartExportCapabilitiesMock).toHaveBeenCalledWith(TEST_TOKEN);
     expect(mockGantt.parse.mock.calls[0]).toEqual([
       mockChartSource.content,
@@ -138,36 +212,40 @@ describe("ProjectManagerGanttPage", () => {
     ]);
   });
 
-  it("shows the missing-chart message when the backend returns 404", async () => {
-    getProjectChartMock.mockRejectedValue(
-      new ApiError("http", "HTTP 404", {
-        responseBody: "",
-        status: 404,
-      }),
+  it("uses default chart XML when the backend has no chart file", async () => {
+    getProjectChartOrNullMock.mockResolvedValue(null);
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
     );
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    await waitFor(() => {
+      expect(mockGantt.parse).toHaveBeenCalledWith(DEFAULT_PROJECT_CHART_XML, "xml");
+    });
 
-    expect(await screen.findByText("No gantt chart file exists for this project yet.")).toBeVisible();
-    expect(mockGantt.parse).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Create" })).toBeVisible();
   });
 
   it("shows a generic error message when the backend returns a non-404 failure", async () => {
-    getProjectChartMock.mockRejectedValue(
+    getProjectChartOrNullMock.mockRejectedValue(
       new ApiError("http", "HTTP 500", {
         responseBody: "{\"message\":\"Broken chart endpoint\"}",
         status: 500,
       }),
     );
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     expect(await screen.findByText("Broken chart endpoint")).toBeVisible();
     expect(mockGantt.parse).not.toHaveBeenCalled();
   });
 
   it("cleans up the gantt instance on unmount", async () => {
-    const view = renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    const view = renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -184,27 +262,27 @@ describe("ProjectManagerGanttPage", () => {
       content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"2002\"><![CDATA[Second chart]]></task></data>",
       type: "xml" as const,
     };
-    getProjectChartMock
+    getProjectChartOrNullMock
       .mockResolvedValueOnce(mockChartSource)
       .mockResolvedValueOnce(secondChartSource);
 
     const view = renderWithProjectRouter(42);
 
     await waitFor(() => {
-      expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
     });
 
     view.rerender(
       <ThemeProvider theme={appTheme}>
         <CssBaseline />
         <MemoryRouter>
-          <ProjectManagerGanttPage projectId={77} token={TEST_TOKEN} />
+          <ProjectManagerGanttPage {...defaultPageProps} projectId={77} token={TEST_TOKEN} />
         </MemoryRouter>
       </ThemeProvider>,
     );
 
     await waitFor(() => {
-      expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 77);
+      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 77);
     });
 
     await waitFor(() => {
@@ -218,7 +296,7 @@ describe("ProjectManagerGanttPage", () => {
   it("survives React Strict Mode remounts without destructing the shared gantt instance", async () => {
     renderWithTheme(
       <StrictMode>
-        <ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />
+        <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />
       </StrictMode>,
     );
 
@@ -233,7 +311,9 @@ describe("ProjectManagerGanttPage", () => {
   it("switches display modes from the bottom control panel tabs", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -307,7 +387,9 @@ describe("ProjectManagerGanttPage", () => {
   it("can collapse and reopen the gantt control panel", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -324,7 +406,9 @@ describe("ProjectManagerGanttPage", () => {
   });
 
   it("keeps the gantt download action in the same navigation row as the project tabs", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     expect(await screen.findByRole("button", { name: /^Download\b/i })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Details" })).toBeVisible();
@@ -334,7 +418,9 @@ describe("ProjectManagerGanttPage", () => {
   it("downloads DHTMLX XML locally after changing the selected format", async () => {
     const user = userEvent.setup();
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     const appendChildSpy = vi.spyOn(document.body, "appendChild");
     const clickSpy = vi
@@ -362,7 +448,9 @@ describe("ProjectManagerGanttPage", () => {
   });
 
   it("uses MS Project export by default", async () => {
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
@@ -393,7 +481,9 @@ describe("ProjectManagerGanttPage", () => {
       },
     });
 
-    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
 
     await waitFor(() => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);

@@ -9,8 +9,10 @@ export function GanttRoute() {
 
   return (
     <ProjectManagerAuthenticatedRoute>
-      {(token) => (
+      {(token, currentUserId, currentUserRoles) => (
         <ProjectManagerGanttPage
+          currentUserId={currentUserId}
+          currentUserRoles={currentUserRoles}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
           token={token}
         />

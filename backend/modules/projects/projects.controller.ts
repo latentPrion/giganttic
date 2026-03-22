@@ -35,6 +35,8 @@ import {
   updateProjectTeamsResponseSchema,
   updateProjectRequestSchema,
   updateProjectResponseSchema,
+  updateProjectChartRequestSchema,
+  updateProjectChartResponseSchema,
 } from "./projects.contracts.js";
 import { ProjectsService } from "./projects.service.js";
 
@@ -86,6 +88,24 @@ export class ProjectsController {
     return await this.projectsService.getProjectChart(
       request.authContext!,
       projectId,
+    );
+  }
+
+  @Put(":projectId/chart")
+  async updateProjectChart(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(updateProjectChartRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+    const { xml } = updateProjectChartRequestSchema.parse(body);
+
+    return updateProjectChartResponseSchema.parse(
+      this.projectsService.updateProjectChart(
+        request.authContext!,
+        projectId,
+        xml,
+      ),
     );
   }
 

@@ -11,8 +11,14 @@ import { issuesApi } from "./spas/project-manager/api/issues-api.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
 
+const { ROUTING_TEST_CHART_XML } = vi.hoisted(() => ({
+  ROUTING_TEST_CHART_XML:
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Test chart]]></task></data>",
+}));
+
 vi.mock("./spas/project-manager/lib/dhtmlx-gantt-adapter.js", () => ({
   getDhtmlxGantt: () => ({
+    attachEvent: vi.fn(() => 1),
     clearAll: vi.fn(),
     config: {
       columns: [],
@@ -24,10 +30,12 @@ vi.mock("./spas/project-manager/lib/dhtmlx-gantt-adapter.js", () => ({
       show_grid: true,
     },
     destructor: vi.fn(),
+    detachEvent: vi.fn(),
     init: vi.fn(),
     parse: vi.fn(),
     render: vi.fn(),
     resetLayout: vi.fn(),
+    serialize: vi.fn(() => ROUTING_TEST_CHART_XML),
     setSizes: vi.fn(),
   }),
 }));
@@ -87,6 +95,9 @@ vi.mock("./spas/project-manager/api/issues-api.js", () => ({
 vi.mock("./spas/project-manager/api/gantt-api.js", () => ({
   ganttApi: {
     getProjectChart: vi.fn(),
+    getProjectChartExportCapabilities: vi.fn(),
+    getProjectChartOrNull: vi.fn(),
+    putProjectChart: vi.fn(),
   },
 }));
 
@@ -124,9 +135,24 @@ describe("app routing", () => {
     lobbyApiMock.listProjects.mockResolvedValue({ projects: [] });
     lobbyApiMock.listTeams.mockResolvedValue({ teams: [] });
     ganttApiMock.getProjectChart.mockResolvedValue({
-      content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Test chart]]></task></data>",
+      content: ROUTING_TEST_CHART_XML,
       type: "xml",
     });
+    ganttApiMock.getProjectChartExportCapabilities.mockResolvedValue({
+      ganttExport: {
+        dhtmlxXml: { enabled: true },
+        msProjectXml: {
+          enabled: true,
+          mode: "cloud_fallback",
+          serverUrl: null,
+        },
+      },
+    });
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: ROUTING_TEST_CHART_XML,
+      type: "xml",
+    });
+    ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
     issuesApiMock.getIssue.mockResolvedValue({
       issue: {
         closedAt: null,
@@ -470,7 +496,7 @@ describe("app routing", () => {
     });
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
-    expect(screen.getByText("No gantt chart file exists for this project yet.")).toBeVisible();
+    expect(screen.getByText("Selected project: Sample chart")).toBeVisible();
   });
 
   it("renders a safe fallback when the PM kanban route is missing projectId", async () => {
