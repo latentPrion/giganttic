@@ -1,5 +1,6 @@
 import React, { StrictMode } from "react";
 import {
+  act,
   render,
   screen,
   waitFor,
@@ -38,29 +39,94 @@ const getProjectMock = vi.fn();
 const putProjectChartMock = vi.fn();
 const createObjectUrlMock = vi.fn(() => "blob:chart-download");
 const revokeObjectUrlMock = vi.fn();
+const ganttEventHandlers = new Map<string, {
+  handler: (...args: unknown[]) => boolean;
+  name: string;
+}>();
+let selectedTaskId: number | string | null = null;
+let nextGanttEventId = 1;
+let nextCreatedTaskId = 5000;
+let serializedXml = mockChartSource.content;
+
+function triggerGanttEvent(eventName: string, ...args: unknown[]): void {
+  for (const registration of ganttEventHandlers.values()) {
+    if (registration.name === eventName) {
+      registration.handler(...args);
+    }
+  }
+}
 
 const mockGantt = {
-  attachEvent: vi.fn(() => 1),
+  addTask: vi.fn((_task: unknown, parent?: unknown) => {
+    void parent;
+    selectedTaskId = nextCreatedTaskId;
+    nextCreatedTaskId += 1;
+    return selectedTaskId;
+  }),
+  attachEvent: vi.fn((name: string, handler: (...args: unknown[]) => boolean) => {
+    const eventId = `${name}-${nextGanttEventId}`;
+    nextGanttEventId += 1;
+    ganttEventHandlers.set(eventId, { handler, name });
+    return eventId;
+  }),
   clearAll: vi.fn(),
   config: {
     columns: [] as unknown[],
     date_format: "",
+    details_on_dblclick: false,
+    drag_links: false,
+    drag_move: false,
+    drag_progress: false,
+    drag_resize: false,
     grid_width: 0,
     keep_grid_width: false,
     layout: null as unknown,
+    lightbox: {
+      milestone_sections: [] as unknown[],
+      project_sections: [] as unknown[],
+      sections: [] as unknown[],
+    },
     readonly: false,
     show_chart: true,
     show_grid: true,
   },
+  deleteTask: vi.fn((taskId: unknown) => {
+    if (selectedTaskId === taskId) {
+      selectedTaskId = null;
+    }
+  }),
   destructor: vi.fn(),
-  detachEvent: vi.fn(),
+  detachEvent: vi.fn((eventId: string) => {
+    ganttEventHandlers.delete(eventId);
+  }),
   exportToMSProject: vi.fn(),
+  getLink: vi.fn((linkId: number | string) => ({
+    id: linkId,
+    source: 1001,
+  })),
+  getSelectedId: vi.fn(() => selectedTaskId),
+  getTask: vi.fn((taskId: number | string) => ({
+    id: taskId,
+    parent: 0,
+    start_date: new Date("2026-03-01T09:00:00.000Z"),
+  })),
   init: vi.fn(),
   parse: vi.fn(),
   render: vi.fn(),
   resetLayout: vi.fn(),
-  serialize: vi.fn(() => mockChartSource.content),
+  selectTask: vi.fn((taskId: number | string) => {
+    selectedTaskId = taskId;
+    return taskId;
+  }),
+  serialize: vi.fn((format?: string) => {
+    if (format === "xml") {
+      return serializedXml;
+    }
+
+    return { data: [] };
+  }),
   setSizes: vi.fn(),
+  showLightbox: vi.fn(),
 };
 
 vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
@@ -138,6 +204,11 @@ function renderWithProjectRouter(projectId: number) {
 
 describe("ProjectManagerGanttPage", () => {
   beforeEach(() => {
+    ganttEventHandlers.clear();
+    selectedTaskId = null;
+    nextCreatedTaskId = 5000;
+    nextGanttEventId = 1;
+    serializedXml = mockChartSource.content;
     getProjectChartExportCapabilitiesMock.mockReset();
     getProjectChartExportCapabilitiesMock.mockResolvedValue(mockCapabilities);
     getProjectChartOrNullMock.mockReset();
@@ -149,25 +220,56 @@ describe("ProjectManagerGanttPage", () => {
     putProjectChartMock.mockReset();
     putProjectChartMock.mockResolvedValue({ ok: true });
     mockGantt.attachEvent.mockReset();
-    mockGantt.attachEvent.mockReturnValue(1);
+    mockGantt.attachEvent.mockImplementation((name: string, handler: (...args: unknown[]) => boolean) => {
+      const eventId = `${name}-${nextGanttEventId}`;
+      nextGanttEventId += 1;
+      ganttEventHandlers.set(eventId, { handler, name });
+      return eventId;
+    });
     mockGantt.clearAll.mockReset();
     mockGantt.config.columns = [];
     mockGantt.config.date_format = "";
+    mockGantt.config.details_on_dblclick = false;
+    mockGantt.config.drag_links = false;
+    mockGantt.config.drag_move = false;
+    mockGantt.config.drag_progress = false;
+    mockGantt.config.drag_resize = false;
     mockGantt.config.grid_width = 0;
     mockGantt.config.keep_grid_width = false;
     mockGantt.config.layout = null;
+    mockGantt.config.lightbox = {
+      milestone_sections: [],
+      project_sections: [],
+      sections: [],
+    };
     mockGantt.config.show_chart = true;
     mockGantt.config.show_grid = true;
+    mockGantt.addTask.mockClear();
     mockGantt.destructor.mockReset();
+    mockGantt.deleteTask.mockClear();
     mockGantt.detachEvent.mockReset();
+    mockGantt.detachEvent.mockImplementation((eventId: string) => {
+      ganttEventHandlers.delete(eventId);
+    });
     mockGantt.exportToMSProject.mockReset();
+    mockGantt.getLink.mockClear();
+    mockGantt.getSelectedId.mockClear();
+    mockGantt.getTask.mockClear();
     mockGantt.init.mockReset();
     mockGantt.parse.mockReset();
     mockGantt.render.mockReset();
     mockGantt.resetLayout.mockReset();
+    mockGantt.selectTask.mockClear();
     mockGantt.serialize.mockReset();
-    mockGantt.serialize.mockReturnValue(mockChartSource.content);
+    mockGantt.serialize.mockImplementation((format?: string) => {
+      if (format === "xml") {
+        return serializedXml;
+      }
+
+      return { data: [] };
+    });
     mockGantt.setSizes.mockReset();
+    mockGantt.showLightbox.mockClear();
     createObjectUrlMock.mockClear();
     revokeObjectUrlMock.mockClear();
     URL.createObjectURL = createObjectUrlMock;
@@ -187,6 +289,10 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add Task" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add Child Task" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit Selected" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete Selected" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Download\b/i })).toBeVisible();
     expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
@@ -203,12 +309,46 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
+    expect(mockGantt.config.details_on_dblclick).toBe(true);
+    expect(mockGantt.config.drag_links).toBe(true);
+    expect(mockGantt.config.drag_move).toBe(true);
+    expect(mockGantt.config.drag_progress).toBe(true);
+    expect(mockGantt.config.drag_resize).toBe(true);
+    expect(mockGantt.config.columns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          editor: expect.objectContaining({ map_to: "text", type: "text" }),
+          name: "text",
+        }),
+        expect.objectContaining({
+          editor: expect.objectContaining({ map_to: "start_date", type: "date" }),
+          name: "start_date",
+        }),
+        expect.objectContaining({
+          editor: expect.objectContaining({ map_to: "duration", type: "duration" }),
+          name: "duration",
+        }),
+        expect.objectContaining({
+          editor: expect.objectContaining({ map_to: "auto", type: "predecessor" }),
+          name: "predecessors",
+        }),
+        expect.objectContaining({ name: "add" }),
+      ]),
+    );
+    expect(mockGantt.config.lightbox.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ map_to: "text", name: "description", type: "textarea" }),
+        expect.objectContaining({ map_to: "parent", name: "parent", type: "parent" }),
+        expect.objectContaining({ map_to: "auto", name: "time", type: "duration" }),
+      ]),
+    );
     expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
     expect(getProjectChartExportCapabilitiesMock).toHaveBeenCalledWith(TEST_TOKEN);
     expect(mockGantt.parse.mock.calls[0]).toEqual([
       mockChartSource.content,
       mockChartSource.type,
     ]);
+    expect(mockGantt.serialize).toHaveBeenCalledWith("xml");
   });
 
   it("shows a missing-chart message when the backend has no chart file", async () => {
@@ -241,6 +381,149 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(screen.queryByText("No gantt chart exists for this project yet.")).not.toBeInTheDocument();
+  });
+
+  it("adds a task and opens the lightbox from the page actions", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add Task" }));
+
+    expect(mockGantt.addTask).toHaveBeenCalledTimes(1);
+    expect(mockGantt.addTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 1,
+        parent: 0,
+        text: "New Task",
+      }),
+    );
+    expect(mockGantt.selectTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
+  });
+
+  it("normalizes blank root parents during lightbox save", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    const lightboxTask = {
+      parent: "",
+      text: "Kekw",
+    };
+
+    await act(async () => {
+      triggerGanttEvent("onLightboxSave", 5000, lightboxTask, true);
+    });
+
+    expect(lightboxTask.parent).toBe(0);
+  });
+
+  it("normalizes blank root parents before persisting gantt XML", async () => {
+    const user = userEvent.setup();
+    serializedXml = "<data><task id='5000' parent='' start_date='2026-03-22 00:00' duration='1'><![CDATA[Kekw]]></task></data>";
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(putProjectChartMock).toHaveBeenCalledWith(
+        TEST_TOKEN,
+        42,
+        "<data><task id='5000' parent='0' start_date='2026-03-22 00:00' duration='1'><![CDATA[Kekw]]></task></data>",
+      );
+    });
+  });
+
+  it("enables selected-task actions and supports editing and deleting the selection", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add Child Task" })).toBeEnabled();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Edit Selected" }));
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(1001);
+
+    await user.click(screen.getByRole("button", { name: "Delete Selected" }));
+    expect(mockGantt.deleteTask).toHaveBeenCalledWith(1001);
+  });
+
+  it("keeps the save action visible when unsaved changes are shown", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      serializedXml = `${mockChartSource.content}<changed />`;
+      triggerGanttEvent("onAfterTaskDelete");
+    });
+
+    expect(await screen.findByText("Unsaved changes")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+  });
+
+  it("adds a child task under the currently selected task", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add Child Task" }));
+
+    expect(mockGantt.getTask).toHaveBeenCalledWith(1001);
+    expect(mockGantt.addTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 1,
+        text: "New Task",
+      }),
+      1001,
+    );
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
   });
 
   it("shows a generic error message when the backend returns a non-404 failure", async () => {

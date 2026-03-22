@@ -17,7 +17,10 @@ import { GanttDownloadSplitButton } from "../components/GanttDownloadSplitButton
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
-import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
+import type {
+  GanttChartHandle,
+  GanttTaskId,
+} from "../models/gantt-chart-handle.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
@@ -35,9 +38,113 @@ const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project Manager Gantt";
 const SELECT_PROJECT_MESSAGE = "Select a valid project to view its gantt chart.";
 const UNSAVED_CHANGES_LABEL = "Unsaved changes";
+const ADD_CHILD_TASK_LABEL = "Add Child Task";
+const ADD_TASK_LABEL = "Add Task";
+const DELETE_SELECTED_LABEL = "Delete Selected";
+const EDIT_SELECTED_LABEL = "Edit Selected";
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? "None" : `${projectId}`;
+}
+
+function renderEditorActionButtons(
+  chartSource: GanttChartSource | null,
+  isLoading: boolean,
+  isPersisting: boolean,
+  isTaskSelected: boolean,
+  onAddChildTask: () => void,
+  onAddTask: () => void,
+  onDeleteSelectedTask: () => void,
+  onEditSelectedTask: () => void,
+) {
+  if (chartSource === null) {
+    return null;
+  }
+
+  return (
+    <>
+      <Button
+        disabled={isLoading || isPersisting}
+        onClick={() => {
+          onAddTask();
+        }}
+        size="small"
+        variant="outlined"
+      >
+        {ADD_TASK_LABEL}
+      </Button>
+      <Button
+        disabled={isLoading || isPersisting || !isTaskSelected}
+        onClick={() => {
+          onAddChildTask();
+        }}
+        size="small"
+        variant="outlined"
+      >
+        {ADD_CHILD_TASK_LABEL}
+      </Button>
+      <Button
+        disabled={isLoading || isPersisting || !isTaskSelected}
+        onClick={() => {
+          onEditSelectedTask();
+        }}
+        size="small"
+        variant="outlined"
+      >
+        {EDIT_SELECTED_LABEL}
+      </Button>
+      <Button
+        color="error"
+        disabled={isLoading || isPersisting || !isTaskSelected}
+        onClick={() => {
+          onDeleteSelectedTask();
+        }}
+        size="small"
+        variant="outlined"
+      >
+        {DELETE_SELECTED_LABEL}
+      </Button>
+    </>
+  );
+}
+
+function renderPersistenceActions(
+  hasServerChart: boolean,
+  isDirty: boolean,
+  isLoading: boolean,
+  isPersisting: boolean,
+  onPersist: () => void,
+) {
+  return (
+    <Stack
+      alignItems={{ xs: "stretch", sm: "center" }}
+      direction={{ xs: "column", sm: "row" }}
+      justifyContent="flex-end"
+      spacing={1}
+      sx={{ width: "100%" }}
+    >
+      {isDirty && (
+        <Chip
+          color="warning"
+          label={UNSAVED_CHANGES_LABEL}
+          size="small"
+          sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}
+          variant="outlined"
+        />
+      )}
+      <Button
+        disabled={isPersisting || isLoading}
+        onClick={() => {
+          void onPersist();
+        }}
+        size="small"
+        sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
+        variant="contained"
+      >
+        {hasServerChart ? "Save" : "Create"}
+      </Button>
+    </Stack>
+  );
 }
 
 function renderGanttContainer(
@@ -49,6 +156,7 @@ function renderGanttContainer(
   onBaselineReady: (serializedXml: string) => void,
   onDisplayModeChange: (nextValue: GanttDisplayMode) => void,
   onEditorChange: () => void,
+  onSelectionChange: (selectedTaskId: GanttTaskId | null) => void,
   onToggleExpanded: () => void,
 ) {
   return (
@@ -70,6 +178,7 @@ function renderGanttContainer(
         interactionsEnabled={canEdit}
         onBaselineReady={onBaselineReady}
         onEditorChange={onEditorChange}
+        onSelectionChange={onSelectionChange}
       />
       <GanttChartControlPanel
         displayMode={displayMode}
@@ -88,6 +197,11 @@ function renderNavigationActions(
   isDirty: boolean,
   isLoading: boolean,
   isPersisting: boolean,
+  isTaskSelected: boolean,
+  onAddChildTask: () => void,
+  onAddTask: () => void,
+  onDeleteSelectedTask: () => void,
+  onEditSelectedTask: () => void,
   onPersist: () => void,
   projectId: number | null,
   token: string,
@@ -97,34 +211,31 @@ function renderNavigationActions(
   }
 
   return (
-    <Stack alignItems="center" direction="row" flexWrap="wrap" spacing={1}>
-      <GanttDownloadSplitButton
-        chartSource={chartSource}
-        isLoadingChart={isLoading}
-        projectId={projectId}
-        token={token}
-      />
-      {canEdit && (
-        <>
-          {isDirty && (
-            <Chip
-              color="warning"
-              label={UNSAVED_CHANGES_LABEL}
-              size="small"
-              variant="outlined"
-            />
-          )}
-          <Button
-            disabled={isPersisting || isLoading}
-            onClick={() => {
-              void onPersist();
-            }}
-            size="small"
-            variant="contained"
-          >
-            {hasServerChart ? "Save" : "Create"}
-          </Button>
-        </>
+    <Stack spacing={1} sx={{ minWidth: 0, width: { xs: "100%", md: "auto" } }}>
+      <Stack alignItems="center" direction="row" flexWrap="wrap" spacing={1}>
+        <GanttDownloadSplitButton
+          chartSource={chartSource}
+          isLoadingChart={isLoading}
+          projectId={projectId}
+          token={token}
+        />
+        {canEdit && renderEditorActionButtons(
+          chartSource,
+          isLoading,
+          isPersisting,
+          isTaskSelected,
+          onAddChildTask,
+          onAddTask,
+          onDeleteSelectedTask,
+          onEditSelectedTask,
+        )}
+      </Stack>
+      {canEdit && renderPersistenceActions(
+        hasServerChart,
+        isDirty,
+        isLoading,
+        isPersisting,
+        onPersist,
       )}
     </Stack>
   );
@@ -134,6 +245,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   const [displayMode, setDisplayMode] = useState<GanttDisplayMode>(DEFAULT_DISPLAY_MODE);
   const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true);
   const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<GanttTaskId | null>(null);
   const ganttRef = useRef<GanttChartHandle | null>(null);
 
   const fileManager = useGanttChartFileManager({
@@ -197,6 +309,10 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
     setDirtyFromEditor();
   }, [setDirtyFromEditor]);
 
+  const onSelectionChange = useCallback((nextSelectedTaskId: GanttTaskId | null) => {
+    setSelectedTaskId(nextSelectedTaskId);
+  }, []);
+
   const canEdit = canEditProject(
     props.currentUserId,
     props.currentUserRoles,
@@ -205,6 +321,22 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
 
   function toggleControlPanelExpanded(): void {
     setIsControlPanelExpanded((current) => !current);
+  }
+
+  function addChildTask(): void {
+    ganttRef.current?.addChildTask();
+  }
+
+  function addTask(): void {
+    ganttRef.current?.addRootTask();
+  }
+
+  function deleteSelectedTask(): void {
+    ganttRef.current?.deleteSelectedTask();
+  }
+
+  function editSelectedTask(): void {
+    ganttRef.current?.editSelectedTask();
   }
 
   return (
@@ -230,6 +362,11 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
               isDirty,
               isLoading,
               isPersisting,
+              selectedTaskId !== null,
+              addChildTask,
+              addTask,
+              deleteSelectedTask,
+              editSelectedTask,
               persistChart,
               props.projectId,
               props.token,
@@ -274,6 +411,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             onBaselineReady,
             setDisplayMode,
             onEditorChange,
+            onSelectionChange,
             toggleControlPanelExpanded,
           )
         )}

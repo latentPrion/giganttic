@@ -82,7 +82,7 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
       </Tabs>
       {props.actions ? (
-        <Box sx={{ flexShrink: 0 }}>
+        <Box sx={{ flexShrink: 0, minWidth: 0, width: { xs: "100%", md: "auto" } }}>
           {props.actions}
         </Box>
       ) : null}

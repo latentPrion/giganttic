@@ -410,6 +410,17 @@ describe("projects crud api", () => {
 </data>
 `;
 
+const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="1" open="1" parent="0" progress="0" start_date="2026-03-01 09:00" duration="3"><![CDATA[Planning]]></task>
+  <task id="2" open="1" parent="0" progress="0" start_date="2026-03-04 09:00" duration="2"><![CDATA[Implementation]]></task>
+  <coll_options for="links">
+    <item value="0" label="finish_to_start" />
+  </coll_options>
+  <link id="1" source="1" target="2" type="0" />
+</data>
+`;
+
   it("persists project chart XML via PUT for a project editor", async () => {
     const creator = await harness.registerUser("project-chart-put-ok");
     const createResponse = await createProject(creator.accessToken, {
@@ -439,6 +450,37 @@ describe("projects crud api", () => {
     });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.payload).toBe(UPDATED_PROJECT_CHART_XML);
+  });
+
+  it("round-trips dependency-rich gantt XML via PUT and GET", async () => {
+    const creator = await harness.registerUser("project-chart-put-links");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Linked Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const putResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PUT",
+      payload: { xml: UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(putResponse.statusCode).toBe(200);
+
+    const chartPath = harness.createProjectChartPath(createdProjectId);
+    expect(await readFile(chartPath, "utf8")).toBe(UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML);
+
+    const getResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+    });
+
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.payload).toBe(UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML);
   });
 
   it("creates a project chart file via PUT when the chart file was missing", async () => {
