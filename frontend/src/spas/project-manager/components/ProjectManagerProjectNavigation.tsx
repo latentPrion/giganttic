@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Box,
   Tab,
   Tabs,
 } from "@mui/material";
@@ -13,6 +14,7 @@ import {
 } from "../routes/project-route-paths.js";
 
 interface ProjectManagerProjectNavigationProps {
+  actions?: React.ReactNode;
   currentSection: ProjectRouteSection;
   projectId: number | null;
 }
@@ -59,11 +61,31 @@ export function ProjectManagerProjectNavigation(
   }
 
   return (
-    <Tabs onChange={handleSectionChange} value={props.currentSection}>
-      <Tab disabled={props.projectId === null} label={DETAIL_LABEL} value="detail" />
-      <Tab disabled={props.projectId === null} label={GANTT_LABEL} value="gantt" />
-      <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
-      <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
-    </Tabs>
+    <Box
+      sx={{
+        alignItems: { xs: "stretch", md: "center" },
+        display: "flex",
+        flexDirection: { xs: "column", md: "row" },
+        gap: 1.5,
+        justifyContent: "space-between",
+      }}
+    >
+      <Tabs
+        onChange={handleSectionChange}
+        sx={{ flex: 1, minWidth: 0 }}
+        value={props.currentSection}
+        variant="scrollable"
+      >
+        <Tab disabled={props.projectId === null} label={DETAIL_LABEL} value="detail" />
+        <Tab disabled={props.projectId === null} label={GANTT_LABEL} value="gantt" />
+        <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
+        <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
+      </Tabs>
+      {props.actions ? (
+        <Box sx={{ flexShrink: 0 }}>
+          {props.actions}
+        </Box>
+      ) : null}
+    </Box>
   );
 }

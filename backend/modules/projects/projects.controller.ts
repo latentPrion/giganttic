@@ -22,6 +22,7 @@ import {
   createProjectResponseSchema,
   deleteProjectResponseSchema,
   getProjectResponseSchema,
+  getProjectChartExportCapabilitiesResponseSchema,
   listProjectsResponseSchema,
   projectOrganizationAssociationRequestSchema,
   projectRoleAssignmentRequestSchema,
@@ -62,6 +63,15 @@ export class ProjectsController {
   listProjects(@Req() request: AuthenticatedRequest) {
     return listProjectsResponseSchema.parse(
       this.projectsService.listProjects(request.authContext!),
+    );
+  }
+
+  @Get("chart-export-capabilities")
+  getProjectChartExportCapabilities(@Req() request: AuthenticatedRequest) {
+    return getProjectChartExportCapabilitiesResponseSchema.parse(
+      this.projectsService.getProjectChartExportCapabilities(
+        request.authContext!,
+      ),
     );
   }
 

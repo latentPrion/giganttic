@@ -18,6 +18,11 @@ const PROJECT_ROLE_ASSIGNMENT_REQUIRED_MESSAGE =
 const PROJECT_DUPLICATE_TEAMS_MESSAGE = "Each associated team must be unique";
 const PROJECT_DUPLICATE_ORGANIZATIONS_MESSAGE =
   "Each associated organization must be unique";
+const GANTT_EXPORT_MODE_VALUES = [
+  "configured_server",
+  "cloud_fallback",
+  "unavailable",
+] as const;
 
 function createOptionalDescriptionSchema() {
   return z.string().trim().min(1).nullable().optional();
@@ -151,6 +156,21 @@ export const projectOrganizationSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const ganttExportModeSchema = z.enum(GANTT_EXPORT_MODE_VALUES);
+
+export const getProjectChartExportCapabilitiesResponseSchema = z.object({
+  ganttExport: z.object({
+    dhtmlxXml: z.object({
+      enabled: z.literal(true),
+    }),
+    msProjectXml: z.object({
+      enabled: z.boolean(),
+      mode: ganttExportModeSchema,
+      serverUrl: z.string().nullable(),
+    }),
+  }),
+});
+
 export const createProjectResponseSchema = z.object({
   project: projectSchema,
 });
@@ -198,6 +218,10 @@ export const updateProjectOrganizationsResponseSchema = z.object({
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type DeleteProjectResponse = z.infer<typeof deleteProjectResponseSchema>;
 export type GetProjectResponse = z.infer<typeof getProjectResponseSchema>;
+export type GetProjectChartExportCapabilitiesResponse = z.infer<
+  typeof getProjectChartExportCapabilitiesResponseSchema
+>;
+export type GanttExportMode = z.infer<typeof ganttExportModeSchema>;
 export type ListProjectsResponse = z.infer<typeof listProjectsResponseSchema>;
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
 export type ProjectManager = z.infer<typeof projectManagerSchema>;

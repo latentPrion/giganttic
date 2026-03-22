@@ -9,6 +9,10 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
+  BACKEND_CONFIG,
+  type BackendConfig,
+} from "../../config/backend-config.js";
+import {
   issues,
   organizations,
   projects,
@@ -52,6 +56,7 @@ import { ProjectChartsService } from "../project-charts/project-charts.service.j
 import type {
   CreateProjectRequest,
   DeleteProjectResponse,
+  GetProjectChartExportCapabilitiesResponse,
   GetProjectResponse,
   ListProjectsResponse,
   ProjectMember,
@@ -180,6 +185,8 @@ function extractDirectProjectOwnerIds(
 @Injectable()
 export class ProjectsService {
   constructor(
+    @Inject(BACKEND_CONFIG)
+    private readonly config: BackendConfig,
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
     @Inject(ProjectChartsService)
@@ -204,6 +211,19 @@ export class ProjectsService {
     return this.buildProjectResponse(createdProjectId);
   }
 
+  getProjectChartExportCapabilities(
+    _authContext: AuthContext,
+  ): GetProjectChartExportCapabilitiesResponse {
+    return {
+      ganttExport: {
+        dhtmlxXml: {
+          enabled: true,
+        },
+        msProjectXml: this.createMsProjectExportCapabilities(),
+      },
+    };
+  }
+
   async getProjectChart(
     authContext: AuthContext,
     projectId: number,
@@ -217,6 +237,30 @@ export class ProjectsService {
     }
 
     return chartXml;
+  }
+
+  private createMsProjectExportCapabilities() {
+    if (this.config.ganttExportServerUrl) {
+      return {
+        enabled: true,
+        mode: "configured_server" as const,
+        serverUrl: this.config.ganttExportServerUrl,
+      };
+    }
+
+    if (this.config.allowCloudGanttExportFallback) {
+      return {
+        enabled: true,
+        mode: "cloud_fallback" as const,
+        serverUrl: null,
+      };
+    }
+
+    return {
+      enabled: false,
+      mode: "unavailable" as const,
+      serverUrl: null,
+    };
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {

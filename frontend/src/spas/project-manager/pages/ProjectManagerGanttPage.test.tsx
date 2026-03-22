@@ -15,11 +15,26 @@ import { appTheme } from "../../../theme/app-theme.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
 const TEST_TOKEN = "test-token";
+const mockCapabilities = {
+  ganttExport: {
+    dhtmlxXml: {
+      enabled: true,
+    },
+    msProjectXml: {
+      enabled: true,
+      mode: "cloud_fallback" as const,
+      serverUrl: null,
+    },
+  },
+};
 const mockChartSource = {
   content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Repo chart task]]></task></data>",
   type: "xml" as const,
 };
+const getProjectChartExportCapabilitiesMock = vi.fn();
 const getProjectChartMock = vi.fn();
+const createObjectUrlMock = vi.fn(() => "blob:chart-download");
+const revokeObjectUrlMock = vi.fn();
 
 const mockGantt = {
   clearAll: vi.fn(),
@@ -33,6 +48,7 @@ const mockGantt = {
     show_grid: true,
   },
   destructor: vi.fn(),
+  exportToMSProject: vi.fn(),
   init: vi.fn(),
   parse: vi.fn(),
   render: vi.fn(),
@@ -46,6 +62,8 @@ vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
 
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
+    getProjectChartExportCapabilities: (...args: unknown[]) =>
+      getProjectChartExportCapabilitiesMock(...args),
     getProjectChart: (...args: unknown[]) => getProjectChartMock(...args),
   },
 }));
@@ -63,6 +81,8 @@ function renderWithProjectRouter(projectId: number) {
 
 describe("ProjectManagerGanttPage", () => {
   beforeEach(() => {
+    getProjectChartExportCapabilitiesMock.mockReset();
+    getProjectChartExportCapabilitiesMock.mockResolvedValue(mockCapabilities);
     getProjectChartMock.mockReset();
     getProjectChartMock.mockResolvedValue(mockChartSource);
     mockGantt.clearAll.mockReset();
@@ -74,11 +94,16 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.config.show_chart = true;
     mockGantt.config.show_grid = true;
     mockGantt.destructor.mockReset();
+    mockGantt.exportToMSProject.mockReset();
     mockGantt.init.mockReset();
     mockGantt.parse.mockReset();
     mockGantt.render.mockReset();
     mockGantt.resetLayout.mockReset();
     mockGantt.setSizes.mockReset();
+    createObjectUrlMock.mockClear();
+    revokeObjectUrlMock.mockClear();
+    URL.createObjectURL = createObjectUrlMock;
+    URL.revokeObjectURL = revokeObjectUrlMock;
   });
 
   it("renders the gantt container and bottom control panel", async () => {
@@ -93,6 +118,8 @@ describe("ProjectManagerGanttPage", () => {
 
     expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
     expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+    expect(screen.getByRole("button", { name: /^Download\b/i })).toBeVisible();
+    expect(screen.getByText("MS Project XML")).toBeVisible();
   });
 
   it("loads gantt XML from the backend chart api on first render", async () => {
@@ -104,6 +131,7 @@ describe("ProjectManagerGanttPage", () => {
 
     expect(mockGantt.config.keep_grid_width).toBe(true);
     expect(getProjectChartMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+    expect(getProjectChartExportCapabilitiesMock).toHaveBeenCalledWith(TEST_TOKEN);
     expect(mockGantt.parse.mock.calls[0]).toEqual([
       mockChartSource.content,
       mockChartSource.type,
@@ -293,5 +321,88 @@ describe("ProjectManagerGanttPage", () => {
     await user.click(screen.getByRole("button", { name: "Show Controls" }));
 
     expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+  });
+
+  it("keeps the gantt download action in the same navigation row as the project tabs", async () => {
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    expect(await screen.findByRole("button", { name: /^Download\b/i })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Details" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Choose download format" })).toBeVisible();
+  });
+
+  it("downloads DHTMLX XML locally after changing the selected format", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    const appendChildSpy = vi.spyOn(document.body, "appendChild");
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    try {
+      await waitFor(() => {
+        expect(mockGantt.init).toHaveBeenCalledTimes(1);
+      });
+
+      await user.click(screen.getByRole("button", { name: "Choose download format" }));
+      await user.click(screen.getByRole("menuitem", { name: "DHTMLX Gantt XML" }));
+      await user.click(screen.getByRole("button", { name: /^Download\b/i }));
+
+      expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
+      expect(mockGantt.exportToMSProject).not.toHaveBeenCalled();
+      expect(appendChildSpy).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:chart-download");
+    } finally {
+      appendChildSpy.mockRestore();
+      clickSpy.mockRestore();
+    }
+  });
+
+  it("uses MS Project export by default", async () => {
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Download\b/i }));
+
+    expect(screen.getByText("MS Project XML")).toBeVisible();
+    expect(mockGantt.exportToMSProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "project-42.ms-project.xml",
+        server: "https://export.dhtmlx.com/gantt",
+      }),
+    );
+  });
+
+  it("shows the ms project option as unavailable when export is disabled", async () => {
+    const user = userEvent.setup();
+
+    getProjectChartExportCapabilitiesMock.mockResolvedValue({
+      ganttExport: {
+        dhtmlxXml: { enabled: true },
+        msProjectXml: {
+          enabled: false,
+          mode: "unavailable" as const,
+          serverUrl: null,
+        },
+      },
+    });
+
+    renderWithTheme(<ProjectManagerGanttPage projectId={42} token={TEST_TOKEN} />);
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Choose download format" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: "MS Project XML [Unavailable]" }),
+    ).toHaveAttribute("aria-disabled", "true");
   });
 });

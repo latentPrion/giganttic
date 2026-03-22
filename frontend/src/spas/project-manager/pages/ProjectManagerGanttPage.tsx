@@ -13,6 +13,7 @@ import {
 } from "../../../common/api/api-error.js";
 import { GanttChart } from "../components/GanttChart.js";
 import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js";
+import { GanttDownloadSplitButton } from "../components/GanttDownloadSplitButton.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
@@ -81,6 +82,26 @@ function renderGanttContainer(
         onToggleExpanded={onToggleExpanded}
       />
     </Box>
+  );
+}
+
+function renderNavigationActions(
+  chartSource: GanttChartSource | null,
+  isLoading: boolean,
+  projectId: number | null,
+  token: string,
+) {
+  if (projectId === null) {
+    return undefined;
+  }
+
+  return (
+    <GanttDownloadSplitButton
+      chartSource={chartSource}
+      isLoadingChart={isLoading}
+      projectId={projectId}
+      token={token}
+    />
   );
 }
 
@@ -162,7 +183,16 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
-          <ProjectManagerProjectNavigation currentSection="gantt" projectId={props.projectId} />
+          <ProjectManagerProjectNavigation
+            actions={renderNavigationActions(
+              chartSource,
+              isLoading,
+              props.projectId,
+              props.token,
+            )}
+            currentSection="gantt"
+            projectId={props.projectId}
+          />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>

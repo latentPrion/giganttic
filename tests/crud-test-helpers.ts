@@ -10,7 +10,10 @@ import {
 import { Test } from "@nestjs/testing";
 
 import { AppModule } from "../backend/app.module.js";
-import { buildBackendConfig } from "../backend/config/backend-config.js";
+import {
+  buildBackendConfig,
+  type BackendConfig,
+} from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
 import {
   requireDbTestRuntimeConfig,
@@ -42,7 +45,10 @@ interface CrudTestHarness {
   app: NestFastifyApplication;
 }
 
-export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
+export function createCrudTestHarness(
+  dbFileName: string,
+  backendConfigOverrides: Partial<BackendConfig> = {},
+): CrudTestHarness {
   let app: NestFastifyApplication | undefined;
   let chartsDir: string | undefined;
   let dbPath: string | undefined;
@@ -101,6 +107,7 @@ export function createCrudTestHarness(dbFileName: string): CrudTestHarness {
   async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
     const resolvedChartsDir = path.join(path.dirname(databasePath), "charts");
     const config = buildBackendConfig({
+      ...backendConfigOverrides,
       chartsDir: resolvedChartsDir,
       createDbIfMissing: false,
       dbPath: databasePath,

@@ -46,4 +46,17 @@ describe("ProjectManagerProjectNavigation", () => {
     expect(screen.getByRole("tab", { name: "Kanban Board" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Issues" })).toBeDisabled();
   });
+
+  it("renders optional right-side actions alongside the project tabs", () => {
+    renderWithTheme(
+      <ProjectManagerProjectNavigation
+        actions={<button type="button">Download XML</button>}
+        currentSection="gantt"
+        projectId={42}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Details" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Download XML" })).toBeVisible();
+  });
 });

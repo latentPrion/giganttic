@@ -252,6 +252,106 @@ describe("projects crud api", () => {
     expect(chartResponse.payload).toContain("Edit your new Gantt chart");
   });
 
+  it("reports cloud-fallback gantt export capabilities by default", async () => {
+    const creator = await harness.registerUser("project-chart-export-capabilities");
+
+    const capabilitiesResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/projects/chart-export-capabilities",
+    });
+    const payload = harness.parseJson<{
+      ganttExport: {
+        dhtmlxXml: { enabled: boolean };
+        msProjectXml: {
+          enabled: boolean;
+          mode: string;
+          serverUrl: string | null;
+        };
+      };
+    }>(capabilitiesResponse.payload);
+
+    expect(capabilitiesResponse.statusCode).toBe(200);
+    expect(payload.ganttExport.dhtmlxXml.enabled).toBe(true);
+    expect(payload.ganttExport.msProjectXml).toEqual({
+      enabled: true,
+      mode: "cloud_fallback",
+      serverUrl: null,
+    });
+  });
+
+  it("reports configured-server gantt export capabilities when explicitly configured", async () => {
+    const configuredHarness = createCrudTestHarness("projects-export-configured.sqlite", {
+      allowCloudGanttExportFallback: false,
+      ganttExportServerUrl: "https://exports.example.test/gantt",
+    });
+
+    await configuredHarness.setup();
+
+    try {
+      const creator = await configuredHarness.registerUser("project-chart-export-configured");
+      const capabilitiesResponse = await configuredHarness.app.inject({
+        headers: configuredHarness.createAuthHeaders(creator.accessToken),
+        method: "GET",
+        url: "/stc-proj-mgmt/api/projects/chart-export-capabilities",
+      });
+      const payload = configuredHarness.parseJson<{
+        ganttExport: {
+          msProjectXml: {
+            enabled: boolean;
+            mode: string;
+            serverUrl: string | null;
+          };
+        };
+      }>(capabilitiesResponse.payload);
+
+      expect(capabilitiesResponse.statusCode).toBe(200);
+      expect(payload.ganttExport.msProjectXml).toEqual({
+        enabled: true,
+        mode: "configured_server",
+        serverUrl: "https://exports.example.test/gantt",
+      });
+    } finally {
+      await configuredHarness.cleanup();
+    }
+  });
+
+  it("reports ms project export as unavailable when both configured server and cloud fallback are disabled", async () => {
+    const unavailableHarness = createCrudTestHarness("projects-export-unavailable.sqlite", {
+      allowCloudGanttExportFallback: false,
+      ganttExportServerUrl: null,
+    });
+
+    await unavailableHarness.setup();
+
+    try {
+      const creator = await unavailableHarness.registerUser("project-chart-export-unavailable");
+      const capabilitiesResponse = await unavailableHarness.app.inject({
+        headers: unavailableHarness.createAuthHeaders(creator.accessToken),
+        method: "GET",
+        url: "/stc-proj-mgmt/api/projects/chart-export-capabilities",
+      });
+      const payload = unavailableHarness.parseJson<{
+        ganttExport: {
+          msProjectXml: {
+            enabled: boolean;
+            mode: string;
+            serverUrl: string | null;
+          };
+        };
+      }>(capabilitiesResponse.payload);
+
+      expect(capabilitiesResponse.statusCode).toBe(200);
+      expect(payload.ganttExport.msProjectXml).toEqual({
+        enabled: false,
+        mode: "unavailable",
+        serverUrl: null,
+      });
+    } finally {
+      await unavailableHarness.cleanup();
+    }
+  });
+
   it("returns 404 from the chart route when a project chart file is missing", async () => {
     const creator = await harness.registerUser("project-chart-missing");
     const createResponse = await createProject(creator.accessToken, {
