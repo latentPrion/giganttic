@@ -124,6 +124,24 @@ describe("project tasks history parser", () => {
     expect(statuses.get("m1")).toBe("ISSUE_STATUS_BLOCKED");
   });
 
+  it("infers milestone blocked when dependencies are stored as coll_options items", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="a" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_BLOCKED"><![CDATA[A]]></task>
+  <task id="b" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[B]]></task>
+  <task id="m" type="milestone" start_date="2026-03-02 00:00"><![CDATA[Milestone]]></task>
+
+  <coll_options for="links">
+    <item id="1" source="a" target="m" type="0" />
+    <item id="2" source="b" target="m" type="0" />
+  </coll_options>
+</data>`;
+
+    const tasks = parseProjectTasksHistoryFromXml(xml, NOW);
+    const milestone = tasks.find((task) => task.id === "m");
+    expect(milestone?.status).toBe("ISSUE_STATUS_BLOCKED");
+  });
+
   it("infers milestone blocked when a dependency milestone is blocked", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <data>

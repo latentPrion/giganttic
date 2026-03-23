@@ -15,7 +15,10 @@ const GANTT_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
 const XML_MIME_TYPE = "application/xml";
 const XML_PARSER_ERROR_SELECTOR = "parsererror";
 const TASK_SELECTOR = "task";
-const LINK_SELECTOR = "link";
+// DHTMLX Gantt can serialize dependencies either as `<link source="..." target="..." />`
+// or (in some configurations/exports) as `<coll_options for="links"><item .../></coll_options>`.
+// We support both representations to keep inference consistent across real charts and tests.
+const LINK_SELECTOR = 'link, coll_options[for="links"] item';
 
 type ParsedTaskNodeType = "milestone" | "project" | "task";
 const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
