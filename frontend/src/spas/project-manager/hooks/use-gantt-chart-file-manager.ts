@@ -88,6 +88,7 @@ export function useGanttChartFileManager(options: {
   const [isLoading, setIsLoading] = useState(projectId !== null);
   const [isPersisting, setIsPersisting] = useState(false);
   const lastSavedXmlRef = useRef<string | null>(null);
+  const lastSeenProjectIdRef = useRef<number | null>(projectId);
   const extensionsManagerRef = useRef(new GgtcDhtmlxGanttExtensionsManager());
   const [runtimeCache, setRuntimeCache] = useState<GanttRuntimeChartCacheEntry | null>(() => {
     if (projectId === null) {
@@ -111,6 +112,7 @@ export function useGanttChartFileManager(options: {
   const initializeChart = useCallback(async () => {
     const runId = `gantt-load-${Date.now()}`;
     if (projectId === null) {
+      lastSeenProjectIdRef.current = null;
       setChartSource(null);
       setLoadErrorMessage(null);
       setPersistErrorMessage(null);
@@ -121,8 +123,14 @@ export function useGanttChartFileManager(options: {
       return;
     }
 
+    const isProjectSwitch =
+      lastSeenProjectIdRef.current !== null && lastSeenProjectIdRef.current !== projectId;
+    lastSeenProjectIdRef.current = projectId;
+
     const existingCache = preferRuntimeCacheOnLoad
-      ? getGanttRuntimeChartCacheEntry(projectId)
+      ? isProjectSwitch
+        ? undefined
+        : getGanttRuntimeChartCacheEntry(projectId)
       : undefined;
     if (existingCache) {
       setChartSource({
