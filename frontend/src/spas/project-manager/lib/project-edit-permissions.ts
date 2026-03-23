@@ -1,6 +1,5 @@
 import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
 
-const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
 const PROJECT_OWNER_ROLE_CODE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 
 function hasRoleCode(
@@ -12,13 +11,9 @@ function hasRoleCode(
 
 function canDeleteProject(
   currentUserId: number | undefined,
-  currentUserRoles: readonly string[] | undefined,
+  _currentUserRoles: readonly string[] | undefined,
   response: GetProjectResponse | null,
 ): boolean {
-  if (currentUserRoles?.includes(SYSTEM_ADMIN_ROLE_CODE)) {
-    return true;
-  }
-
   if (!response || currentUserId === undefined) {
     return false;
   }
@@ -39,7 +34,7 @@ export function canEditProject(
   response: GetProjectResponse | null,
 ): boolean {
   if (!response || currentUserId === undefined) {
-    return currentUserRoles?.includes(SYSTEM_ADMIN_ROLE_CODE) ?? false;
+    return false;
   }
 
   return canDeleteProject(currentUserId, currentUserRoles, response) ||

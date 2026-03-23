@@ -10,6 +10,7 @@ import {
   createProjectGanttRoute,
   createProjectKanbanRoute,
   createProjectIssuesRoute,
+  createProjectTasksRoute,
   type ProjectRouteSection,
 } from "../routes/project-route-paths.js";
 
@@ -23,6 +24,7 @@ const DETAIL_LABEL = "Details";
 const GANTT_LABEL = "Gantt";
 const KANBAN_LABEL = "Kanban Board";
 const ISSUES_LABEL = "Issues";
+const TASKS_LABEL = "Tasks";
 
 function buildRouteForSection(
   currentSection: ProjectRouteSection,
@@ -41,6 +43,8 @@ function buildRouteForSection(
       return createProjectKanbanRoute(projectId);
     case "issues":
       return createProjectIssuesRoute(projectId);
+    case "tasks":
+      return createProjectTasksRoute(projectId);
   }
 }
 
@@ -80,6 +84,7 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={GANTT_LABEL} value="gantt" />
         <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
+        <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />
       </Tabs>
       {props.actions ? (
         <Box sx={{ flexShrink: 0, minWidth: 0, width: { xs: "100%", md: "auto" } }}>

@@ -24,7 +24,11 @@ import { GanttChartControlPanel } from "../components/GanttChartControlPanel.js"
 import { GanttDownloadSplitButton } from "../components/GanttDownloadSplitButton.js";
 import { GanttSaveSplitButton } from "../components/GanttSaveSplitButton.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
-import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
+import {
+  type PersistChartResult,
+  useGanttChartFileManager,
+} from "../hooks/use-gantt-chart-file-manager.js";
+import { type GgtcTaskExtensionMissingAttributeReport } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
 import type {
   GanttChartHandle,
@@ -49,6 +53,9 @@ const REFRESH_CANCEL_LABEL = "Cancel";
 const REFRESH_CONFIRM_LABEL = "Refresh";
 const REFRESH_CONFIRMATION_MESSAGE = "Refreshing discards all unsaved changes and resets the current frontend and UI state to the chart reloaded from the backend.";
 const REFRESH_CONFIRMATION_TITLE = "Refresh chart from backend?";
+const SAVE_EXTENSION_WARNING_BODY = "Some tasks are missing required GGTC extension attributes. This should not happen if frontend listeners are working correctly. Please report this to the developers as a bug.";
+const SAVE_EXTENSION_WARNING_CONTINUE = "The chart was still saved successfully.";
+const SAVE_EXTENSION_WARNING_TITLE = "Saved with extension attribute gaps";
 const SELECT_PROJECT_MESSAGE = "Select a valid project to view its gantt chart.";
 const ADD_CHILD_MILESTONE_LABEL = "Add Child Milestone";
 const ADD_CHILD_TASK_LABEL = "Add Child Task";
@@ -65,6 +72,12 @@ const TASK_ACTIONS_LABEL = "Task actions";
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? "None" : `${projectId}`;
+}
+
+function createMissingAttributeLabel(
+  report: GgtcTaskExtensionMissingAttributeReport,
+): string {
+  return `Task ${report.taskId}: ${report.missingAttributes.join(", ")}`;
 }
 
 function isMilestoneSelected(selectedTask: GanttSelectedTask | null): boolean {
@@ -358,6 +371,10 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   const [isRefreshConfirmOpen, setIsRefreshConfirmOpen] = useState(false);
   const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
   const [showSavedState, setShowSavedState] = useState(false);
+  const [saveExtensionWarningReports, setSaveExtensionWarningReports] = useState<
+    GgtcTaskExtensionMissingAttributeReport[]
+  >([]);
+  const [isSaveExtensionWarningOpen, setIsSaveExtensionWarningOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<GanttSelectedTask | null>(null);
   const ganttRef = useRef<GanttChartHandle | null>(null);
 
@@ -390,11 +407,12 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
       return;
     }
 
+    const projectIdForRequest = projectId;
     let isMounted = true;
 
     async function loadProject(): Promise<void> {
       try {
-        const response = await lobbyApi.getProject(token, projectId);
+        const response = await lobbyApi.getProject(token, projectIdForRequest);
         if (isMounted) {
           setProjectResponse(response);
         }
@@ -478,9 +496,19 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
     ganttRef.current?.editSelectedTask();
   }
 
+  function shouldOpenSaveExtensionWarning(result: PersistChartResult): boolean {
+    return result.didPersist && result.missingExtensionAttributeReports.length > 0;
+  }
+
+  function closeSaveExtensionWarningDialog(): void {
+    setIsSaveExtensionWarningOpen(false);
+  }
+
   async function persistCurrentChart(): Promise<void> {
-    const wasPersisted = await persistChart();
-    setShowSavedState(wasPersisted);
+    const persistResult = await persistChart();
+    setShowSavedState(persistResult.didPersist);
+    setSaveExtensionWarningReports(persistResult.missingExtensionAttributeReports);
+    setIsSaveExtensionWarningOpen(shouldOpenSaveExtensionWarning(persistResult));
   }
 
   function requestRefresh(): void {
@@ -598,6 +626,29 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
               variant="contained"
             >
               {REFRESH_CONFIRM_LABEL}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog onClose={closeSaveExtensionWarningDialog} open={isSaveExtensionWarningOpen}>
+          <DialogTitle>{SAVE_EXTENSION_WARNING_TITLE}</DialogTitle>
+          <DialogContent>
+            <Stack spacing={1.25}>
+              <DialogContentText>{SAVE_EXTENSION_WARNING_BODY}</DialogContentText>
+              <DialogContentText>{SAVE_EXTENSION_WARNING_CONTINUE}</DialogContentText>
+              <Box component="ul" sx={{ margin: 0, paddingLeft: 2.5 }}>
+                {saveExtensionWarningReports.map((report) => (
+                  <Box component="li" key={`${report.taskId}-${report.missingAttributes.join("|")}`}>
+                    <Typography variant="body2">
+                      {createMissingAttributeLabel(report)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeSaveExtensionWarningDialog} type="button" variant="contained">
+              Close
             </Button>
           </DialogActions>
         </Dialog>

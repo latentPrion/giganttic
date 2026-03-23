@@ -258,6 +258,22 @@ describe("ProjectManagerProjectPage", () => {
     expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
   });
 
+  it("navigates to the tasks route while preserving project id", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await user.click(await screen.findByRole("tab", { name: "Tasks" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
+  });
+
   it("switches between the local Details, Teams, and Organizations tabs", async () => {
     const user = userEvent.setup();
 

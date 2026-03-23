@@ -15,6 +15,7 @@ import { ApiError } from "../../../common/api/api-error.js";
 import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { appTheme } from "../../../theme/app-theme.js";
+import { injectGgtcTaskAttributesIntoSerializedXml } from "../lib/ggtc-dhtmlx-gantt-xml-serialize.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
 const TEST_TOKEN = "test-token";
@@ -31,7 +32,7 @@ const mockCapabilities = {
   },
 };
 const mockChartSource = {
-  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Repo chart task]]></task></data>",
+  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"><![CDATA[Repo chart task]]></task></data>",
   type: "xml" as const,
 };
 const getProjectChartExportCapabilitiesMock = vi.fn();
@@ -123,12 +124,7 @@ const mockGantt = {
     source: 1001,
   })),
   getSelectedId: vi.fn(() => selectedTaskId),
-  getTask: vi.fn((taskId: number | string) => ({
-    id: taskId,
-    parent: 0,
-    start_date: new Date("2026-03-01T09:00:00.000Z"),
-    type: taskId === selectedTaskId ? selectedTaskType : "task",
-  })),
+  getTask: vi.fn(),
   init: vi.fn(),
   open: vi.fn(),
   parse: vi.fn(),
@@ -141,7 +137,7 @@ const mockGantt = {
   }),
   serialize: vi.fn((format?: string) => {
     if (format === "xml") {
-      return serializedXml;
+      return injectGgtcTaskAttributesIntoSerializedXml(serializedXml, mockGantt);
     }
 
     return { data: [] };
@@ -279,6 +275,14 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.getLink.mockClear();
     mockGantt.getSelectedId.mockClear();
     mockGantt.getTask.mockClear();
+    mockGantt.getTask.mockImplementation((taskId: number | string) => ({
+      ggtc_task_closed_reason: "",
+      ggtc_task_status: "ISSUE_STATUS_OPEN",
+      id: taskId,
+      parent: 0,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: taskId === selectedTaskId ? selectedTaskType : "task",
+    }));
     mockGantt.init.mockReset();
     mockGantt.open.mockReset();
     mockGantt.parse.mockReset();
@@ -289,7 +293,7 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.serialize.mockReset();
     mockGantt.serialize.mockImplementation((format?: string) => {
       if (format === "xml") {
-        return serializedXml;
+        return injectGgtcTaskAttributesIntoSerializedXml(serializedXml, mockGantt);
       }
 
       return { data: [] };
@@ -485,6 +489,105 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(lightboxTask.parent).toBe(0);
+    expect(lightboxTask).toMatchObject({
+      ggtc_task_closed_reason: "",
+      ggtc_task_status: "ISSUE_STATUS_OPEN",
+    });
+  });
+
+  it("injects GGTC extension attrs on onAfterTaskAdd when missing", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    mockGantt.updateTask.mockClear();
+    mockGantt.refreshTask.mockClear();
+
+    const newTask = {
+      parent: 0,
+      text: "Injected by event",
+    };
+
+    await act(async () => {
+      triggerGanttEvent("onAfterTaskAdd", 9101, newTask);
+    });
+
+    expect(newTask).toMatchObject({
+      ggtc_task_closed_reason: "",
+      ggtc_task_status: "ISSUE_STATUS_OPEN",
+    });
+    expect(mockGantt.updateTask).toHaveBeenCalledWith(9101);
+    expect(mockGantt.refreshTask).toHaveBeenCalledWith(9101);
+  });
+
+  it("injects GGTC extension attrs via getTask fallback on onAfterTaskUpdate", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    mockGantt.updateTask.mockClear();
+    mockGantt.refreshTask.mockClear();
+
+    mockGantt.getTask.mockImplementation((taskId: number | string) => {
+      if (taskId === 1001) {
+        return {
+          id: 1001,
+          parent: 0,
+          start_date: new Date("2026-03-01T09:00:00.000Z"),
+          type: "task",
+        };
+      }
+      return {
+        ggtc_task_closed_reason: "",
+        ggtc_task_status: "ISSUE_STATUS_OPEN",
+        id: taskId,
+        parent: 0,
+        start_date: new Date("2026-03-01T09:00:00.000Z"),
+        type: taskId === selectedTaskId ? selectedTaskType : "task",
+      };
+    });
+
+    await act(async () => {
+      triggerGanttEvent("onAfterTaskUpdate", 1001);
+    });
+
+    expect(mockGantt.updateTask).toHaveBeenCalledWith(1001);
+    expect(mockGantt.refreshTask).toHaveBeenCalledWith(1001);
+  });
+
+  it("does not rewrite tasks that already include GGTC extension attrs on update hooks", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    mockGantt.updateTask.mockClear();
+    mockGantt.refreshTask.mockClear();
+
+    const completeTask = {
+      ggtc_task_closed_reason: "ISSUE_CLOSED_REASON_RESOLVED",
+      ggtc_task_status: "ISSUE_STATUS_CLOSED",
+      parent: 0,
+      text: "Already complete",
+    };
+
+    await act(async () => {
+      triggerGanttEvent("onAfterTaskUpdate", 9202, completeTask);
+    });
+
+    expect(mockGantt.updateTask).not.toHaveBeenCalled();
+    expect(mockGantt.refreshTask).not.toHaveBeenCalled();
   });
 
   it("normalizes blank root parents before persisting gantt XML", async () => {
@@ -505,9 +608,58 @@ describe("ProjectManagerGanttPage", () => {
       expect(putProjectChartMock).toHaveBeenCalledWith(
         TEST_TOKEN,
         42,
-        "<data><task id='5000' parent='0' start_date='2026-03-22 00:00' duration='1'><![CDATA[Kekw]]></task></data>",
+        "<data><task id=\"5000\" parent=\"0\" start_date=\"2026-03-22 00:00\" duration=\"1\" type=\"task\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"><![CDATA[Kekw]]></task></data>",
       );
     });
+  });
+
+  it("does not show extension warning when serialized XML includes GGTC attrs (inject path)", async () => {
+    const user = userEvent.setup();
+    serializedXml = "<data><task id='5000' parent='0' start_date='2026-03-22 00:00' duration='1'><![CDATA[Kekw]]></task></data>";
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(putProjectChartMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(screen.queryByText("Saved with extension attribute gaps")).not.toBeInTheDocument();
+  });
+
+  it("shows extension warning dialog when save XML is missing GGTC attrs", async () => {
+    const user = userEvent.setup();
+    serializedXml = "<data><task id='5000' parent='0' start_date='2026-03-22 00:00' duration='1'><![CDATA[Kekw]]></task></data>";
+
+    mockGantt.serialize.mockImplementation((format?: string) => {
+      if (format === "xml") {
+        return serializedXml;
+      }
+
+      return { data: [] };
+    });
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Saved with extension attribute gaps")).toBeVisible();
+    });
+    expect(putProjectChartMock).toHaveBeenCalledTimes(1);
   });
 
   it("enables selected task menu actions and supports editing and deleting the selection", async () => {
@@ -613,10 +765,11 @@ describe("ProjectManagerGanttPage", () => {
 
     await waitFor(() => {
       expect(getProjectChartOrNullMock).toHaveBeenCalledTimes(2);
-      expect(mockGantt.parse).toHaveBeenLastCalledWith(
-        refreshedChartSource.content,
-        refreshedChartSource.type,
-      );
+      const lastParseCall = mockGantt.parse.mock.calls.at(-1);
+      expect(lastParseCall?.[1]).toBe(refreshedChartSource.type);
+      expect(lastParseCall?.[0]).toContain("id=\"1002\"");
+      expect(lastParseCall?.[0]).toContain("ggtc_task_status=\"ISSUE_STATUS_OPEN\"");
+      expect(lastParseCall?.[0]).toContain("ggtc_task_closed_reason=\"\"");
     });
 
     expect(screen.queryByTestId("gantt-save-status-unsaved")).not.toBeInTheDocument();
@@ -629,6 +782,7 @@ describe("ProjectManagerGanttPage", () => {
       open: false,
       parent: 0,
       start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: "task" as const,
     }));
 
     renderWithTheme(
@@ -671,6 +825,7 @@ describe("ProjectManagerGanttPage", () => {
       open: true,
       parent: 0,
       start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: "task" as const,
     }));
 
     renderWithTheme(
@@ -954,9 +1109,14 @@ describe("ProjectManagerGanttPage", () => {
 
     await waitFor(() => {
       expect(mockGantt.parse).toHaveBeenCalledWith(
-        secondChartSource.content,
+        expect.stringContaining("id=\"2002\""),
         secondChartSource.type,
       );
+      const matchingCall = mockGantt.parse.mock.calls.find((call) =>
+        typeof call[0] === "string" && call[0].includes("id=\"2002\""),
+      );
+      expect(matchingCall?.[0]).toContain("ggtc_task_status=\"ISSUE_STATUS_OPEN\"");
+      expect(matchingCall?.[0]).toContain("ggtc_task_closed_reason=\"\"");
     });
   });
 

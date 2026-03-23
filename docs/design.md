@@ -268,6 +268,8 @@ Current project-manager SPA interaction model:
   npm package
 - a hideable bottom `GanttChartControlPanel` hosts a tabset for `Both`, `Grid`,
   and `Chart` display modes
+- GGTC task XML extensions (status, closed reason) and save-time enforcement vs
+  load/listener enrichment: [gantt-chart-ggtc-extensions.md](./gantt-chart-ggtc-extensions.md)
 
 ### Temporal
 

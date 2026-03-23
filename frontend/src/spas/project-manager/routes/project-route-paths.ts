@@ -1,4 +1,4 @@
-export const PROJECT_ROUTE_SECTION_VALUES = ["detail", "gantt", "kanban", "issues"] as const;
+export const PROJECT_ROUTE_SECTION_VALUES = ["detail", "gantt", "kanban", "issues", "tasks"] as const;
 
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
 
@@ -28,6 +28,10 @@ export function createProjectKanbanRoute(projectId: number): string {
 
 export function createProjectIssuesRoute(projectId: number): string {
   return `/pm/project/issues?projectId=${projectId}`;
+}
+
+export function createProjectTasksRoute(projectId: number): string {
+  return `/pm/project/tasks?projectId=${projectId}`;
 }
 
 export function createProjectIssueRoute(projectId: number, issueId: number): string {

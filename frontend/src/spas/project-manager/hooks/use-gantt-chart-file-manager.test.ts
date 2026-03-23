@@ -1,10 +1,25 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { RefObject } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../../common/api/api-error.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
+import {
+  GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+  GGTC_TASK_STATUS_ATTRIBUTE,
+} from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
+import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import { useGanttChartFileManager } from "./use-gantt-chart-file-manager.js";
+
+function stubGanttRef(
+  current: { getSerializedXml: () => string } | null,
+): RefObject<GanttChartHandle | null> {
+  if (current === null) {
+    return { current: null };
+  }
+  return { current: current as unknown as GanttChartHandle | null };
+}
 
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
@@ -15,8 +30,9 @@ vi.mock("../api/gantt-api.js", () => ({
 
 const ganttApiMock = vi.mocked(ganttApi);
 
-const SERVER_XML = "<?xml version=\"1.0\"?><data><task id=\"1\"/></data>";
+const SERVER_XML = "<?xml version=\"1.0\"?><data><task id=\"1\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"/></data>";
 const BASELINE_XML = "<baseline/>";
+const MISSING_EXTENSION_XML = "<?xml version=\"1.0\"?><data><task id=\"1\"/></data>";
 const MODIFIED_XML = "<modified/>";
 
 describe("useGanttChartFileManager", () => {
@@ -30,7 +46,7 @@ describe("useGanttChartFileManager", () => {
       content: SERVER_XML,
       type: "xml",
     });
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -53,7 +69,7 @@ describe("useGanttChartFileManager", () => {
 
   it("uses default XML and hasServerChart false when the server has no chart file", async () => {
     ganttApiMock.getProjectChartOrNull.mockResolvedValue(null);
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -78,7 +94,7 @@ describe("useGanttChartFileManager", () => {
         status: 500,
       }),
     );
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -96,12 +112,39 @@ describe("useGanttChartFileManager", () => {
     expect(result.current.loadErrorMessage).toBe("Chart service down");
   });
 
+  it("normalizes missing task extension attrs during load", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: MISSING_EXTENSION_XML,
+      type: "xml",
+    });
+    const ganttRef = stubGanttRef(null);
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 15,
+        token: "token-normalize",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    const normalizedXml = result.current.chartSource?.content ?? "";
+    const xmlDocument = new DOMParser().parseFromString(normalizedXml, "application/xml");
+    const taskElement = xmlDocument.querySelector("task[id=\"1\"]");
+
+    expect(taskElement?.getAttribute(GGTC_TASK_STATUS_ATTRIBUTE)).toBe("ISSUE_STATUS_OPEN");
+    expect(taskElement?.getAttribute(GGTC_TASK_CLOSED_REASON_ATTRIBUTE)).toBe("");
+  });
+
   it("resets state when projectId is null", async () => {
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: SERVER_XML,
       type: "xml",
     });
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result, rerender } = renderHook(
       ({ projectId }: { projectId: number | null }) =>
@@ -133,9 +176,7 @@ describe("useGanttChartFileManager", () => {
       type: "xml",
     });
     const getSerializedXml = vi.fn().mockReturnValue(MODIFIED_XML);
-    const ganttRef = {
-      current: { getSerializedXml },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -171,9 +212,7 @@ describe("useGanttChartFileManager", () => {
       content: SERVER_XML,
       type: "xml",
     });
-    const ganttRef = {
-      current: { getSerializedXml: () => MODIFIED_XML },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml: () => MODIFIED_XML });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -200,9 +239,7 @@ describe("useGanttChartFileManager", () => {
     });
     ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
     const getSerializedXml = vi.fn().mockReturnValue(MODIFIED_XML);
-    const ganttRef = {
-      current: { getSerializedXml },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -225,7 +262,9 @@ describe("useGanttChartFileManager", () => {
     expect(result.current.isDirty).toBe(true);
 
     await act(async () => {
-      await result.current.persistChart();
+      const persistResult = await result.current.persistChart();
+      expect(persistResult.didPersist).toBe(true);
+      expect(persistResult.missingExtensionAttributeReports).toEqual([]);
     });
 
     expect(ganttApiMock.putProjectChart).toHaveBeenCalledWith("tok-e", 5, MODIFIED_XML);
@@ -246,9 +285,7 @@ describe("useGanttChartFileManager", () => {
         status: 403,
       }),
     );
-    const ganttRef = {
-      current: { getSerializedXml: () => MODIFIED_XML },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml: () => MODIFIED_XML });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -263,7 +300,8 @@ describe("useGanttChartFileManager", () => {
     });
 
     await act(async () => {
-      await result.current.persistChart();
+      const persistResult = await result.current.persistChart();
+      expect(persistResult.didPersist).toBe(false);
     });
 
     expect(result.current.persistErrorMessage).toBeTruthy();
@@ -276,9 +314,7 @@ describe("useGanttChartFileManager", () => {
       type: "xml",
     });
     ganttApiMock.putProjectChart.mockRejectedValue(new Error("network"));
-    const ganttRef = {
-      current: { getSerializedXml: () => MODIFIED_XML },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml: () => MODIFIED_XML });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -304,10 +340,43 @@ describe("useGanttChartFileManager", () => {
     expect(result.current.persistErrorMessage).toBeNull();
   });
 
+  it("returns save diagnostics when extension attrs are missing at save", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: SERVER_XML,
+      type: "xml",
+    });
+    ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
+    const ganttRef = stubGanttRef({ getSerializedXml: () => "<data><task id=\"55\"/></data>" });
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 22,
+        token: "tok-diag",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      const persistResult = await result.current.persistChart();
+      expect(persistResult.didPersist).toBe(true);
+      expect(persistResult.missingExtensionAttributeReports).toEqual([
+        {
+          missingAttributes: [
+            GGTC_TASK_STATUS_ATTRIBUTE,
+            GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+          ],
+          taskId: "55",
+        },
+      ]);
+    });
+  });
+
   it("does not call putProjectChart when projectId is null", async () => {
-    const ganttRef = {
-      current: { getSerializedXml: () => MODIFIED_XML },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml: () => MODIFIED_XML });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -327,7 +396,7 @@ describe("useGanttChartFileManager", () => {
   it("creates a default chart when no server chart exists yet", async () => {
     ganttApiMock.getProjectChartOrNull.mockResolvedValue(null);
     ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -367,9 +436,7 @@ describe("useGanttChartFileManager", () => {
       resolvePut = resolve;
     });
     ganttApiMock.putProjectChart.mockReturnValue(putPromise);
-    const ganttRef = {
-      current: { getSerializedXml: () => MODIFIED_XML },
-    };
+    const ganttRef = stubGanttRef({ getSerializedXml: () => MODIFIED_XML });
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({
@@ -383,7 +450,7 @@ describe("useGanttChartFileManager", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    let persistPromise: Promise<void>;
+    let persistPromise: ReturnType<typeof result.current.persistChart>;
     act(() => {
       persistPromise = result.current.persistChart();
     });
@@ -408,7 +475,7 @@ describe("useGanttChartFileManager", () => {
         content: "<second/>",
         type: "xml",
       });
-    const ganttRef = { current: null };
+    const ganttRef = stubGanttRef(null);
 
     const { result } = renderHook(() =>
       useGanttChartFileManager({

@@ -7,6 +7,7 @@ import React, {
 import { Box } from "@mui/material";
 
 import { getDhtmlxGantt } from "../lib/dhtmlx-gantt-adapter.js";
+import { GgtcDhtmlxGanttExtensionsManager } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import type {
   GanttChartHandle,
   GanttSelectedTask,
@@ -105,6 +106,8 @@ type GanttInlineEditors = {
 type GanttTaskLike = {
   duration?: number;
   end_date?: Date | string;
+  ggtc_task_closed_reason?: string | null;
+  ggtc_task_status?: string | null;
   open?: boolean | "true" | "false";
   parent?: GanttTaskId | 0 | "" | null;
   progress?: number;
@@ -134,6 +137,11 @@ const SELECTION_EVENT_NAMES: string[] = [
   "onTaskSelected",
   "onTaskUnselected",
 ];
+const TASK_EXTENSION_EVENT_NAMES: string[] = [
+  "onAfterTaskAdd",
+  "onAfterTaskUpdate",
+];
+const ggtcExtensionsManager = new GgtcDhtmlxGanttExtensionsManager();
 
 function createInlineEditors(): GanttInlineEditors {
   return {
@@ -421,10 +429,44 @@ function attachLightboxParentNormalizationEvent(
 
   const eventId = gantt.attachEvent("onLightboxSave", (_taskId, task) => {
     normalizeTaskParent(task);
+    ggtcExtensionsManager.ensureTaskObjectAttrs(task);
     return true;
   });
 
   return [eventId];
+}
+
+function attachTaskExtensionAttributeEvents(
+  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+): string[] {
+  const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
+    attachEvent: (name: string, handler: (...args: unknown[]) => boolean) => string;
+    getTask: (id: GanttTaskId) => GanttTaskLike;
+    refreshTask?: (id: GanttTaskId) => void;
+    updateTask: (id: GanttTaskId) => void;
+  };
+
+  function handleRuntimeTaskMutation(taskId: GanttTaskId, task: GanttTaskLike): boolean {
+    const didMutate = ggtcExtensionsManager.ensureTaskObjectAttrs(task);
+    if (didMutate) {
+      gantt.updateTask(taskId);
+      gantt.refreshTask?.(taskId);
+    }
+    return true;
+  }
+
+  return TASK_EXTENSION_EVENT_NAMES.map((eventName) =>
+    gantt.attachEvent(eventName, (...args: unknown[]) => {
+      const taskId = args[0] as GanttTaskId | null | undefined;
+      if (taskId === null || taskId === undefined) {
+        return true;
+      }
+
+      const taskFromEvent = args[1] as GanttTaskLike | undefined;
+      const task = taskFromEvent ?? gantt.getTask(taskId);
+      return handleRuntimeTaskMutation(taskId, task);
+    }),
+  );
 }
 
 function attachSelectionEvents(
@@ -482,6 +524,7 @@ function initializeMountedGantt(
   ganttInstance.setSizes();
 
   const eventIds = [
+    ...attachTaskExtensionAttributeEvents(ganttInstance),
     ...attachLightboxParentNormalizationEvent(ganttInstance),
     ...attachEditorEvents(ganttInstance, onEditorChange),
   ];
@@ -851,6 +894,10 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
 
         return createSelectedTaskSummary(ganttInstance);
       },
+      /**
+       * Returns chart XML via `serializeGanttXml` (DHTMLX `serialize("xml")` + root-parent normalization).
+       * GGTC attrs are merged inside the global `gantt.xml.serialize` hook (`dhtmlx-gantt-adapter.ts`), not in this component.
+       */
       getSerializedXml(): string {
         const ganttInstance = ganttReference.current;
         if (!ganttInstance) {

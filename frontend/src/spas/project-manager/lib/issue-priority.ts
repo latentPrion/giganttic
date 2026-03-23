@@ -1,5 +1,7 @@
 import {
   IssuePriorityCode,
+  issuePriorityMaximum,
+  issuePriorityMinimum,
   issuePriorityLabels,
   issuePriorityValues,
 } from "../../../../../db/v3/schema.js";
@@ -20,6 +22,17 @@ export function createIssuePriorityOptions(): IssuePriorityOption[] {
   }));
 }
 
+export function clampIssuePriorityValue(value: number): IssuePriorityCode {
+  if (value <= issuePriorityMinimum) {
+    return issuePriorityMinimum;
+  }
+  if (value >= issuePriorityMaximum) {
+    return issuePriorityMaximum;
+  }
+
+  return value as IssuePriorityCode;
+}
+
 export function getIssuePriorityLabel(priority: number): string {
-  return issuePriorityLabels[priority as IssuePriorityCode] ?? `${priority}`;
+  return issuePriorityLabels[clampIssuePriorityValue(priority)] ?? `${priority}`;
 }

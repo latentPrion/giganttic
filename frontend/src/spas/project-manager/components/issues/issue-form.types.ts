@@ -5,6 +5,7 @@ import type {
   IssueStatus,
   UpdateIssueRequest,
 } from "../../contracts/issue.contracts.js";
+import { clampIssuePriorityValue } from "../../lib/issue-priority.js";
 import {
   ISSUE_DEFAULT_PRIORITY,
   ISSUE_DEFAULT_PROGRESS,
@@ -24,13 +25,14 @@ export interface IssueFormState {
 const DEFAULT_ISSUE_STATUS: IssueStatus = "ISSUE_STATUS_OPEN";
 
 export function createIssueFormState(issue: Issue | null): IssueFormState {
+  const normalizedPriority = clampIssuePriorityValue(issue?.priority ?? ISSUE_DEFAULT_PRIORITY);
   return {
     closedReason: issue?.closedReason ?? "",
     closedReasonDescription: issue?.closedReasonDescription ?? "",
     description: issue?.description ?? "",
     journal: issue?.journal ?? "",
     name: issue?.name ?? "",
-    priority: `${issue?.priority ?? ISSUE_DEFAULT_PRIORITY}`,
+    priority: `${normalizedPriority}`,
     progressPercentage: `${issue?.progressPercentage ?? ISSUE_DEFAULT_PROGRESS}`,
     status: issue?.status ?? DEFAULT_ISSUE_STATUS,
   };
@@ -59,7 +61,7 @@ function normalizePriority(value: string): number | undefined {
     return undefined;
   }
 
-  return Number(value);
+  return clampIssuePriorityValue(Number(value));
 }
 
 export function normalizeCreateIssuePayload(

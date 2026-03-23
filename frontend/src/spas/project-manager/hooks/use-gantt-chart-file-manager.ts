@@ -3,8 +3,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
+import {
+  type GgtcTaskExtensionMissingAttributeReport,
+  GgtcDhtmlxGanttExtensionsManager,
+} from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
+
+export interface PersistChartResult {
+  didPersist: boolean;
+  missingExtensionAttributeReports: GgtcTaskExtensionMissingAttributeReport[];
+}
 
 export interface UseGanttChartFileManagerResult {
   chartSource: GanttChartSource | null;
@@ -14,7 +23,7 @@ export interface UseGanttChartFileManagerResult {
   isLoading: boolean;
   isPersisting: boolean;
   loadErrorMessage: string | null;
-  persistChart: () => Promise<boolean>;
+  persistChart: () => Promise<PersistChartResult>;
   persistErrorMessage: string | null;
   reloadChart: () => Promise<void>;
   setDirtyFromEditor: () => void;
@@ -38,6 +47,7 @@ export function useGanttChartFileManager(options: {
   const [isLoading, setIsLoading] = useState(projectId !== null);
   const [isPersisting, setIsPersisting] = useState(false);
   const lastSavedXmlRef = useRef<string | null>(null);
+  const extensionsManagerRef = useRef(new GgtcDhtmlxGanttExtensionsManager());
 
   const loadChart = useCallback(async () => {
     if (projectId === null) {
@@ -61,8 +71,14 @@ export function useGanttChartFileManager(options: {
     try {
       const loaded = await ganttApi.getProjectChartOrNull(token, projectId);
       if (loaded) {
+        const normalizationResult = extensionsManagerRef.current.normalizeXmlTasksWithExtensionAttrs(
+          loaded.content,
+        );
         setHasServerChart(true);
-        setChartSource(loaded);
+        setChartSource({
+          content: normalizationResult.xml,
+          type: loaded.type,
+        });
       } else {
         setHasServerChart(false);
         setChartSource(null);
@@ -93,11 +109,24 @@ export function useGanttChartFileManager(options: {
     setIsDirty(current !== baseline);
   }, [ganttRef]);
 
-  const persistChart = useCallback(async (): Promise<boolean> => {
+  /**
+   * Persists the current chart XML. This path **does not** merge or default GGTC extension attributes:
+   * it uploads whatever `getSerializedXml()` returns and uses `scanXmlForMissingExtensionAttrs` only as an
+   * **enforcement** diagnostic when required attributes are absent from that XML (hooks or serializer merge
+   * were insufficient). Chart enrichment belongs to load-time normalization and task event listeners; see
+   * `docs/gantt-chart-ggtc-extensions.md`.
+   */
+  const persistChart = useCallback(async (): Promise<PersistChartResult> => {
     if (projectId === null) {
-      return false;
+      return {
+        didPersist: false,
+        missingExtensionAttributeReports: [],
+      };
     }
     const xml = ganttRef.current?.getSerializedXml() ?? DEFAULT_PROJECT_CHART_XML;
+    const missingExtensionAttributeReports = extensionsManagerRef.current.scanXmlForMissingExtensionAttrs(
+      xml,
+    );
 
     setIsPersisting(true);
     setPersistErrorMessage(null);
@@ -110,10 +139,16 @@ export function useGanttChartFileManager(options: {
         content: xml,
         type: "xml",
       });
-      return true;
+      return {
+        didPersist: true,
+        missingExtensionAttributeReports,
+      };
     } catch (error) {
       setPersistErrorMessage(getApiErrorMessage(error, SAVE_ERROR));
-      return false;
+      return {
+        didPersist: false,
+        missingExtensionAttributeReports,
+      };
     } finally {
       setIsPersisting(false);
     }
