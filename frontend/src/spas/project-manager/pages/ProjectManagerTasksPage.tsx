@@ -20,6 +20,10 @@ import {
   type ParsedProjectTaskHistoryEntry,
   parseProjectTasksHistoryFromXml,
 } from "../lib/project-tasks-history-parser.js";
+import {
+  subscribeGanttRuntimeChartUpdatedEvent,
+  type GanttRuntimeChartUpdatedEventDetail,
+} from "../lib/gantt-runtime-chart-events.js";
 
 interface ProjectManagerTasksPageProps {
   projectId: number | null;
@@ -63,6 +67,24 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
   const [tasks, setTasks] = useState<ParsedProjectTaskHistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      return undefined;
+    }
+
+    const unsubscribe = subscribeGanttRuntimeChartUpdatedEvent((detail: GanttRuntimeChartUpdatedEventDetail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+
+      setErrorMessage(null);
+      setIsLoading(false);
+      setTasks(parseProjectTasksHistoryFromXml(detail.serializedXml));
+    });
+
+    return () => unsubscribe();
+  }, [props.projectId]);
 
   const visibleTasks = useMemo(
     () => sortTasksByMostRecentStartDate(filterTasksByStatus(tasks, activeStatusTab)),

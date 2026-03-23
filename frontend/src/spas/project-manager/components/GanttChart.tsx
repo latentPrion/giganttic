@@ -18,6 +18,10 @@ import {
   GGTC_TASK_STATUS_OPEN,
   GgtcDhtmlxGanttExtensionsManager,
 } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
+import { inferMilestoneStatusesFromXml } from "../lib/project-tasks-history-parser.js";
+import {
+  emitGanttRuntimeChartUpdatedEvent,
+} from "../lib/gantt-runtime-chart-events.js";
 import type {
   GanttChartHandle,
   GanttSelectedTask,
@@ -30,6 +34,7 @@ import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 export type { GanttChartHandle };
 
 interface GanttChartProps {
+  projectId: number;
   chartSource: GanttChartSource;
   displayMode: GanttDisplayMode;
   interactionsEnabled?: boolean;
@@ -479,6 +484,8 @@ function attachEditorEvents(
 
 function attachLightboxParentNormalizationEvent(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  projectId: number,
+  isApplyingMilestoneInferenceRef: { current: boolean },
 ): string[] {
   const gantt = ganttInstance as unknown as {
     attachEvent: (
@@ -487,13 +494,107 @@ function attachLightboxParentNormalizationEvent(
     ) => string;
   };
 
-  const eventId = gantt.attachEvent("onLightboxSave", (_taskId, task) => {
+  const eventId = gantt.attachEvent("onLightboxSave", (taskId, task) => {
     normalizeTaskParent(task);
     ggtcExtensionsManager.ensureTaskObjectAttrs(task);
+
+    // DHTMLX runs `onLightboxSave` before it applies the task changes into the runtime chart.
+    // We need the runtime chart to reflect the edited `task` immediately so that we can
+    // serialize/infer using the new status values.
+    try {
+      if (taskId === null || taskId === undefined) {
+        return true;
+      }
+
+      const runtimeTask = ganttInstance.getTask(taskId as GanttTaskId);
+      runtimeTask.parent = task.parent ?? undefined;
+      runtimeTask.ggtc_task_status = task.ggtc_task_status;
+      runtimeTask.ggtc_task_closed_reason = task.ggtc_task_closed_reason;
+      runtimeTask.ggtc_task_description = task.ggtc_task_description;
+    } catch {
+      // If the runtime task cannot be found (e.g. transient UI state), inference still
+      // happens best-effort based on whatever is currently serializable.
+    }
+
+    if (isApplyingMilestoneInferenceRef.current) {
+      return true;
+    }
+
+    isApplyingMilestoneInferenceRef.current = true;
+    try {
+      inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+        projectId,
+        shouldEmit: true,
+      });
+    } finally {
+      isApplyingMilestoneInferenceRef.current = false;
+    }
+
     return true;
   });
 
   return [eventId];
+}
+
+function inferAndApplyMilestoneStatusesToRuntime(
+  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  options: {
+    projectId: number;
+    shouldEmit: boolean;
+  },
+): void {
+  const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
+    getTask: (id: GanttTaskId) => GanttTaskLike;
+    updateTask?: (id: GanttTaskId) => void;
+    refreshTask?: (id: GanttTaskId) => void;
+  };
+
+  const preInferenceXml = serializeGanttXml(ganttInstance);
+  let inferredStatusesByMilestoneId: ReturnType<typeof inferMilestoneStatusesFromXml> | null = null;
+  try {
+    inferredStatusesByMilestoneId = inferMilestoneStatusesFromXml(preInferenceXml);
+  } catch {
+    // If the chart XML is malformed (e.g. during certain UI tests or intermediate states),
+    // don't break the editor; just skip milestone inference for this pass.
+    inferredStatusesByMilestoneId = null;
+  }
+
+  if (!inferredStatusesByMilestoneId) {
+    return;
+  }
+  let didMutate = false;
+
+  for (const [milestoneId, inferredStatus] of inferredStatusesByMilestoneId.entries()) {
+    let milestoneTask: GanttTaskLike | undefined;
+    try {
+      milestoneTask = gantt.getTask(milestoneId);
+    } catch {
+      milestoneTask = undefined;
+    }
+
+    if (!milestoneTask) {
+      continue;
+    }
+
+    const currentStatus = milestoneTask.ggtc_task_status ?? null;
+    if (currentStatus === inferredStatus) {
+      continue;
+    }
+
+    milestoneTask.ggtc_task_status = inferredStatus;
+    didMutate = true;
+
+    gantt.updateTask?.(milestoneId);
+    gantt.refreshTask?.(milestoneId);
+  }
+
+  const postInferenceXml = didMutate ? serializeGanttXml(ganttInstance) : preInferenceXml;
+  if (options.shouldEmit) {
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: options.projectId,
+      serializedXml: postInferenceXml,
+    });
+  }
 }
 
 function attachTaskExtensionAttributeEvents(
@@ -571,6 +672,8 @@ function initializeMountedGantt(
   containerElement: HTMLDivElement,
   displayMode: GanttDisplayMode,
   interactionsEnabled: boolean,
+  projectId: number,
+  isApplyingMilestoneInferenceRef: { current: boolean },
   onBaselineReady?: (serializedXml: string) => void,
   onEditorChange?: () => void,
 ) {
@@ -583,9 +686,20 @@ function initializeMountedGantt(
   ganttInstance.render();
   ganttInstance.setSizes();
 
+  // Ensure milestone statuses are inferred and written into runtime tasks on initial load,
+  // so the lightbox shows consistent values even before the first user edit.
+  inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+    projectId,
+    shouldEmit: false,
+  });
+
   const eventIds = [
     ...attachTaskExtensionAttributeEvents(ganttInstance),
-    ...attachLightboxParentNormalizationEvent(ganttInstance),
+    ...attachLightboxParentNormalizationEvent(
+      ganttInstance,
+      projectId,
+      isApplyingMilestoneInferenceRef,
+    ),
     ...attachEditorEvents(ganttInstance, onEditorChange),
   ];
 
@@ -862,6 +976,7 @@ function editSelectedTask(
 export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
   function GanttChart(props, ref) {
     const {
+      projectId,
       chartSource,
       displayMode,
       interactionsEnabled = true,
@@ -871,6 +986,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
     } = props;
     const containerReference = useRef<HTMLDivElement | null>(null);
     const ganttReference = useRef<ReturnType<typeof getDhtmlxGantt> | null>(null);
+    const isApplyingMilestoneInferenceRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
       addChildTask(): void {
@@ -982,6 +1098,8 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
         containerElement,
         displayMode,
         interactionsEnabled,
+        projectId,
+        isApplyingMilestoneInferenceRef,
         onBaselineReady,
         onEditorChange,
       );
@@ -1004,6 +1122,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
       chartSource,
       displayMode,
       interactionsEnabled,
+      projectId,
       onBaselineReady,
       onEditorChange,
       onSelectionChange,

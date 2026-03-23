@@ -18,6 +18,8 @@ const TASK_SELECTOR = "task";
 const LINK_SELECTOR = "link";
 
 type ParsedTaskNodeType = "milestone" | "project" | "task";
+const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
+const DEBUG_SESSION_ID = "117825";
 
 interface ParsedTaskNode {
   id: string;
@@ -27,6 +29,51 @@ interface ParsedTaskNode {
   status: IssueStatus;
   title: string;
   type: ParsedTaskNodeType;
+}
+
+function parseTaskNodeForMilestoneInference(taskElement: Element): ParsedTaskNode | null {
+  const id = taskElement.getAttribute("id")?.trim() ?? "";
+  const title = extractOwnTextContent(taskElement);
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    predecessorIds: [],
+    progressPercentage: parseTaskProgressPercentage(taskElement),
+    startDate: parseGanttDate(taskElement.getAttribute("start_date") ?? ""),
+    status: parseTaskStatus(taskElement),
+    title,
+    type: parseTaskNodeType(taskElement),
+  };
+}
+
+function emitDebugLog(
+  location: string,
+  message: string,
+  hypothesisId: string,
+  runId: string,
+  data: Record<string, unknown>,
+): void {
+  // #region agent log
+  fetch(DEBUG_INGEST_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": DEBUG_SESSION_ID,
+    },
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+      runId,
+      hypothesisId,
+    }),
+  }).catch(() => {});
+  // #endregion
 }
 
 export interface ParsedProjectTaskHistoryEntry {
@@ -136,6 +183,16 @@ function mapTaskNodesById(xmlDocument: XMLDocument): Map<string, ParsedTaskNode>
     }, new Map<string, ParsedTaskNode>());
 }
 
+function mapTaskNodesByIdForMilestoneInference(xmlDocument: XMLDocument): Map<string, ParsedTaskNode> {
+  return Array.from(xmlDocument.querySelectorAll(TASK_SELECTOR))
+    .map((taskElement) => parseTaskNodeForMilestoneInference(taskElement))
+    .filter((task): task is ParsedTaskNode => task !== null)
+    .reduce((map, task) => {
+      map.set(task.id, task);
+      return map;
+    }, new Map<string, ParsedTaskNode>());
+}
+
 function collectIncomingDependencies(
   xmlDocument: XMLDocument,
 ): Map<string, string[]> {
@@ -227,6 +284,24 @@ function isDisplayableTask(task: ParsedTaskNode, now: Date): boolean {
   return hasStarted(task.startDate, now);
 }
 
+export function inferMilestoneStatusesFromXml(xmlContent: string): Map<string, IssueStatus> {
+  const xmlDocument = parseChartXmlDocument(xmlContent);
+  const tasksById = mapTaskNodesByIdForMilestoneInference(xmlDocument);
+  const dependenciesByTarget = collectIncomingDependencies(xmlDocument);
+  applyDependenciesToTasks(tasksById, dependenciesByTarget);
+
+  const resolveTaskStatus = createStatusResolver(tasksById);
+  const inferred = new Map<string, IssueStatus>();
+  for (const task of tasksById.values()) {
+    if (task.type !== "milestone") {
+      continue;
+    }
+    inferred.set(task.id, resolveTaskStatus(task.id));
+  }
+
+  return inferred;
+}
+
 function toHistoryEntry(task: ParsedTaskNode, status: IssueStatus): ParsedProjectTaskHistoryEntry {
   return {
     id: task.id,
@@ -242,14 +317,39 @@ export function parseProjectTasksHistoryFromXml(
   xmlContent: string,
   now: Date = new Date(),
 ): ParsedProjectTaskHistoryEntry[] {
+  const runId = `tasks-parse-${Date.now()}`;
   const xmlDocument = parseChartXmlDocument(xmlContent);
   const tasksById = mapTaskNodesById(xmlDocument);
   const dependenciesByTarget = collectIncomingDependencies(xmlDocument);
   applyDependenciesToTasks(tasksById, dependenciesByTarget);
 
   const resolveTaskStatus = createStatusResolver(tasksById);
-
-  return Array.from(tasksById.values())
-    .filter((task) => isDisplayableTask(task, now))
+  const allTasks = Array.from(tasksById.values());
+  const displayableTasks = allTasks.filter((task) => isDisplayableTask(task, now));
+  const historyEntries = displayableTasks
     .map((task) => toHistoryEntry(task, task.type === "milestone" ? resolveTaskStatus(task.id) : task.status));
+  const statusCounts = historyEntries.reduce((acc, entry) => {
+    acc[entry.status] = (acc[entry.status] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const hiddenFutureTaskIds = allTasks
+    .filter((task) => task.type !== "project" && !isDisplayableTask(task, now))
+    .map((task) => task.id);
+
+  emitDebugLog(
+    "project-tasks-history-parser.ts:parseProjectTasksHistoryFromXml",
+    "Parsed tasks for task-tab status buckets",
+    "H1",
+    runId,
+    {
+      displayableTaskCount: displayableTasks.length,
+      hiddenFutureTaskCount: hiddenFutureTaskIds.length,
+      hiddenFutureTaskIds,
+      nowIso: now.toISOString(),
+      statusCounts,
+      totalTaskNodes: allTasks.length,
+    },
+  );
+
+  return historyEntries;
 }

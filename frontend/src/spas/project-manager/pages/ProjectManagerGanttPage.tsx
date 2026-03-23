@@ -324,6 +324,7 @@ function renderGanttWorkspace(
           ref={chartRef}
           chartSource={chartSource}
           displayMode={displayMode}
+          projectId={projectId}
           interactionsEnabled={canEdit}
           onBaselineReady={onBaselineReady}
           onEditorChange={onEditorChange}

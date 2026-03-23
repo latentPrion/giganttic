@@ -16,6 +16,7 @@ import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contract
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { appTheme } from "../../../theme/app-theme.js";
 import { injectGgtcTaskAttributesIntoSerializedXml } from "../lib/ggtc-dhtmlx-gantt-xml-serialize.js";
+import { GANTT_RUNTIME_CHART_UPDATED_EVENT } from "../lib/gantt-runtime-chart-events.js";
 import { ProjectManagerGanttPage } from "./ProjectManagerGanttPage.js";
 
 const TEST_TOKEN = "test-token";
@@ -547,6 +548,134 @@ describe("ProjectManagerGanttPage", () => {
       ggtc_task_description: "",
       ggtc_task_status: "ISSUE_STATUS_OPEN",
     });
+  });
+
+  it("re-infers milestone statuses on initial load", async () => {
+    serializedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_BLOCKED" progress="0"><![CDATA[Predecessor]]></task>
+  <task id="m1" type="milestone" start_date="2026-03-02 09:00" progress="0"><![CDATA[Milestone]]></task>
+  <link id="1" source="t1" target="m1" />
+</data>`;
+
+    mockGantt.getTask.mockImplementation((taskId: number | string) => {
+      if (taskId === "t1") {
+        return {
+          ggtc_task_closed_reason: "",
+          ggtc_task_description: "",
+          ggtc_task_status: "ISSUE_STATUS_BLOCKED",
+          id: taskId,
+          parent: 0,
+          start_date: new Date("2026-03-01T09:00:00.000Z"),
+          type: "task",
+        };
+      }
+
+      if (taskId === "m1") {
+        // Intentionally wrong so the inference must correct it.
+        return {
+          ggtc_task_closed_reason: "",
+          ggtc_task_description: "",
+          ggtc_task_status: "ISSUE_STATUS_IN_PROGRESS",
+          id: taskId,
+          parent: 0,
+          start_date: new Date("2026-03-02T09:00:00.000Z"),
+          type: "milestone",
+        };
+      }
+
+      return undefined as unknown as never;
+    });
+
+    mockGantt.updateTask.mockClear();
+    mockGantt.refreshTask.mockClear();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockGantt.updateTask).toHaveBeenCalledWith("m1");
+    expect(mockGantt.refreshTask).toHaveBeenCalledWith("m1");
+  });
+
+  it("re-infers milestone statuses and emits runtime chart update on lightbox save", async () => {
+    serializedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="0"><![CDATA[Predecessor]]></task>
+  <task id="m1" type="milestone" start_date="2026-03-02 09:00"><![CDATA[Milestone]]></task>
+  <link id="1" source="t1" target="m1" />
+</data>`;
+
+    const predecessorTask = {
+      ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
+      ggtc_task_status: "ISSUE_STATUS_OPEN",
+      id: "t1",
+      parent: 0,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: "task",
+    };
+    const milestoneTask = {
+      ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
+      ggtc_task_status: "ISSUE_STATUS_IN_PROGRESS",
+      id: "m1",
+      parent: 0,
+      start_date: new Date("2026-03-02T09:00:00.000Z"),
+      type: "milestone",
+    };
+
+    mockGantt.getTask.mockImplementation((taskId: number | string) => {
+      if (taskId === "t1") {
+        return predecessorTask;
+      }
+      if (taskId === "m1") {
+        return milestoneTask;
+      }
+
+      return undefined as unknown as never;
+    });
+
+    const emittedEvents: Event[] = [];
+    const listener = (event: Event) => emittedEvents.push(event);
+    window.addEventListener(GANTT_RUNTIME_CHART_UPDATED_EVENT, listener);
+
+    try {
+      renderWithTheme(
+        <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+      );
+
+      await waitFor(() => {
+        expect(mockGantt.init).toHaveBeenCalledTimes(1);
+      });
+
+      mockGantt.updateTask.mockClear();
+      mockGantt.refreshTask.mockClear();
+
+      predecessorTask.ggtc_task_status = "ISSUE_STATUS_CLOSED";
+
+      await act(async () => {
+        triggerGanttEvent("onLightboxSave", "t1", predecessorTask, true);
+      });
+
+      expect(mockGantt.updateTask).toHaveBeenCalledWith("m1");
+      expect(mockGantt.refreshTask).toHaveBeenCalledWith("m1");
+      expect(emittedEvents).toHaveLength(1);
+
+      const detail = (emittedEvents[0] as CustomEvent<{ serializedXml: string }>).detail;
+      // Ensure the edited task's status is reflected in the emitted runtime XML
+      // before milestone inference / bucketing runs.
+      expect(detail.serializedXml).toMatch(
+        /<task[^>]*id="t1"[^>]*ggtc_task_status="ISSUE_STATUS_CLOSED"/,
+      );
+      expect(detail.serializedXml).toMatch(/<task[^>]*id="m1"[^>]*ggtc_task_status="ISSUE_STATUS_CLOSED"/);
+    } finally {
+      window.removeEventListener(GANTT_RUNTIME_CHART_UPDATED_EVENT, listener);
+    }
   });
 
   it("injects GGTC extension attrs on onAfterTaskAdd when missing", async () => {

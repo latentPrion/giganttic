@@ -32,6 +32,35 @@ export interface UseGanttChartFileManagerResult {
 
 const DEFAULT_ERROR = "Unable to load that gantt chart right now.";
 const SAVE_ERROR = "Unable to save the gantt chart right now.";
+const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
+const DEBUG_SESSION_ID = "117825";
+
+function emitDebugLog(
+  location: string,
+  message: string,
+  hypothesisId: string,
+  runId: string,
+  data: Record<string, unknown>,
+): void {
+  // #region agent log
+  fetch(DEBUG_INGEST_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": DEBUG_SESSION_ID,
+    },
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+      runId,
+      hypothesisId,
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 export function useGanttChartFileManager(options: {
   ganttRef: React.RefObject<GanttChartHandle | null>;
@@ -50,6 +79,7 @@ export function useGanttChartFileManager(options: {
   const extensionsManagerRef = useRef(new GgtcDhtmlxGanttExtensionsManager());
 
   const loadChart = useCallback(async () => {
+    const runId = `gantt-load-${Date.now()}`;
     if (projectId === null) {
       setChartSource(null);
       setLoadErrorMessage(null);
@@ -73,6 +103,18 @@ export function useGanttChartFileManager(options: {
       if (loaded) {
         const normalizationResult = extensionsManagerRef.current.normalizeXmlTasksWithExtensionAttrs(
           loaded.content,
+        );
+        emitDebugLog(
+          "use-gantt-chart-file-manager.ts:loadChart",
+          "Loaded chart and normalized extension attributes",
+          "H4",
+          runId,
+          {
+            loadedType: loaded.type,
+            mutatedTaskIds: normalizationResult.mutatedTaskIds,
+            mutatedTaskCount: normalizationResult.mutatedTaskIds.length,
+            projectId,
+          },
         );
         setHasServerChart(true);
         setChartSource({
@@ -117,6 +159,7 @@ export function useGanttChartFileManager(options: {
    * `docs/gantt-chart-ggtc-extensions.md`.
    */
   const persistChart = useCallback(async (): Promise<PersistChartResult> => {
+    const runId = `gantt-persist-${Date.now()}`;
     if (projectId === null) {
       return {
         didPersist: false,
@@ -126,6 +169,17 @@ export function useGanttChartFileManager(options: {
     const xml = ganttRef.current?.getSerializedXml() ?? DEFAULT_PROJECT_CHART_XML;
     const missingExtensionAttributeReports = extensionsManagerRef.current.scanXmlForMissingExtensionAttrs(
       xml,
+    );
+    emitDebugLog(
+      "use-gantt-chart-file-manager.ts:persistChart",
+      "Persist preflight extension scan",
+      "H3",
+      runId,
+      {
+        missingReports: missingExtensionAttributeReports,
+        missingReportsCount: missingExtensionAttributeReports.length,
+        projectId,
+      },
     );
 
     setIsPersisting(true);

@@ -98,7 +98,14 @@ function createDownloadButtonLabel(
   isLoadingCapabilities: boolean,
 ): React.ReactNode {
   if (isLoadingCapabilities) {
-    return <CircularProgress color="inherit" size={18} />;
+    // Keep "Download" in the accessible name while loading so tests (and screen readers)
+    // don't lose the primary action label.
+    return (
+      <>
+        <CircularProgress color="inherit" size={18} />
+        {DOWNLOAD_BUTTON_LABEL}
+      </>
+    );
   }
 
   return DOWNLOAD_BUTTON_LABEL;

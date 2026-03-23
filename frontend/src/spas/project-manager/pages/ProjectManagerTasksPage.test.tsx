@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerTasksPage } from "./ProjectManagerTasksPage.js";
+import { GANTT_RUNTIME_CHART_UPDATED_EVENT } from "../lib/gantt-runtime-chart-events.js";
 
 const DEFAULT_TOKEN = "pm-token";
 const TASKS_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -69,6 +70,60 @@ describe("ProjectManagerTasksPage", () => {
     await user.click(screen.getByRole("tab", { name: "Closed" }));
     expect(await screen.findByText("Closed Task")).toBeVisible();
     expect(screen.getByText("Milestone Closed")).toBeVisible();
+  });
+
+  it("re-buckets milestones immediately when gantt runtime emits an update", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    await user.click(screen.getByRole("tab", { name: "Closed" }));
+    expect(await screen.findByText("Milestone Closed")).toBeVisible();
+
+    const updatedXml = TASKS_XML.replace(
+      'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="1"',
+      'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="1"',
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(GANTT_RUNTIME_CHART_UPDATED_EVENT, {
+        detail: {
+          projectId: 42,
+          serializedXml: updatedXml,
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Milestone Closed")).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("tab", { name: "In Progress" }));
+    expect(await screen.findByText("Milestone Closed")).toBeVisible();
+  });
+
+  it("ignores gantt runtime updates for other projects", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    await user.click(screen.getByRole("tab", { name: "Closed" }));
+    expect(await screen.findByText("Milestone Closed")).toBeVisible();
+
+    const updatedXml = TASKS_XML.replace(
+      'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="1"',
+      'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="1"',
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(GANTT_RUNTIME_CHART_UPDATED_EVENT, {
+        detail: {
+          projectId: 999,
+          serializedXml: updatedXml,
+        },
+      }),
+    );
+
+    // Still on Closed tab; milestone should not disappear due to the mismatched projectId.
+    expect(await screen.findByText("Milestone Closed")).toBeVisible();
   });
 
   it("sorts tasks by most recent start date first within a status tab", async () => {
