@@ -1,5 +1,6 @@
 export const GGTC_TASK_STATUS_ATTRIBUTE = "ggtc_task_status";
 export const GGTC_TASK_CLOSED_REASON_ATTRIBUTE = "ggtc_task_closed_reason";
+export const GGTC_TASK_DESCRIPTION_ATTRIBUTE = "ggtc_task_description";
 
 export const GGTC_TASK_STATUS_OPEN = "ISSUE_STATUS_OPEN";
 export const GGTC_TASK_STATUS_IN_PROGRESS = "ISSUE_STATUS_IN_PROGRESS";
@@ -32,6 +33,7 @@ interface XmlTaskElement {
 
 interface TaskLikeWithExtensions {
   ggtc_task_closed_reason?: string | null;
+  ggtc_task_description?: string | null;
   ggtc_task_status?: string | null;
 }
 
@@ -66,6 +68,11 @@ function isMissingRequiredClosedReasonAttribute(taskElement: XmlTaskElement): bo
   return closedReason === null;
 }
 
+function isMissingRequiredDescriptionAttribute(taskElement: XmlTaskElement): boolean {
+  const description = taskElement.getAttribute(GGTC_TASK_DESCRIPTION_ATTRIBUTE);
+  return description === null;
+}
+
 function collectMissingAttributes(taskElement: XmlTaskElement): string[] {
   const missingAttributes: string[] = [];
   if (isMissingRequiredStatusAttribute(taskElement)) {
@@ -73,6 +80,9 @@ function collectMissingAttributes(taskElement: XmlTaskElement): string[] {
   }
   if (isMissingRequiredClosedReasonAttribute(taskElement)) {
     missingAttributes.push(GGTC_TASK_CLOSED_REASON_ATTRIBUTE);
+  }
+  if (isMissingRequiredDescriptionAttribute(taskElement)) {
+    missingAttributes.push(GGTC_TASK_DESCRIPTION_ATTRIBUTE);
   }
   return missingAttributes;
 }
@@ -90,6 +100,11 @@ function normalizeTaskElementAttributes(taskElement: XmlTaskElement): boolean {
     mutated = true;
   }
 
+  if (isMissingRequiredDescriptionAttribute(taskElement)) {
+    taskElement.setAttribute(GGTC_TASK_DESCRIPTION_ATTRIBUTE, "");
+    mutated = true;
+  }
+
   return mutated;
 }
 
@@ -103,6 +118,10 @@ function shouldSetRuntimeStatus(task: TaskLikeWithExtensions): boolean {
 
 function shouldSetRuntimeClosedReason(task: TaskLikeWithExtensions): boolean {
   return task.ggtc_task_closed_reason === null || task.ggtc_task_closed_reason === undefined;
+}
+
+function shouldSetRuntimeDescription(task: TaskLikeWithExtensions): boolean {
+  return task.ggtc_task_description === null || task.ggtc_task_description === undefined;
 }
 
 export class GgtcDhtmlxGanttExtensionsManager {
@@ -159,6 +178,11 @@ export class GgtcDhtmlxGanttExtensionsManager {
 
     if (shouldSetRuntimeClosedReason(task)) {
       task.ggtc_task_closed_reason = GGTC_TASK_CLOSED_REASON_NONE;
+      mutated = true;
+    }
+
+    if (shouldSetRuntimeDescription(task)) {
+      task.ggtc_task_description = "";
       mutated = true;
     }
 

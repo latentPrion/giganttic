@@ -7,7 +7,17 @@ import React, {
 import { Box } from "@mui/material";
 
 import { getDhtmlxGantt } from "../lib/dhtmlx-gantt-adapter.js";
-import { GgtcDhtmlxGanttExtensionsManager } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
+import {
+  GGTC_TASK_CLOSED_REASON_CANTFIX,
+  GGTC_TASK_CLOSED_REASON_NONE,
+  GGTC_TASK_CLOSED_REASON_RESOLVED,
+  GGTC_TASK_CLOSED_REASON_WONTFIX,
+  GGTC_TASK_STATUS_BLOCKED,
+  GGTC_TASK_STATUS_CLOSED,
+  GGTC_TASK_STATUS_IN_PROGRESS,
+  GGTC_TASK_STATUS_OPEN,
+  GgtcDhtmlxGanttExtensionsManager,
+} from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import type {
   GanttChartHandle,
   GanttSelectedTask,
@@ -56,6 +66,8 @@ const GANTT_GRID_WIDTH =
   + GANTT_ADD_COLUMN_WIDTH + GANTT_GRID_PADDING_WIDTH;
 const LIGHTBOX_DESCRIPTION_HEIGHT = 70;
 const LIGHTBOX_PARENT_HEIGHT = 28;
+const LIGHTBOX_GGTC_TEXTAREA_HEIGHT = 70;
+const LIGHTBOX_GGTC_SELECT_HEIGHT = 28;
 const LIGHTBOX_TIME_HEIGHT = 72;
 
 interface GanttLayoutCell {
@@ -93,7 +105,13 @@ interface GanttLightboxSection {
   height: number;
   map_to: string;
   name: string;
+  options?: GanttLightboxSelectOption[];
   type: string;
+}
+
+interface GanttLightboxSelectOption {
+  key: string;
+  label: string;
 }
 
 type GanttInlineEditors = {
@@ -107,6 +125,7 @@ type GanttTaskLike = {
   duration?: number;
   end_date?: Date | string;
   ggtc_task_closed_reason?: string | null;
+  ggtc_task_description?: string | null;
   ggtc_task_status?: string | null;
   open?: boolean | "true" | "false";
   parent?: GanttTaskId | 0 | "" | null;
@@ -142,6 +161,24 @@ const TASK_EXTENSION_EVENT_NAMES: string[] = [
   "onAfterTaskUpdate",
 ];
 const ggtcExtensionsManager = new GgtcDhtmlxGanttExtensionsManager();
+
+function createGgtcStatusOptions(): GanttLightboxSelectOption[] {
+  return [
+    { key: GGTC_TASK_STATUS_OPEN, label: "Open" },
+    { key: GGTC_TASK_STATUS_IN_PROGRESS, label: "In Progress" },
+    { key: GGTC_TASK_STATUS_BLOCKED, label: "Blocked" },
+    { key: GGTC_TASK_STATUS_CLOSED, label: "Closed" },
+  ];
+}
+
+function createGgtcClosedReasonOptions(): GanttLightboxSelectOption[] {
+  return [
+    { key: GGTC_TASK_CLOSED_REASON_NONE, label: "None" },
+    { key: GGTC_TASK_CLOSED_REASON_RESOLVED, label: "Resolved" },
+    { key: GGTC_TASK_CLOSED_REASON_WONTFIX, label: "Won't fix" },
+    { key: GGTC_TASK_CLOSED_REASON_CANTFIX, label: "Can't fix" },
+  ];
+}
 
 function createInlineEditors(): GanttInlineEditors {
   return {
@@ -229,6 +266,9 @@ function createGridColumns(
 }
 
 function createDefaultLightboxSections(): GanttLightboxSection[] {
+  const statusOptions = createGgtcStatusOptions();
+  const closedReasonOptions = createGgtcClosedReasonOptions();
+
   return [
     {
       focus: true,
@@ -236,6 +276,26 @@ function createDefaultLightboxSections(): GanttLightboxSection[] {
       map_to: "text",
       name: "description",
       type: "textarea",
+    },
+    {
+      height: LIGHTBOX_GGTC_TEXTAREA_HEIGHT,
+      map_to: "ggtc_task_description",
+      name: "ggtc description",
+      type: "textarea",
+    },
+    {
+      height: LIGHTBOX_GGTC_SELECT_HEIGHT,
+      map_to: "ggtc_task_status",
+      name: "ggtc status",
+      options: statusOptions,
+      type: "select",
+    },
+    {
+      height: LIGHTBOX_GGTC_SELECT_HEIGHT,
+      map_to: "ggtc_task_closed_reason",
+      name: "ggtc closed reason",
+      options: closedReasonOptions,
+      type: "select",
     },
     {
       height: LIGHTBOX_PARENT_HEIGHT,

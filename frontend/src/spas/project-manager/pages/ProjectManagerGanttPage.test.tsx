@@ -32,7 +32,7 @@ const mockCapabilities = {
   },
 };
 const mockChartSource = {
-  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"><![CDATA[Repo chart task]]></task></data>",
+  content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\" ggtc_task_description=\"\"><![CDATA[Repo chart task]]></task></data>",
   type: "xml" as const,
 };
 const getProjectChartExportCapabilitiesMock = vi.fn();
@@ -277,6 +277,7 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.getTask.mockClear();
     mockGantt.getTask.mockImplementation((taskId: number | string) => ({
       ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
       ggtc_task_status: "ISSUE_STATUS_OPEN",
       id: taskId,
       parent: 0,
@@ -368,6 +369,32 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.config.lightbox.sections).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ map_to: "text", name: "description", type: "textarea" }),
+        expect.objectContaining({
+          map_to: "ggtc_task_description",
+          name: "ggtc description",
+          type: "textarea",
+        }),
+        expect.objectContaining({
+          map_to: "ggtc_task_status",
+          name: "ggtc status",
+          type: "select",
+          options: expect.arrayContaining([
+            expect.objectContaining({ key: "ISSUE_STATUS_OPEN", label: "Open" }),
+            expect.objectContaining({ key: "ISSUE_STATUS_CLOSED", label: "Closed" }),
+          ]),
+        }),
+        expect.objectContaining({
+          map_to: "ggtc_task_closed_reason",
+          name: "ggtc closed reason",
+          type: "select",
+          options: expect.arrayContaining([
+            expect.objectContaining({ key: "", label: "None" }),
+            expect.objectContaining({
+              key: "ISSUE_CLOSED_REASON_RESOLVED",
+              label: "Resolved",
+            }),
+          ]),
+        }),
         expect.objectContaining({ map_to: "parent", name: "parent", type: "parent" }),
         expect.objectContaining({ map_to: "auto", name: "time", type: "duration" }),
       ]),
@@ -379,6 +406,32 @@ describe("ProjectManagerGanttPage", () => {
       mockChartSource.type,
     ]);
     expect(mockGantt.serialize).toHaveBeenCalledWith("xml");
+  });
+
+  it("configures GGTC lightbox extension fields for task, project, and milestone editors", async () => {
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    const expectedMaps = ["ggtc_task_description", "ggtc_task_status", "ggtc_task_closed_reason"];
+    const sectionGroups = [
+      mockGantt.config.lightbox.sections,
+      mockGantt.config.lightbox.project_sections,
+      mockGantt.config.lightbox.milestone_sections,
+    ];
+
+    for (const sections of sectionGroups) {
+      expect(Array.isArray(sections)).toBe(true);
+      for (const mapTo of expectedMaps) {
+        expect(sections).toEqual(
+          expect.arrayContaining([expect.objectContaining({ map_to: mapTo })]),
+        );
+      }
+    }
   });
 
   it("shows a missing-chart message when the backend has no chart file", async () => {
@@ -491,6 +544,7 @@ describe("ProjectManagerGanttPage", () => {
     expect(lightboxTask.parent).toBe(0);
     expect(lightboxTask).toMatchObject({
       ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
       ggtc_task_status: "ISSUE_STATUS_OPEN",
     });
   });
@@ -518,6 +572,7 @@ describe("ProjectManagerGanttPage", () => {
 
     expect(newTask).toMatchObject({
       ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
       ggtc_task_status: "ISSUE_STATUS_OPEN",
     });
     expect(mockGantt.updateTask).toHaveBeenCalledWith(9101);
@@ -539,6 +594,7 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.getTask.mockImplementation((taskId: number | string) => {
       if (taskId === 1001) {
         return {
+          ggtc_task_description: "",
           id: 1001,
           parent: 0,
           start_date: new Date("2026-03-01T09:00:00.000Z"),
@@ -547,6 +603,7 @@ describe("ProjectManagerGanttPage", () => {
       }
       return {
         ggtc_task_closed_reason: "",
+        ggtc_task_description: "",
         ggtc_task_status: "ISSUE_STATUS_OPEN",
         id: taskId,
         parent: 0,
@@ -577,6 +634,7 @@ describe("ProjectManagerGanttPage", () => {
 
     const completeTask = {
       ggtc_task_closed_reason: "ISSUE_CLOSED_REASON_RESOLVED",
+      ggtc_task_description: "Already complete",
       ggtc_task_status: "ISSUE_STATUS_CLOSED",
       parent: 0,
       text: "Already complete",
@@ -608,7 +666,7 @@ describe("ProjectManagerGanttPage", () => {
       expect(putProjectChartMock).toHaveBeenCalledWith(
         TEST_TOKEN,
         42,
-        "<data><task id=\"5000\" parent=\"0\" start_date=\"2026-03-22 00:00\" duration=\"1\" type=\"task\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"><![CDATA[Kekw]]></task></data>",
+        "<data><task id=\"5000\" parent=\"0\" start_date=\"2026-03-22 00:00\" duration=\"1\" type=\"task\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\" ggtc_task_description=\"\"><![CDATA[Kekw]]></task></data>",
       );
     });
   });
@@ -770,6 +828,7 @@ describe("ProjectManagerGanttPage", () => {
       expect(lastParseCall?.[0]).toContain("id=\"1002\"");
       expect(lastParseCall?.[0]).toContain("ggtc_task_status=\"ISSUE_STATUS_OPEN\"");
       expect(lastParseCall?.[0]).toContain("ggtc_task_closed_reason=\"\"");
+      expect(lastParseCall?.[0]).toContain("ggtc_task_description=\"\"");
     });
 
     expect(screen.queryByTestId("gantt-save-status-unsaved")).not.toBeInTheDocument();
@@ -1117,6 +1176,7 @@ describe("ProjectManagerGanttPage", () => {
       );
       expect(matchingCall?.[0]).toContain("ggtc_task_status=\"ISSUE_STATUS_OPEN\"");
       expect(matchingCall?.[0]).toContain("ggtc_task_closed_reason=\"\"");
+      expect(matchingCall?.[0]).toContain("ggtc_task_description=\"\"");
     });
   });
 

@@ -1,5 +1,6 @@
 import {
   GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+  GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
 } from "./ggtc-dhtmlx-gantt-extensions-manager.js";
 
@@ -13,6 +14,7 @@ export interface GanttInstanceForGgtcXmlInjection {
 
 type GanttRuntimeTaskForXmlSerialization = {
   ggtc_task_closed_reason?: string | null;
+  ggtc_task_description?: string | null;
   ggtc_task_status?: string | null;
   type?: string;
 };
@@ -63,6 +65,7 @@ function mergeRuntimeTaskFieldsIntoTaskElement(
   setTaskNodeTypeAttribute(taskElement, runtimeTask.type);
   setTaskNodeAttribute(taskElement, GGTC_TASK_STATUS_ATTRIBUTE, runtimeTask.ggtc_task_status);
   setTaskNodeAttribute(taskElement, GGTC_TASK_CLOSED_REASON_ATTRIBUTE, runtimeTask.ggtc_task_closed_reason);
+  setTaskNodeAttribute(taskElement, GGTC_TASK_DESCRIPTION_ATTRIBUTE, runtimeTask.ggtc_task_description);
 }
 
 /**

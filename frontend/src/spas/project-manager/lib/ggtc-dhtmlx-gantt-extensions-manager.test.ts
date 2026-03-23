@@ -4,13 +4,14 @@ import {
   GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
   GGTC_TASK_CLOSED_REASON_CANTFIX,
   GGTC_TASK_CLOSED_REASON_NONE,
+  GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
   GGTC_TASK_STATUS_IN_PROGRESS,
   GGTC_TASK_STATUS_OPEN,
   GgtcDhtmlxGanttExtensionsManager,
 } from "./ggtc-dhtmlx-gantt-extensions-manager.js";
 
-const BASELINE_XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1\"><![CDATA[Task A]]></task><task id=\"2\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\"><![CDATA[Task B]]></task><task id=\"3\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\"><![CDATA[Task C]]></task><task id=\"4\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\"><![CDATA[Task D]]></task></data>";
+const BASELINE_XML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1\"><![CDATA[Task A]]></task><task id=\"2\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\"><![CDATA[Task B]]></task><task id=\"3\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\"><![CDATA[Task C]]></task><task id=\"4\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\" ggtc_task_description=\"Task D note\"><![CDATA[Task D]]></task></data>";
 
 function parseXml(xml: string): XMLDocument {
   return new DOMParser().parseFromString(xml, "application/xml");
@@ -32,21 +33,24 @@ describe("GgtcDhtmlxGanttExtensionsManager", () => {
     expect(getTaskAttribute(result.xml, "1", GGTC_TASK_CLOSED_REASON_ATTRIBUTE)).toBe(
       GGTC_TASK_CLOSED_REASON_NONE,
     );
+    expect(getTaskAttribute(result.xml, "1", GGTC_TASK_DESCRIPTION_ATTRIBUTE)).toBe("");
     expect(getTaskAttribute(result.xml, "2", GGTC_TASK_STATUS_ATTRIBUTE)).toBe(
       GGTC_TASK_STATUS_IN_PROGRESS,
     );
     expect(getTaskAttribute(result.xml, "2", GGTC_TASK_CLOSED_REASON_ATTRIBUTE)).toBe(
       GGTC_TASK_CLOSED_REASON_NONE,
     );
+    expect(getTaskAttribute(result.xml, "2", GGTC_TASK_DESCRIPTION_ATTRIBUTE)).toBe("");
     expect(getTaskAttribute(result.xml, "3", GGTC_TASK_STATUS_ATTRIBUTE)).toBe(GGTC_TASK_STATUS_OPEN);
     expect(getTaskAttribute(result.xml, "3", GGTC_TASK_CLOSED_REASON_ATTRIBUTE)).toBe(
       GGTC_TASK_CLOSED_REASON_CANTFIX,
     );
+    expect(getTaskAttribute(result.xml, "3", GGTC_TASK_DESCRIPTION_ATTRIBUTE)).toBe("");
   });
 
   it("returns source xml unchanged when no attrs are missing", () => {
     const manager = new GgtcDhtmlxGanttExtensionsManager();
-    const completeXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"4\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\"><![CDATA[Task D]]></task></data>";
+    const completeXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"4\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\" ggtc_task_closed_reason=\"ISSUE_CLOSED_REASON_CANTFIX\" ggtc_task_description=\"Task D note\"><![CDATA[Task D]]></task></data>";
 
     const result = manager.normalizeXmlTasksWithExtensionAttrs(completeXml);
 
@@ -61,15 +65,19 @@ describe("GgtcDhtmlxGanttExtensionsManager", () => {
 
     expect(reports).toEqual([
       {
-        missingAttributes: [GGTC_TASK_STATUS_ATTRIBUTE, GGTC_TASK_CLOSED_REASON_ATTRIBUTE],
+        missingAttributes: [
+          GGTC_TASK_STATUS_ATTRIBUTE,
+          GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+          GGTC_TASK_DESCRIPTION_ATTRIBUTE,
+        ],
         taskId: "1",
       },
       {
-        missingAttributes: [GGTC_TASK_CLOSED_REASON_ATTRIBUTE],
+        missingAttributes: [GGTC_TASK_CLOSED_REASON_ATTRIBUTE, GGTC_TASK_DESCRIPTION_ATTRIBUTE],
         taskId: "2",
       },
       {
-        missingAttributes: [GGTC_TASK_STATUS_ATTRIBUTE],
+        missingAttributes: [GGTC_TASK_STATUS_ATTRIBUTE, GGTC_TASK_DESCRIPTION_ATTRIBUTE],
         taskId: "3",
       },
     ]);
@@ -84,6 +92,7 @@ describe("GgtcDhtmlxGanttExtensionsManager", () => {
     expect(mutated).toBe(true);
     expect(task).toMatchObject({
       ggtc_task_closed_reason: GGTC_TASK_CLOSED_REASON_NONE,
+      ggtc_task_description: "",
       ggtc_task_status: GGTC_TASK_STATUS_OPEN,
     });
   });
@@ -92,6 +101,7 @@ describe("GgtcDhtmlxGanttExtensionsManager", () => {
     const manager = new GgtcDhtmlxGanttExtensionsManager();
     const task = {
       ggtc_task_closed_reason: GGTC_TASK_CLOSED_REASON_CANTFIX,
+      ggtc_task_description: "already set",
       ggtc_task_status: GGTC_TASK_STATUS_IN_PROGRESS,
     };
 
@@ -100,6 +110,7 @@ describe("GgtcDhtmlxGanttExtensionsManager", () => {
     expect(mutated).toBe(false);
     expect(task).toEqual({
       ggtc_task_closed_reason: GGTC_TASK_CLOSED_REASON_CANTFIX,
+      ggtc_task_description: "already set",
       ggtc_task_status: GGTC_TASK_STATUS_IN_PROGRESS,
     });
   });

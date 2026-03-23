@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+  GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
   GgtcDhtmlxGanttExtensionsManager,
 } from "./ggtc-dhtmlx-gantt-extensions-manager.js";
@@ -13,6 +14,7 @@ describe("injectGgtcTaskAttributesIntoSerializedXml", () => {
     const ganttStub = {
       getTask: (id: string | number) => ({
         ggtc_task_closed_reason: "",
+        ggtc_task_description: "Task details",
         ggtc_task_status: "ISSUE_STATUS_OPEN",
         id,
         type: "milestone",
@@ -24,6 +26,7 @@ describe("injectGgtcTaskAttributesIntoSerializedXml", () => {
     expect(result).toContain("type=\"milestone\"");
     expect(result).toContain(`${GGTC_TASK_STATUS_ATTRIBUTE}=\"ISSUE_STATUS_OPEN\"`);
     expect(result).toContain(`${GGTC_TASK_CLOSED_REASON_ATTRIBUTE}=\"\"`);
+    expect(result).toContain(`${GGTC_TASK_DESCRIPTION_ATTRIBUTE}=\"Task details\"`);
   });
 
   it("returns the original string when XML does not parse", () => {
@@ -51,7 +54,11 @@ describe("injectGgtcTaskAttributesIntoSerializedXml", () => {
     expect(result).toContain("type=\"task\"");
     expect(reports.length).toBeGreaterThan(0);
     expect(reports[0]?.missingAttributes).toEqual(
-      expect.arrayContaining([GGTC_TASK_STATUS_ATTRIBUTE, GGTC_TASK_CLOSED_REASON_ATTRIBUTE]),
+      expect.arrayContaining([
+        GGTC_TASK_STATUS_ATTRIBUTE,
+        GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+        GGTC_TASK_DESCRIPTION_ATTRIBUTE,
+      ]),
     );
   });
 
@@ -60,6 +67,7 @@ describe("injectGgtcTaskAttributesIntoSerializedXml", () => {
     const ganttStub = {
       getTask: () => ({
         ggtc_task_closed_reason: "",
+        ggtc_task_description: "Task details",
         ggtc_task_status: "ISSUE_STATUS_OPEN",
         id: 3,
         type: "task",
