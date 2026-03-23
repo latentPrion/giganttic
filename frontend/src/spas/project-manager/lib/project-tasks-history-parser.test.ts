@@ -61,6 +61,60 @@ describe("project tasks history parser", () => {
     expect(milestone?.status).toBe("ISSUE_STATUS_BLOCKED");
   });
 
+  it("infers milestone blocked when a transitive predecessor task is blocked", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_BLOCKED"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T2]]></task>
+  <task id="t3" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T3]]></task>
+  <task id="m" type="milestone" start_date="2026-03-02 00:00"><![CDATA[Milestone]]></task>
+
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="t3" />
+  <link id="3" source="t3" target="m" />
+</data>`;
+
+    const tasks = parseProjectTasksHistoryFromXml(xml, NOW);
+    const milestone = tasks.find((task) => task.id === "m");
+    expect(milestone?.status).toBe("ISSUE_STATUS_BLOCKED");
+  });
+
+  it("infers milestone closed only when all transitive predecessors are closed", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T2]]></task>
+  <task id="t3" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T3]]></task>
+  <task id="m" type="milestone" start_date="2026-03-02 00:00"><![CDATA[Milestone]]></task>
+
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="t3" />
+  <link id="3" source="t3" target="m" />
+</data>`;
+
+    const tasks = parseProjectTasksHistoryFromXml(xml, NOW);
+    const milestone = tasks.find((task) => task.id === "m");
+    expect(milestone?.status).toBe("ISSUE_STATUS_CLOSED");
+  });
+
+  it("infers milestone in progress when transitive predecessors include open/in-progress", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_OPEN"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T2]]></task>
+  <task id="t3" type="task" start_date="2026-03-01 00:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[T3]]></task>
+  <task id="m" type="milestone" start_date="2026-03-02 00:00"><![CDATA[Milestone]]></task>
+
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="t3" />
+  <link id="3" source="t3" target="m" />
+</data>`;
+
+    const tasks = parseProjectTasksHistoryFromXml(xml, NOW);
+    const milestone = tasks.find((task) => task.id === "m");
+    expect(milestone?.status).toBe("ISSUE_STATUS_IN_PROGRESS");
+  });
+
   it("infers milestone closed only when all dependencies are closed", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <data>

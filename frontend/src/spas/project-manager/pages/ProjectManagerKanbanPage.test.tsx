@@ -7,6 +7,8 @@ import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { issuesApi } from "../api/issues-api.js";
 import { ProjectManagerKanbanPage } from "./ProjectManagerKanbanPage.js";
+import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
+import { emitGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-events.js";
 
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
@@ -60,6 +62,7 @@ function getColumn(columnName: "Open" | "In Progress" | "Blocked" | "Closed") {
 
 describe("ProjectManagerKanbanPage", () => {
   beforeEach(() => {
+    clearGanttRuntimeChartCache();
     issuesApiMock.listIssues.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
@@ -91,7 +94,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     expect(within(getColumn("Open")).getByText("Open issue")).toBeVisible();
     expect(within(getColumn("In Progress")).getByText("Progress issue")).toBeVisible();
-    expect(within(getColumn("In Progress")).getByText("Started task")).toBeVisible();
+    expect(await within(getColumn("In Progress")).findByText("Started task")).toBeVisible();
     expect(within(getColumn("Blocked")).getByText("Blocked issue")).toBeVisible();
     expect(within(getColumn("Closed")).getByText("Closed issue")).toBeVisible();
   });
@@ -112,6 +115,35 @@ describe("ProjectManagerKanbanPage", () => {
 
     expect(await screen.findByText("Open issue")).toBeVisible();
     expect(screen.queryByText("Started task")).not.toBeInTheDocument();
+  });
+
+  it("initializes kanban gantt tasks from cached gantt runtime xml when update happened before mount", async () => {
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: ACTIVE_GANTT_XML,
+    });
+
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(await screen.findByText("Started task")).toBeVisible();
+    expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
+  });
+
+  it("re-renders kanban gantt tasks when gantt runtime cache updates while mounted", async () => {
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(await screen.findByText("Started task")).toBeVisible();
+
+    const completedStartedTaskXml = ACTIVE_GANTT_XML.replace('id="101" start_date="2000-03-03 09:00" progress="0.65"', 'id="101" start_date="2000-03-03 09:00" progress="1"');
+
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: completedStartedTaskXml,
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Started task")).not.toBeInTheDocument();
+    });
   });
 
   it("shows an error when issue loading fails", async () => {

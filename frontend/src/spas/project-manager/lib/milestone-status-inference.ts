@@ -80,6 +80,50 @@ function sanitizePredecessorIds(taskId: string, predecessorIds: readonly string[
   return removeSelfDependency(taskId, predecessorIds);
 }
 
+function collectTransitivePredecessorIds(
+  taskId: string,
+  directPredecessorIds: readonly string[],
+  tasksById: ReadonlyMap<string, MilestoneInferenceTaskLike>,
+): string[] {
+  const visited = new Set<string>();
+  const result = new Set<string>();
+
+  // Stack-based traversal so we don't depend on recursion depth.
+  const stack: string[] = [...directPredecessorIds];
+  visited.add(taskId);
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    if (current === taskId) {
+      continue;
+    }
+
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    result.add(current);
+
+    const node = tasksById.get(current);
+    if (!node) {
+      continue;
+    }
+
+    for (const predecessorId of node.predecessorIds) {
+      if (predecessorId === taskId) {
+        continue;
+      }
+      stack.push(predecessorId);
+    }
+  }
+
+  return Array.from(result);
+}
+
 export function inferMilestoneStatus(
   taskId: string,
   context: MilestoneStatusInferenceContext,
@@ -90,7 +134,9 @@ export function inferMilestoneStatus(
     return STATUS_IN_PROGRESS;
   }
 
-  const predecessorIds = sanitizePredecessorIds(taskId, task.predecessorIds);
+  const directPredecessorIds = sanitizePredecessorIds(taskId, task.predecessorIds);
+  const predecessorIds = collectTransitivePredecessorIds(taskId, directPredecessorIds, context.tasksById);
+
   const predecessorStatuses = predecessorIds.map((predecessorId) => ({
     predecessorId,
     status: context.resolveTaskStatus(predecessorId),

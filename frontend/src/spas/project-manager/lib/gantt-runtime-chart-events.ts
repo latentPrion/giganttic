@@ -1,3 +1,5 @@
+import { setGanttRuntimeChartCacheEntry } from "./gantt-runtime-chart-cache.js";
+
 export const GANTT_RUNTIME_CHART_UPDATED_EVENT = "gantt-runtime-chart-updated";
 
 export interface GanttRuntimeChartUpdatedEventDetail {
@@ -15,6 +17,8 @@ export function emitGanttRuntimeChartUpdatedEvent(
   if (typeof window === "undefined") {
     return;
   }
+
+  setGanttRuntimeChartCacheEntry(detail.projectId, { serializedXml: detail.serializedXml, type: "xml" });
 
   window.dispatchEvent(
     new CustomEvent<GanttRuntimeChartUpdatedEventDetail>(GANTT_RUNTIME_CHART_UPDATED_EVENT, {

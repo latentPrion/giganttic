@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -12,7 +12,6 @@ import {
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
-import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { TaskListItem } from "../components/tasks/TaskListItem.js";
 import type { IssueStatus } from "../contracts/issue.contracts.js";
@@ -20,10 +19,8 @@ import {
   type ParsedProjectTaskHistoryEntry,
   parseProjectTasksHistoryFromXml,
 } from "../lib/project-tasks-history-parser.js";
-import {
-  subscribeGanttRuntimeChartUpdatedEvent,
-  type GanttRuntimeChartUpdatedEventDetail,
-} from "../lib/gantt-runtime-chart-events.js";
+import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
+import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 
 interface ProjectManagerTasksPageProps {
   projectId: number | null;
@@ -63,28 +60,16 @@ function filterTasksByStatus(
 }
 
 export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
+  const ganttRef = useRef<GanttChartHandle | null>(null);
+  const fileManager = useGanttChartFileManager({
+    ganttRef,
+    projectId: props.projectId,
+    token: props.token,
+  });
+
   const [activeStatusTab, setActiveStatusTab] = useState<IssueStatus>(STATUS_TAB_IN_PROGRESS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(props.projectId !== null);
   const [tasks, setTasks] = useState<ParsedProjectTaskHistoryEntry[]>([]);
-
-  useEffect(() => {
-    if (props.projectId === null) {
-      return undefined;
-    }
-
-    const unsubscribe = subscribeGanttRuntimeChartUpdatedEvent((detail: GanttRuntimeChartUpdatedEventDetail) => {
-      if (detail.projectId !== props.projectId) {
-        return;
-      }
-
-      setErrorMessage(null);
-      setIsLoading(false);
-      setTasks(parseProjectTasksHistoryFromXml(detail.serializedXml));
-    });
-
-    return () => unsubscribe();
-  }, [props.projectId]);
 
   const visibleTasks = useMemo(
     () => sortTasksByMostRecentStartDate(filterTasksByStatus(tasks, activeStatusTab)),
@@ -94,55 +79,41 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
   useEffect(() => {
     if (props.projectId === null) {
       setErrorMessage(null);
-      setIsLoading(false);
       setTasks([]);
       return;
     }
 
-    let isMounted = true;
-
-    async function loadTasks(): Promise<void> {
-      setErrorMessage(null);
-      setIsLoading(true);
-
-      try {
-        const chartSource = await ganttApi.getProjectChartOrNull(props.token, props.projectId!);
-        if (!isMounted) {
-          return;
-        }
-
-        if (!chartSource) {
-          setTasks([]);
-          return;
-        }
-
-        setTasks(parseProjectTasksHistoryFromXml(chartSource.content));
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-        setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
-        setTasks([]);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+    if (fileManager.loadErrorMessage) {
+      setErrorMessage(fileManager.loadErrorMessage);
+      setTasks([]);
+      return;
     }
 
-    void loadTasks();
+    if (fileManager.cache.serializedXml === null) {
+      setErrorMessage(null);
+      setTasks([]);
+      return;
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [props.projectId, props.token]);
+    try {
+      setErrorMessage(null);
+      setTasks(parseProjectTasksHistoryFromXml(fileManager.cache.serializedXml));
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      setTasks([]);
+    }
+  }, [
+    fileManager.cache.serializedXml,
+    fileManager.loadErrorMessage,
+    props.projectId,
+  ]);
 
   function renderContent() {
     if (props.projectId === null) {
       return <Alert severity="info">{MISSING_PROJECT_MESSAGE}</Alert>;
     }
 
-    if (isLoading) {
+    if (fileManager.isLoading) {
       return (
         <Stack alignItems="center" direction="row" spacing={1.5}>
           <CircularProgress size={20} />

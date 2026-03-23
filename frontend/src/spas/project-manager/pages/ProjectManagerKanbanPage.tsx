@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -9,7 +9,6 @@ import {
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
-import { ganttApi } from "../api/gantt-api.js";
 import { KanbanBoard } from "../components/kanban/KanbanBoard.js";
 import { createKanbanColumns } from "../components/kanban/kanban-models.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
@@ -18,6 +17,8 @@ import {
   parseProjectKanbanTasksFromXml,
   type ParsedGanttKanbanTask,
 } from "../lib/project-kanban-gantt-parser.js";
+import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
+import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 
 interface ProjectManagerKanbanPageProps {
   projectId: number | null;
@@ -38,18 +39,14 @@ function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? "None" : `${projectId}`;
 }
 
-async function loadGanttTasks(
-  token: string,
-  projectId: number,
-): Promise<ParsedGanttKanbanTask[]> {
-  const chartSource = await ganttApi.getProjectChartOrNull(token, projectId);
-  if (chartSource === null) {
-    return [];
-  }
-  return parseProjectKanbanTasksFromXml(chartSource.content);
-}
-
 export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
+  const ganttRef = useRef<GanttChartHandle | null>(null);
+  const fileManager = useGanttChartFileManager({
+    ganttRef,
+    projectId: props.projectId,
+    token: props.token,
+  });
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -71,53 +68,72 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       return;
     }
 
-    const resolvedProjectId = projectId;
+    // Keep issues loading independent from chart-cache loading.
+    setIsLoading(true);
+    setErrorMessage(null);
+
     let isMounted = true;
-
-    async function loadKanbanData(): Promise<void> {
-      setErrorMessage(null);
-      setIsLoading(true);
-
-      try {
-        const [issuesResponse, ganttTasks] = await Promise.all([
-          issuesApi.listIssues(token, resolvedProjectId),
-          loadGanttTasks(token, resolvedProjectId),
-        ]);
-
+    issuesApi
+      .listIssues(token, projectId)
+      .then((issuesResponse) => {
         if (!isMounted) {
           return;
         }
-
         setIssues(issuesResponse.issues);
-        setTasks(ganttTasks);
-      } catch (error) {
+      })
+      .catch((error) => {
         if (!isMounted) {
           return;
         }
-
         setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
         setIssues([]);
-        setTasks([]);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
+      })
+      .finally(() => {
+        if (!isMounted) {
+          return;
         }
-      }
-    }
-
-    void loadKanbanData();
+        setIsLoading(false);
+      });
 
     return () => {
       isMounted = false;
     };
   }, [props.projectId, props.token]);
 
+  useEffect(() => {
+    if (props.projectId === null) {
+      return;
+    }
+
+    if (fileManager.loadErrorMessage) {
+      setErrorMessage(fileManager.loadErrorMessage);
+      setTasks([]);
+      return;
+    }
+
+    if (fileManager.cache.serializedXml === null) {
+      setTasks([]);
+      return;
+    }
+
+    try {
+      setTasks(parseProjectKanbanTasksFromXml(fileManager.cache.serializedXml));
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      setTasks([]);
+    }
+  }, [
+    fileManager.cache.serializedXml,
+    fileManager.loadErrorMessage,
+    props.projectId,
+  ]);
+
   function renderContent() {
     if (props.projectId === null) {
       return <Alert severity="info">{MISSING_PROJECT_MESSAGE}</Alert>;
     }
 
-    if (isLoading) {
+    if (isLoading || fileManager.isLoading) {
       return (
         <Stack alignItems="center" direction="row" spacing={1.5}>
           <CircularProgress size={20} />

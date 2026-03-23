@@ -48,6 +48,48 @@ describe("milestone status inference", () => {
     expect(status).toBe("ISSUE_STATUS_IN_PROGRESS");
   });
 
+  it("returns blocked when a transitive predecessor task is blocked", () => {
+    // m1 depends on t3, which depends on t2, which depends on t1.
+    // Only t1 is blocked; the milestone should still become blocked.
+    const tasksById = new Map([
+      ["m1", { id: "m1", predecessorIds: ["t3"], type: "milestone" as const }],
+      ["t3", { id: "t3", predecessorIds: ["t2"], type: "task" as const }],
+      ["t2", { id: "t2", predecessorIds: ["t1"], type: "task" as const }],
+      ["t1", { id: "t1", predecessorIds: [], type: "task" as const }],
+    ]);
+
+    const resolveTaskStatus = (taskId: string) => {
+      if (taskId === "t1") {
+        return "ISSUE_STATUS_BLOCKED";
+      }
+
+      return "ISSUE_STATUS_CLOSED";
+    };
+
+    const status = inferMilestoneStatus("m1", { resolveTaskStatus, tasksById });
+    expect(status).toBe("ISSUE_STATUS_BLOCKED");
+  });
+
+  it("returns in progress when dependencies exist but a transitive predecessor is open/in progress", () => {
+    const tasksById = new Map([
+      ["m1", { id: "m1", predecessorIds: ["t3"], type: "milestone" as const }],
+      ["t3", { id: "t3", predecessorIds: ["t2"], type: "task" as const }],
+      ["t2", { id: "t2", predecessorIds: ["t1"], type: "task" as const }],
+      ["t1", { id: "t1", predecessorIds: [], type: "task" as const }],
+    ]);
+
+    const resolveTaskStatus = (taskId: string) => {
+      if (taskId === "t1") {
+        return "ISSUE_STATUS_OPEN";
+      }
+
+      return "ISSUE_STATUS_CLOSED";
+    };
+
+    const status = inferMilestoneStatus("m1", { resolveTaskStatus, tasksById });
+    expect(status).toBe("ISSUE_STATUS_IN_PROGRESS");
+  });
+
   it("returns in progress when milestone has no dependencies", () => {
     const tasksById = new Map([
       ["m1", { id: "m1", predecessorIds: [], type: "milestone" as const }],
@@ -130,6 +172,41 @@ describe("milestone status inference", () => {
     };
 
     const status = inferMilestoneStatus("m1", { resolveTaskStatus, tasksById });
+    expect(status).toBe("ISSUE_STATUS_IN_PROGRESS");
+  });
+
+  it("returns blocked even if predecessor graph loops back to the milestone", () => {
+    // m <- t1 <- m (cycle involving a task predecessor). The milestone should still
+    // be blocked if the task in the chain is blocked.
+    const tasksById = new Map([
+      ["m", { id: "m", predecessorIds: ["t1"], type: "milestone" as const }],
+      ["t1", { id: "t1", predecessorIds: ["m"], type: "task" as const }],
+    ]);
+
+    const resolveTaskStatus = (taskId: string) => {
+      if (taskId === "t1") {
+        return "ISSUE_STATUS_BLOCKED";
+      }
+
+      // inferMilestoneStatus should never ask for the milestone status directly in this unit test.
+      return "ISSUE_STATUS_IN_PROGRESS";
+    };
+
+    const status = inferMilestoneStatus("m", { resolveTaskStatus, tasksById });
+    expect(status).toBe("ISSUE_STATUS_BLOCKED");
+  });
+
+  it("treats direct self-dependency as no dependencies", () => {
+    const tasksById = new Map([
+      ["m", { id: "m", predecessorIds: ["m"], type: "milestone" as const }],
+    ]);
+
+    const status = inferMilestoneStatus("m", {
+      resolveTaskStatus: () => "ISSUE_STATUS_CLOSED",
+      tasksById,
+    });
+
+    // sanitizePredecessorIds removes self-dependency, so there are no dependencies.
     expect(status).toBe("ISSUE_STATUS_IN_PROGRESS");
   });
 

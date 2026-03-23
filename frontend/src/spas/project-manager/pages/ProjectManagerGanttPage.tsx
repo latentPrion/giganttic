@@ -383,6 +383,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
     ganttRef,
     projectId: props.projectId,
     token: props.token,
+    preferRuntimeCacheOnLoad: false,
   });
 
   const {

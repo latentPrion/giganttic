@@ -7,10 +7,12 @@ import { ganttApi } from "../api/gantt-api.js";
 import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
 import {
   GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+  GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
 } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import { useGanttChartFileManager } from "./use-gantt-chart-file-manager.js";
+import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
 
 function stubGanttRef(
   current: { getSerializedXml: () => string } | null,
@@ -30,13 +32,14 @@ vi.mock("../api/gantt-api.js", () => ({
 
 const ganttApiMock = vi.mocked(ganttApi);
 
-const SERVER_XML = "<?xml version=\"1.0\"?><data><task id=\"1\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\"/></data>";
+const SERVER_XML = "<?xml version=\"1.0\"?><data><task id=\"1\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\" ggtc_task_description=\"\"/></data>";
 const BASELINE_XML = "<baseline/>";
 const MISSING_EXTENSION_XML = "<?xml version=\"1.0\"?><data><task id=\"1\"/></data>";
 const MODIFIED_XML = "<modified/>";
 
 describe("useGanttChartFileManager", () => {
   beforeEach(() => {
+    clearGanttRuntimeChartCache();
     ganttApiMock.getProjectChartOrNull.mockReset();
     ganttApiMock.putProjectChart.mockReset();
   });
@@ -368,6 +371,7 @@ describe("useGanttChartFileManager", () => {
           missingAttributes: [
             GGTC_TASK_STATUS_ATTRIBUTE,
             GGTC_TASK_CLOSED_REASON_ATTRIBUTE,
+            GGTC_TASK_DESCRIPTION_ATTRIBUTE,
           ],
           taskId: "55",
         },

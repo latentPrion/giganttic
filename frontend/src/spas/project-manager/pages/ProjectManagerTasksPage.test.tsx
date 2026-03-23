@@ -6,7 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { ProjectManagerTasksPage } from "./ProjectManagerTasksPage.js";
-import { GANTT_RUNTIME_CHART_UPDATED_EVENT } from "../lib/gantt-runtime-chart-events.js";
+import {
+  GANTT_RUNTIME_CHART_UPDATED_EVENT,
+} from "../lib/gantt-runtime-chart-events.js";
+import { emitGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-events.js";
+import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
 
 const DEFAULT_TOKEN = "pm-token";
 const TASKS_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -34,6 +38,7 @@ const ganttApiMock = vi.mocked(ganttApi);
 
 describe("ProjectManagerTasksPage", () => {
   beforeEach(() => {
+    clearGanttRuntimeChartCache();
     ganttApiMock.getProjectChartOrNull.mockReset();
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: TASKS_XML,
@@ -84,14 +89,10 @@ describe("ProjectManagerTasksPage", () => {
       'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="1"',
     );
 
-    window.dispatchEvent(
-      new CustomEvent(GANTT_RUNTIME_CHART_UPDATED_EVENT, {
-        detail: {
-          projectId: 42,
-          serializedXml: updatedXml,
-        },
-      }),
-    );
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: updatedXml,
+    });
 
     await waitFor(() => {
       expect(screen.queryByText("Milestone Closed")).not.toBeInTheDocument();
@@ -99,6 +100,101 @@ describe("ProjectManagerTasksPage", () => {
 
     await user.click(screen.getByRole("tab", { name: "In Progress" }));
     expect(await screen.findByText("Milestone Closed")).toBeVisible();
+  });
+
+  it("re-buckets transitive milestone inference immediately when a dependency task is blocked", async () => {
+    const user = userEvent.setup();
+    const transitiveXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-02 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T2]]></task>
+  <task id="t3" type="task" start_date="2026-03-03 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T3]]></task>
+  <task id="mile" type="milestone" start_date="2026-03-06 09:00"><![CDATA[Transitive Milestone]]></task>
+
+  <!-- t1 -> t2 -> t3 -> mile (mile depends transitively on t1) -->
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="t3" />
+  <link id="3" source="t3" target="mile" />
+</data>`;
+
+    ganttApiMock.getProjectChartOrNull.mockResolvedValueOnce({
+      content: transitiveXml,
+      type: "xml",
+    });
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    // Default tab is "In Progress"; with all dependencies closed, inferred milestone should be "Closed".
+    await user.click(screen.getByRole("tab", { name: "Closed" }));
+    expect(await screen.findByText("Transitive Milestone")).toBeVisible();
+
+    // Block t1, which should make the transitive milestone blocked.
+    const updatedXml = transitiveXml.replace(
+      'id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED"',
+      'id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_BLOCKED"',
+    );
+
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: updatedXml,
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Transitive Milestone")).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Blocked" }));
+    expect(await screen.findByText("Transitive Milestone")).toBeVisible();
+  });
+
+  it("keeps transitive milestone in progress when transitive dependency is open", async () => {
+    const user = userEvent.setup();
+    const transitiveXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="0"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-02 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T2]]></task>
+  <task id="t3" type="task" start_date="2026-03-03 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T3]]></task>
+  <task id="mile" type="milestone" start_date="2026-03-06 09:00"><![CDATA[Transitive Milestone]]></task>
+
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="t3" />
+  <link id="3" source="t3" target="mile" />
+</data>`;
+
+    ganttApiMock.getProjectChartOrNull.mockResolvedValueOnce({
+      content: transitiveXml,
+      type: "xml",
+    });
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(await screen.findByText("Transitive Milestone")).toBeVisible();
+    await user.click(screen.getByRole("tab", { name: "Closed" }));
+    expect(screen.queryByText("Transitive Milestone")).not.toBeInTheDocument();
+  });
+
+  it("initializes from cached gantt runtime xml when a runtime update happened before mount", async () => {
+    const user = userEvent.setup();
+    const transitiveXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_BLOCKED" progress="0"><![CDATA[T1]]></task>
+  <task id="t2" type="task" start_date="2026-03-02 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED" progress="0"><![CDATA[T2]]></task>
+  <task id="mile" type="milestone" start_date="2026-03-06 09:00"><![CDATA[Cached Milestone]]></task>
+  <link id="1" source="t1" target="t2" />
+  <link id="2" source="t2" target="mile" />
+</data>`;
+
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: transitiveXml,
+    });
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("tab", { name: "Blocked" }));
+    expect(await screen.findByText("Cached Milestone")).toBeVisible();
   });
 
   it("ignores gantt runtime updates for other projects", async () => {
@@ -113,14 +209,10 @@ describe("ProjectManagerTasksPage", () => {
       'id="closed-task" type="task" start_date="2026-03-04 09:00" ggtc_task_status="ISSUE_STATUS_OPEN" progress="1"',
     );
 
-    window.dispatchEvent(
-      new CustomEvent(GANTT_RUNTIME_CHART_UPDATED_EVENT, {
-        detail: {
-          projectId: 999,
-          serializedXml: updatedXml,
-        },
-      }),
-    );
+    emitGanttRuntimeChartUpdatedEvent({
+      projectId: 999,
+      serializedXml: updatedXml,
+    });
 
     // Still on Closed tab; milestone should not disappear due to the mismatched projectId.
     expect(await screen.findByText("Milestone Closed")).toBeVisible();
