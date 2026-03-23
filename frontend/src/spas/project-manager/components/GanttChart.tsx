@@ -97,6 +97,7 @@ type GanttInlineEditors = {
 };
 
 type GanttTaskLike = {
+  open?: boolean | "true" | "false";
   parent?: GanttTaskId | 0 | "" | null;
   start_date?: Date | string;
   text?: string;
@@ -572,6 +573,34 @@ function createTaskWithParent(
   return gantt.addTask(newTaskBlueprint, parentId);
 }
 
+function revealTaskBranch(
+  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  createdTaskId: GanttTaskId,
+  parentId: GanttTaskId | null,
+) {
+  const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
+    getTask?: (id: GanttTaskId) => GanttTaskLike;
+    open?: (id: GanttTaskId) => void;
+    refreshTask?: (id: GanttTaskId) => void;
+    showTask?: (id: GanttTaskId) => void;
+    updateTask?: (id: GanttTaskId) => void;
+  };
+
+  if (parentId !== null) {
+    const parentTask = gantt.getTask?.(parentId);
+    if (parentTask && parentTask.open !== true) {
+      parentTask.open = true;
+      gantt.updateTask?.(parentId);
+      gantt.refreshTask?.(parentId);
+    }
+
+    gantt.open?.(parentId);
+  }
+
+  gantt.showTask?.(createdTaskId);
+  gantt.refreshTask?.(createdTaskId);
+}
+
 function addTaskAndFocusEditor(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
   parentId: GanttTaskId | null,
@@ -585,6 +614,7 @@ function addTaskAndFocusEditor(
   const parentTask = parentId === null ? null : gantt.getTask(parentId);
   const createdTaskId = createTaskWithParent(gantt, parentTask, parentId);
 
+  revealTaskBranch(ganttInstance, createdTaskId, parentId);
   gantt.selectTask(createdTaskId);
   gantt.showLightbox(createdTaskId);
 }

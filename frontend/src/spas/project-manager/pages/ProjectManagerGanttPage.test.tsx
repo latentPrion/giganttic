@@ -111,7 +111,9 @@ const mockGantt = {
     start_date: new Date("2026-03-01T09:00:00.000Z"),
   })),
   init: vi.fn(),
+  open: vi.fn(),
   parse: vi.fn(),
+  refreshTask: vi.fn(),
   render: vi.fn(),
   resetLayout: vi.fn(),
   selectTask: vi.fn((taskId: number | string) => {
@@ -127,6 +129,8 @@ const mockGantt = {
   }),
   setSizes: vi.fn(),
   showLightbox: vi.fn(),
+  showTask: vi.fn(),
+  updateTask: vi.fn(),
 };
 
 vi.mock("../lib/dhtmlx-gantt-adapter.js", () => ({
@@ -256,7 +260,9 @@ describe("ProjectManagerGanttPage", () => {
     mockGantt.getSelectedId.mockClear();
     mockGantt.getTask.mockClear();
     mockGantt.init.mockReset();
+    mockGantt.open.mockReset();
     mockGantt.parse.mockReset();
+    mockGantt.refreshTask.mockReset();
     mockGantt.render.mockReset();
     mockGantt.resetLayout.mockReset();
     mockGantt.selectTask.mockClear();
@@ -270,6 +276,8 @@ describe("ProjectManagerGanttPage", () => {
     });
     mockGantt.setSizes.mockReset();
     mockGantt.showLightbox.mockClear();
+    mockGantt.showTask.mockReset();
+    mockGantt.updateTask.mockReset();
     createObjectUrlMock.mockClear();
     revokeObjectUrlMock.mockClear();
     URL.createObjectURL = createObjectUrlMock;
@@ -404,6 +412,10 @@ describe("ProjectManagerGanttPage", () => {
         text: "New Task",
       }),
     );
+    expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.refreshTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.open).not.toHaveBeenCalled();
+    expect(mockGantt.updateTask).not.toHaveBeenCalled();
     expect(mockGantt.selectTask).toHaveBeenCalledWith(5000);
     expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
   });
@@ -499,6 +511,12 @@ describe("ProjectManagerGanttPage", () => {
 
   it("adds a child task under the currently selected task", async () => {
     const user = userEvent.setup();
+    mockGantt.getTask.mockImplementation((taskId: number | string) => ({
+      id: taskId,
+      open: false,
+      parent: 0,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+    }));
 
     renderWithTheme(
       <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
@@ -523,7 +541,42 @@ describe("ProjectManagerGanttPage", () => {
       }),
       1001,
     );
+    expect(mockGantt.updateTask).toHaveBeenCalledWith(1001);
+    expect(mockGantt.refreshTask).toHaveBeenNthCalledWith(1, 1001);
+    expect(mockGantt.open).toHaveBeenCalledWith(1001);
+    expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.refreshTask).toHaveBeenNthCalledWith(2, 5000);
     expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
+  });
+
+  it("does not re-update an already open parent when adding a child task", async () => {
+    const user = userEvent.setup();
+    mockGantt.getTask.mockImplementation((taskId: number | string) => ({
+      id: taskId,
+      open: true,
+      parent: 0,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+    }));
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Add Child Task" }));
+
+    expect(mockGantt.updateTask).not.toHaveBeenCalled();
+    expect(mockGantt.open).toHaveBeenCalledWith(1001);
+    expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.refreshTask).toHaveBeenCalledWith(5000);
   });
 
   it("shows a generic error message when the backend returns a non-404 failure", async () => {
