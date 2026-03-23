@@ -9,7 +9,9 @@ import { Box } from "@mui/material";
 import { getDhtmlxGantt } from "../lib/dhtmlx-gantt-adapter.js";
 import type {
   GanttChartHandle,
+  GanttSelectedTask,
   GanttTaskId,
+  GanttTaskType,
 } from "../models/gantt-chart-handle.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
@@ -22,20 +24,24 @@ interface GanttChartProps {
   interactionsEnabled?: boolean;
   onBaselineReady?: (serializedXml: string) => void;
   onEditorChange?: () => void;
-  onSelectionChange?: (selectedTaskId: GanttTaskId | null) => void;
+  onSelectionChange?: (selectedTask: GanttSelectedTask | null) => void;
 }
 
 const GANTT_ADD_COLUMN_WIDTH = 44;
 const GANTT_CONTAINER_MIN_HEIGHT = 520;
 const GANTT_DATE_FORMAT = "%Y-%m-%d %H:%i";
 const GANTT_DEFAULT_NEW_TASK_DURATION = 1;
+const GANTT_DEFAULT_NEW_MILESTONE_DURATION = 0;
+const GANTT_DEFAULT_NEW_MILESTONE_TEXT = "New Milestone";
 const GANTT_DEFAULT_NEW_TASK_TEXT = "New Task";
 const GANTT_DURATION_COLUMN_WIDTH = 100;
 const GANTT_NAME_COLUMN_WIDTH = 220;
+const GANTT_MILESTONE_TASK_TYPE: GanttTaskType = "milestone";
 const GANTT_PREDECESSORS_COLUMN_WIDTH = 140;
 const GANTT_ROOT_PARENT_ID = 0;
 const GANTT_START_COLUMN_WIDTH = 120;
 const GANTT_SURFACE_BACKGROUND = "#ffffff";
+const GANTT_TASK_TASK_TYPE: GanttTaskType = "task";
 const GANTT_GRID_PADDING_WIDTH = 32;
 const GANTT_HORIZONTAL_SCROLLBAR_HEIGHT = 20;
 const GANTT_LAYOUT_CSS_CLASS = "gantt_container";
@@ -97,10 +103,14 @@ type GanttInlineEditors = {
 };
 
 type GanttTaskLike = {
+  duration?: number;
+  end_date?: Date | string;
   open?: boolean | "true" | "false";
   parent?: GanttTaskId | 0 | "" | null;
+  progress?: number;
   start_date?: Date | string;
   text?: string;
+  type?: GanttTaskType | string;
 };
 
 type GanttLinkLike = {
@@ -419,7 +429,7 @@ function attachLightboxParentNormalizationEvent(
 
 function attachSelectionEvents(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
-  onSelectionChange?: (selectedTaskId: GanttTaskId | null) => void,
+  onSelectionChange?: (selectedTask: GanttSelectedTask | null) => void,
 ): string[] {
   if (!onSelectionChange) {
     return [];
@@ -432,7 +442,7 @@ function attachSelectionEvents(
 
   for (const eventName of SELECTION_EVENT_NAMES) {
     const id = gantt.attachEvent(eventName, () => {
-      onSelectionChange(getSelectedTaskId(ganttInstance));
+      onSelectionChange(createSelectedTaskSummary(ganttInstance));
       return true;
     });
     eventIds.push(id);
@@ -514,6 +524,36 @@ function getSelectedTaskId(
   return gantt.getSelectedId();
 }
 
+function normalizeTaskType(task: GanttTaskLike | null): GanttTaskType {
+  if (task?.type === GANTT_MILESTONE_TASK_TYPE) {
+    return GANTT_MILESTONE_TASK_TYPE;
+  }
+
+  if (task?.type === "project") {
+    return "project";
+  }
+
+  return GANTT_TASK_TASK_TYPE;
+}
+
+function createSelectedTaskSummary(
+  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+): GanttSelectedTask | null {
+  const selectedTaskId = getSelectedTaskId(ganttInstance);
+  if (selectedTaskId === null) {
+    return null;
+  }
+
+  const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
+    getTask: (id: GanttTaskId) => GanttTaskLike;
+  };
+  const selectedTask = gantt.getTask(selectedTaskId);
+  return {
+    id: selectedTaskId,
+    type: normalizeTaskType(selectedTask),
+  };
+}
+
 function createNewTaskStartDate(task: GanttTaskLike | null): Date {
   if (task?.start_date instanceof Date) {
     return task.start_date;
@@ -536,18 +576,47 @@ function normalizeTaskParent(task: GanttTaskLike) {
   }
 }
 
+function createTaskDuration(taskType: GanttTaskType): number {
+  return taskType === GANTT_MILESTONE_TASK_TYPE
+    ? GANTT_DEFAULT_NEW_MILESTONE_DURATION
+    : GANTT_DEFAULT_NEW_TASK_DURATION;
+}
+
+function createTaskLabel(taskType: GanttTaskType): string {
+  return taskType === GANTT_MILESTONE_TASK_TYPE
+    ? GANTT_DEFAULT_NEW_MILESTONE_TEXT
+    : GANTT_DEFAULT_NEW_TASK_TEXT;
+}
+
+function createTaskTypeAttributes(taskType: GanttTaskType) {
+  if (taskType === GANTT_MILESTONE_TASK_TYPE) {
+    return {
+      progress: 0,
+      type: GANTT_MILESTONE_TASK_TYPE,
+    };
+  }
+
+  return {
+    type: GANTT_TASK_TASK_TYPE,
+  };
+}
+
 function createNewTaskBlueprint(
   task: GanttTaskLike | null,
   parentId: GanttTaskId | null,
+  taskType: GanttTaskType,
 ) {
   const blueprint: GanttTaskLike & {
     duration: number;
+    progress?: number;
     start_date: Date;
     text: string;
+    type: GanttTaskType;
   } = {
-    duration: GANTT_DEFAULT_NEW_TASK_DURATION,
+    ...createTaskTypeAttributes(taskType),
+    duration: createTaskDuration(taskType),
     start_date: createNewTaskStartDate(task),
-    text: GANTT_DEFAULT_NEW_TASK_TEXT,
+    text: createTaskLabel(taskType),
   };
 
   if (parentId === null) {
@@ -563,14 +632,53 @@ function createTaskWithParent(
   },
   parentTask: GanttTaskLike | null,
   parentId: GanttTaskId | null,
+  taskType: GanttTaskType,
 ) {
-  const newTaskBlueprint = createNewTaskBlueprint(parentTask, parentId);
+  const newTaskBlueprint = createNewTaskBlueprint(parentTask, parentId, taskType);
 
   if (parentId === null) {
     return gantt.addTask(newTaskBlueprint);
   }
 
   return gantt.addTask(newTaskBlueprint, parentId);
+}
+
+function normalizeTaskShape(task: GanttTaskLike, taskType: GanttTaskType) {
+  if (taskType === GANTT_MILESTONE_TASK_TYPE) {
+    task.duration = 0;
+    task.progress = 0;
+    task.type = GANTT_MILESTONE_TASK_TYPE;
+    return;
+  }
+
+  task.type = GANTT_TASK_TASK_TYPE;
+  if (typeof task.duration !== "number" || task.duration <= 0) {
+    task.duration = GANTT_DEFAULT_NEW_TASK_DURATION;
+  }
+}
+
+function updateSelectedTaskType(
+  ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  nextTaskType: GanttTaskType,
+) {
+  const selectedTaskId = getSelectedTaskId(ganttInstance);
+  if (selectedTaskId === null) {
+    return;
+  }
+
+  const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
+    getTask: (id: GanttTaskId) => GanttTaskLike;
+    refreshTask?: (id: GanttTaskId) => void;
+    showLightbox: (id: GanttTaskId) => void;
+    showTask?: (id: GanttTaskId) => void;
+    updateTask: (id: GanttTaskId) => void;
+  };
+  const selectedTask = gantt.getTask(selectedTaskId);
+  normalizeTaskShape(selectedTask, nextTaskType);
+  gantt.updateTask(selectedTaskId);
+  gantt.refreshTask?.(selectedTaskId);
+  gantt.showTask?.(selectedTaskId);
+  gantt.showLightbox(selectedTaskId);
 }
 
 function revealTaskBranch(
@@ -604,6 +712,7 @@ function revealTaskBranch(
 function addTaskAndFocusEditor(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
   parentId: GanttTaskId | null,
+  taskType: GanttTaskType,
 ) {
   const gantt = ganttInstance as ReturnType<typeof getDhtmlxGantt> & {
     addTask: (task: Record<string, unknown>, parent?: GanttTaskId) => GanttTaskId;
@@ -612,7 +721,7 @@ function addTaskAndFocusEditor(
     showLightbox: (id: GanttTaskId) => void;
   };
   const parentTask = parentId === null ? null : gantt.getTask(parentId);
-  const createdTaskId = createTaskWithParent(gantt, parentTask, parentId);
+  const createdTaskId = createTaskWithParent(gantt, parentTask, parentId, taskType);
 
   revealTaskBranch(ganttInstance, createdTaskId, parentId);
   gantt.selectTask(createdTaskId);
@@ -667,7 +776,23 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
           return;
         }
 
-        addTaskAndFocusEditor(ganttInstance, getSelectedTaskId(ganttInstance));
+        addTaskAndFocusEditor(
+          ganttInstance,
+          getSelectedTaskId(ganttInstance),
+          GANTT_TASK_TASK_TYPE,
+        );
+      },
+      addChildMilestone(): void {
+        const ganttInstance = ganttReference.current;
+        if (!ganttInstance) {
+          return;
+        }
+
+        addTaskAndFocusEditor(
+          ganttInstance,
+          getSelectedTaskId(ganttInstance),
+          GANTT_MILESTONE_TASK_TYPE,
+        );
       },
       addRootTask(): void {
         const ganttInstance = ganttReference.current;
@@ -675,7 +800,31 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
           return;
         }
 
-        addTaskAndFocusEditor(ganttInstance, null);
+        addTaskAndFocusEditor(ganttInstance, null, GANTT_TASK_TASK_TYPE);
+      },
+      addRootMilestone(): void {
+        const ganttInstance = ganttReference.current;
+        if (!ganttInstance) {
+          return;
+        }
+
+        addTaskAndFocusEditor(ganttInstance, null, GANTT_MILESTONE_TASK_TYPE);
+      },
+      convertSelectedMilestoneToTask(): void {
+        const ganttInstance = ganttReference.current;
+        if (!ganttInstance) {
+          return;
+        }
+
+        updateSelectedTaskType(ganttInstance, GANTT_TASK_TASK_TYPE);
+      },
+      convertSelectedTaskToMilestone(): void {
+        const ganttInstance = ganttReference.current;
+        if (!ganttInstance) {
+          return;
+        }
+
+        updateSelectedTaskType(ganttInstance, GANTT_MILESTONE_TASK_TYPE);
       },
       deleteSelectedTask(): void {
         const ganttInstance = ganttReference.current;
@@ -684,7 +833,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
         }
 
         deleteSelectedTask(ganttInstance);
-        onSelectionChange?.(getSelectedTaskId(ganttInstance));
+        onSelectionChange?.(createSelectedTaskSummary(ganttInstance));
       },
       editSelectedTask(): void {
         const ganttInstance = ganttReference.current;
@@ -694,13 +843,13 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
 
         editSelectedTask(ganttInstance);
       },
-      getSelectedTaskId(): GanttTaskId | null {
+      getSelectedTask(): GanttSelectedTask | null {
         const ganttInstance = ganttReference.current;
         if (!ganttInstance) {
           return null;
         }
 
-        return getSelectedTaskId(ganttInstance);
+        return createSelectedTaskSummary(ganttInstance);
       },
       getSerializedXml(): string {
         const ganttInstance = ganttReference.current;
@@ -733,7 +882,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
         ganttInstance,
         onSelectionChange,
       );
-      onSelectionChange?.(getSelectedTaskId(ganttInstance));
+      onSelectionChange?.(createSelectedTaskSummary(ganttInstance));
 
       return () => {
         cleanupMountedGantt(

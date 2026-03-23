@@ -14,7 +14,7 @@ export interface UseGanttChartFileManagerResult {
   isLoading: boolean;
   isPersisting: boolean;
   loadErrorMessage: string | null;
-  persistChart: () => Promise<void>;
+  persistChart: () => Promise<boolean>;
   persistErrorMessage: string | null;
   reloadChart: () => Promise<void>;
   setDirtyFromEditor: () => void;
@@ -93,9 +93,9 @@ export function useGanttChartFileManager(options: {
     setIsDirty(current !== baseline);
   }, [ganttRef]);
 
-  const persistChart = useCallback(async () => {
+  const persistChart = useCallback(async (): Promise<boolean> => {
     if (projectId === null) {
-      return;
+      return false;
     }
     const xml = ganttRef.current?.getSerializedXml() ?? DEFAULT_PROJECT_CHART_XML;
 
@@ -110,8 +110,10 @@ export function useGanttChartFileManager(options: {
         content: xml,
         type: "xml",
       });
+      return true;
     } catch (error) {
       setPersistErrorMessage(getApiErrorMessage(error, SAVE_ERROR));
+      return false;
     } finally {
       setIsPersisting(false);
     }

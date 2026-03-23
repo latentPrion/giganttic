@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CssBaseline, ThemeProvider } from "@mui/material";
@@ -44,6 +45,7 @@ const ganttEventHandlers = new Map<string, {
   name: string;
 }>();
 let selectedTaskId: number | string | null = null;
+let selectedTaskType: "milestone" | "project" | "task" = "task";
 let nextGanttEventId = 1;
 let nextCreatedTaskId = 5000;
 let serializedXml = mockChartSource.content;
@@ -54,6 +56,22 @@ function triggerGanttEvent(eventName: string, ...args: unknown[]): void {
       registration.handler(...args);
     }
   }
+}
+
+function getControlPanel() {
+  return within(screen.getByTestId("pm-gantt-control-panel"));
+}
+
+async function findControlPanel() {
+  return within(await screen.findByTestId("pm-gantt-control-panel"));
+}
+
+async function openTaskActions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(getControlPanel().getByRole("button", { name: "Task actions" }));
+}
+
+async function openMilestoneActions(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(getControlPanel().getByRole("button", { name: "Milestone actions" }));
 }
 
 const mockGantt = {
@@ -109,6 +127,7 @@ const mockGantt = {
     id: taskId,
     parent: 0,
     start_date: new Date("2026-03-01T09:00:00.000Z"),
+    type: taskId === selectedTaskId ? selectedTaskType : "task",
   })),
   init: vi.fn(),
   open: vi.fn(),
@@ -210,6 +229,7 @@ describe("ProjectManagerGanttPage", () => {
   beforeEach(() => {
     ganttEventHandlers.clear();
     selectedTaskId = null;
+    selectedTaskType = "task";
     nextCreatedTaskId = 5000;
     nextGanttEventId = 1;
     serializedXml = mockChartSource.content;
@@ -297,13 +317,11 @@ describe("ProjectManagerGanttPage", () => {
     });
 
     expect(screen.getByTestId("pm-gantt-chart-container")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Add Task" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Add Child Task" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Edit Selected" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete Selected" })).toBeDisabled();
-    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+    expect(getControlPanel().getByRole("button", { name: "Task actions" })).toBeVisible();
+    expect(getControlPanel().getByRole("button", { name: "Milestone actions" })).toBeVisible();
+    expect(screen.getByLabelText("View")).toBeVisible();
     expect(screen.getByRole("button", { name: /^Download\b/i })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+    expect(getControlPanel().getByRole("button", { name: "Save" })).toBeVisible();
     expect(screen.getByText("MS Project XML")).toBeVisible();
   });
 
@@ -370,7 +388,7 @@ describe("ProjectManagerGanttPage", () => {
       await screen.findByText("No gantt chart exists for this project yet."),
     ).toBeVisible();
     expect(mockGantt.parse).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Create" })).toBeVisible();
+    expect((await findControlPanel()).getByRole("button", { name: "Create" })).toBeVisible();
   });
 
   it("creates a default chart after clicking Create when no chart exists", async () => {
@@ -381,7 +399,7 @@ describe("ProjectManagerGanttPage", () => {
       <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "Create" }));
+    await user.click((await findControlPanel()).getByRole("button", { name: "Create" }));
 
     await waitFor(() => {
       expect(putProjectChartMock).toHaveBeenCalledTimes(1);
@@ -391,7 +409,7 @@ describe("ProjectManagerGanttPage", () => {
     expect(screen.queryByText("No gantt chart exists for this project yet.")).not.toBeInTheDocument();
   });
 
-  it("adds a task and opens the lightbox from the page actions", async () => {
+  it("adds a task and opens the lightbox from the task actions menu", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
@@ -402,7 +420,8 @@ describe("ProjectManagerGanttPage", () => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
     });
 
-    await user.click(screen.getByRole("button", { name: "Add Task" }));
+    await openTaskActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Add Task" }));
 
     expect(mockGantt.addTask).toHaveBeenCalledTimes(1);
     expect(mockGantt.addTask).toHaveBeenCalledWith(
@@ -418,6 +437,33 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.updateTask).not.toHaveBeenCalled();
     expect(mockGantt.selectTask).toHaveBeenCalledWith(5000);
     expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
+  });
+
+  it("keeps child, edit, and delete task actions disabled without a task selection", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await openTaskActions(user);
+
+    expect(screen.getByRole("menuitem", { name: "Add Child Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Edit Selected Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Delete Selected Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("normalizes blank root parents during lightbox save", async () => {
@@ -464,7 +510,7 @@ describe("ProjectManagerGanttPage", () => {
     });
   });
 
-  it("enables selected-task actions and supports editing and deleting the selection", async () => {
+  it("enables selected task menu actions and supports editing and deleting the selection", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
@@ -477,21 +523,21 @@ describe("ProjectManagerGanttPage", () => {
 
     await act(async () => {
       selectedTaskId = 1001;
+      selectedTaskType = "task";
       triggerGanttEvent("onTaskSelected");
     });
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Add Child Task" })).toBeEnabled();
-    });
-
-    await user.click(screen.getByRole("button", { name: "Edit Selected" }));
+    await openTaskActions(user);
+    expect(screen.getByRole("menuitem", { name: "Add Child Task" })).toBeEnabled();
+    await user.click(screen.getByRole("menuitem", { name: "Edit Selected Task" }));
     expect(mockGantt.showLightbox).toHaveBeenCalledWith(1001);
 
-    await user.click(screen.getByRole("button", { name: "Delete Selected" }));
+    await openTaskActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete Selected Task" }));
     expect(mockGantt.deleteTask).toHaveBeenCalledWith(1001);
   });
 
-  it("keeps the save action visible when unsaved changes are shown", async () => {
+  it("shows a warning status icon when unsaved changes are present", async () => {
     renderWithTheme(
       <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
     );
@@ -505,8 +551,75 @@ describe("ProjectManagerGanttPage", () => {
       triggerGanttEvent("onAfterTaskDelete");
     });
 
-    expect(await screen.findByText("Unsaved changes")).toBeVisible();
+    expect(await screen.findByTestId("gantt-save-status-unsaved")).toBeVisible();
     expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+  });
+
+  it("shows a green success status icon after a successful save", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(putProjectChartMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(await screen.findByTestId("gantt-save-status-saved")).toBeVisible();
+  });
+
+  it("opens refresh confirmation from the save dropdown and reloads backend state only after confirmation", async () => {
+    const user = userEvent.setup();
+    const refreshedChartSource = {
+      content: "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1002\"><![CDATA[Backend refresh]]></task></data>",
+      type: "xml" as const,
+    };
+    getProjectChartOrNullMock.mockReset();
+    getProjectChartOrNullMock
+      .mockResolvedValueOnce(mockChartSource)
+      .mockResolvedValueOnce(refreshedChartSource);
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      serializedXml = `${mockChartSource.content}<changed />`;
+      triggerGanttEvent("onAfterTaskDelete");
+    });
+
+    expect(await screen.findByTestId("gantt-save-status-unsaved")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Choose save action" }));
+    await user.click(screen.getByRole("menuitem", { name: "Refresh" }));
+
+    expect(
+      screen.getByText("Refreshing discards all unsaved changes and resets the current frontend and UI state to the chart reloaded from the backend."),
+    ).toBeVisible();
+    expect(getProjectChartOrNullMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      expect(getProjectChartOrNullMock).toHaveBeenCalledTimes(2);
+      expect(mockGantt.parse).toHaveBeenLastCalledWith(
+        refreshedChartSource.content,
+        refreshedChartSource.type,
+      );
+    });
+
+    expect(screen.queryByTestId("gantt-save-status-unsaved")).not.toBeInTheDocument();
   });
 
   it("adds a child task under the currently selected task", async () => {
@@ -528,10 +641,12 @@ describe("ProjectManagerGanttPage", () => {
 
     await act(async () => {
       selectedTaskId = 1001;
+      selectedTaskType = "task";
       triggerGanttEvent("onTaskSelected");
     });
 
-    await user.click(screen.getByRole("button", { name: "Add Child Task" }));
+    await openTaskActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Add Child Task" }));
 
     expect(mockGantt.getTask).toHaveBeenCalledWith(1001);
     expect(mockGantt.addTask).toHaveBeenCalledWith(
@@ -568,15 +683,214 @@ describe("ProjectManagerGanttPage", () => {
 
     await act(async () => {
       selectedTaskId = 1001;
+      selectedTaskType = "task";
       triggerGanttEvent("onTaskSelected");
     });
 
-    await user.click(screen.getByRole("button", { name: "Add Child Task" }));
+    await openTaskActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Add Child Task" }));
 
     expect(mockGantt.updateTask).not.toHaveBeenCalled();
     expect(mockGantt.open).toHaveBeenCalledWith(1001);
     expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
     expect(mockGantt.refreshTask).toHaveBeenCalledWith(5000);
+  });
+
+  it("adds a root milestone from the milestone actions menu", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await openMilestoneActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Add Milestone" }));
+
+    expect(mockGantt.addTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 0,
+        parent: 0,
+        text: "New Milestone",
+        type: "milestone",
+      }),
+    );
+    expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(5000);
+  });
+
+  it("adds a child milestone under the selected task", async () => {
+    const user = userEvent.setup();
+    mockGantt.getTask.mockImplementation((taskId: number | string) => ({
+      id: taskId,
+      open: false,
+      parent: 0,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: taskId === selectedTaskId ? selectedTaskType : "task",
+    }));
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      selectedTaskType = "task";
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await openMilestoneActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Add Child Milestone" }));
+
+    expect(mockGantt.addTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 0,
+        text: "New Milestone",
+        type: "milestone",
+      }),
+      1001,
+    );
+    expect(mockGantt.open).toHaveBeenCalledWith(1001);
+    expect(mockGantt.showTask).toHaveBeenCalledWith(5000);
+  });
+
+  it("supports milestone editing, deletion, and conversion actions", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      selectedTaskType = "milestone";
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await openMilestoneActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Edit Selected Milestone" }));
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(1001);
+
+    await openMilestoneActions(user);
+    await user.click(
+      screen.getByRole("menuitem", { name: "Convert Selected Milestone to Task" }),
+    );
+    expect(mockGantt.updateTask).toHaveBeenCalledWith(1001);
+
+    await openMilestoneActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete Selected Milestone" }));
+    expect(mockGantt.deleteTask).toHaveBeenCalledWith(1001);
+  });
+
+  it("disables child task actions when the selected item is a milestone", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      selectedTaskType = "milestone";
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await openTaskActions(user);
+    expect(screen.getByRole("menuitem", { name: "Add Child Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Edit Selected Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Delete Selected Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await user.keyboard("{Escape}");
+    await openMilestoneActions(user);
+    expect(screen.getByRole("menuitem", { name: "Add Child Milestone" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(
+      screen.getByRole("menuitem", { name: "Convert Selected Milestone to Task" }),
+    ).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("disables task and milestone menu actions when the project has no chart yet", async () => {
+    const user = userEvent.setup();
+    getProjectChartOrNullMock.mockResolvedValue(null);
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    expect(
+      await screen.findByText("No gantt chart exists for this project yet."),
+    ).toBeVisible();
+
+    await openTaskActions(user);
+    expect(screen.getByRole("menuitem", { name: "Add Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Add Child Task" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+
+    await user.keyboard("{Escape}");
+    await openMilestoneActions(user);
+    expect(screen.getByRole("menuitem", { name: "Add Milestone" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: "Add Child Milestone" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("supports converting a selected task to a milestone", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      selectedTaskId = 1001;
+      selectedTaskType = "task";
+      triggerGanttEvent("onTaskSelected");
+    });
+
+    await openMilestoneActions(user);
+    await user.click(screen.getByRole("menuitem", { name: "Convert Selected Task to Milestone" }));
+
+    expect(mockGantt.updateTask).toHaveBeenCalledWith(1001);
+    expect(mockGantt.showLightbox).toHaveBeenCalledWith(1001);
   });
 
   it("shows a generic error message when the backend returns a non-404 failure", async () => {
@@ -661,7 +975,7 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.destructor).not.toHaveBeenCalled();
   });
 
-  it("switches display modes from the bottom control panel tabs", async () => {
+  it("switches display modes from the bottom control panel dropdown", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
@@ -672,7 +986,8 @@ describe("ProjectManagerGanttPage", () => {
       expect(mockGantt.init).toHaveBeenCalledTimes(1);
     });
 
-    await user.click(screen.getByRole("tab", { name: "Grid" }));
+    await user.click(screen.getByLabelText("View"));
+    await user.click(screen.getByRole("option", { name: "Grid" }));
 
     expect(mockGantt.config.layout).toMatchObject({
       rows: [
@@ -690,7 +1005,8 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.init).toHaveBeenCalledTimes(2);
     expect(mockGantt.parse).toHaveBeenCalledTimes(2);
 
-    await user.click(screen.getByRole("tab", { name: "Chart" }));
+    await user.click(screen.getByLabelText("View"));
+    await user.click(screen.getByRole("option", { name: "Chart" }));
 
     expect(mockGantt.config.layout).toMatchObject({
       rows: [
@@ -708,7 +1024,8 @@ describe("ProjectManagerGanttPage", () => {
     expect(mockGantt.init).toHaveBeenCalledTimes(3);
     expect(mockGantt.parse).toHaveBeenCalledTimes(3);
 
-    await user.click(screen.getByRole("tab", { name: "Both" }));
+    await user.click(screen.getByLabelText("View"));
+    await user.click(screen.getByRole("option", { name: "Both" }));
 
     expect(mockGantt.config.layout).toMatchObject({
       rows: [
@@ -750,22 +1067,24 @@ describe("ProjectManagerGanttPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Hide Controls" }));
 
-    expect(screen.queryByRole("tab", { name: "Both" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("View")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show Controls" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Show Controls" }));
 
-    expect(screen.getByRole("tab", { name: "Both" })).toBeVisible();
+    expect(screen.getByLabelText("View")).toBeVisible();
   });
 
-  it("keeps the gantt download action in the same navigation row as the project tabs", async () => {
+  it("renders gantt-specific actions inside the bottom control panel", async () => {
     renderWithTheme(
       <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
     );
 
-    expect(await screen.findByRole("button", { name: /^Download\b/i })).toBeVisible();
+    expect((await findControlPanel()).getByRole("button", { name: /^Download\b/i })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Details" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Choose download format" })).toBeVisible();
+    expect(getControlPanel().getByRole("button", { name: "Task actions" })).toBeVisible();
+    expect(getControlPanel().getByRole("button", { name: "Milestone actions" })).toBeVisible();
   });
 
   it("downloads DHTMLX XML locally after changing the selected format", async () => {

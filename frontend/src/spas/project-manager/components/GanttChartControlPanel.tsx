@@ -1,18 +1,19 @@
 import React from "react";
 import {
-  Box,
   Button,
+  MenuItem,
   Paper,
   Stack,
-  Tab,
-  Tabs,
+  TextField,
   Typography,
 } from "@mui/material";
 
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 
 interface GanttChartControlPanelProps {
+  actions?: React.ReactNode;
   displayMode: GanttDisplayMode;
+  hasChart: boolean;
   isExpanded: boolean;
   onDisplayModeChange(displayMode: GanttDisplayMode): void;
   onToggleExpanded(): void;
@@ -20,6 +21,7 @@ interface GanttChartControlPanelProps {
 
 const PANEL_PADDING = 2;
 const PANEL_TITLE = "Gantt Controls";
+const VIEW_CONTROL_LABEL = "View";
 
 function createNextDisplayMode(value: unknown): GanttDisplayMode {
   if (value === "grid" || value === "chart") {
@@ -36,9 +38,10 @@ function createToggleButtonLabel(isExpanded: boolean): string {
 export function GanttChartControlPanel(props: GanttChartControlPanelProps) {
   return (
     <Paper
+      data-testid="pm-gantt-control-panel"
       elevation={0}
       sx={{
-        borderTop: "1px solid rgba(255, 255, 255, 0.12)",
+        borderTop: props.hasChart ? "1px solid rgba(255, 255, 255, 0.12)" : "none",
         borderTopLeftRadius: 16,
         borderTopRightRadius: 16,
         padding: PANEL_PADDING,
@@ -57,18 +60,39 @@ export function GanttChartControlPanel(props: GanttChartControlPanelProps) {
           </Button>
         </Stack>
         {props.isExpanded ? (
-          <Box>
-            <Tabs
-              aria-label="Gantt display mode"
-              onChange={(_, value) => props.onDisplayModeChange(createNextDisplayMode(value))}
+          <Stack
+            alignItems={{ xs: "stretch", lg: "center" }}
+            direction={{ xs: "column", lg: "row" }}
+            justifyContent="space-between"
+            spacing={1.5}
+          >
+            <TextField
+              disabled={!props.hasChart}
+              label={VIEW_CONTROL_LABEL}
+              onChange={(event) => {
+                props.onDisplayModeChange(createNextDisplayMode(event.target.value));
+              }}
+              select
+              size="small"
+              sx={{ minWidth: { xs: "100%", sm: 220 }, width: { xs: "100%", sm: "auto" } }}
               value={props.displayMode}
-              variant="scrollable"
             >
-              <Tab label="Both" value="both" />
-              <Tab label="Grid" value="grid" />
-              <Tab label="Chart" value="chart" />
-            </Tabs>
-          </Box>
+              <MenuItem value="both">Both</MenuItem>
+              <MenuItem value="grid">Grid</MenuItem>
+              <MenuItem value="chart">Chart</MenuItem>
+            </TextField>
+            {props.actions ? (
+              <Stack
+                alignItems={{ xs: "stretch", sm: "center" }}
+                direction={{ xs: "column", sm: "row" }}
+                flexWrap="wrap"
+                spacing={1}
+                sx={{ width: "100%" }}
+              >
+                {props.actions}
+              </Stack>
+            ) : null}
+          </Stack>
         ) : null}
       </Stack>
     </Paper>
