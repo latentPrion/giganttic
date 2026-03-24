@@ -6,6 +6,7 @@ import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ProjectManagerIssuesPage } from "./ProjectManagerIssuesPage.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
+import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
 
 const navigateMock = vi.fn();
 
@@ -270,8 +271,38 @@ describe("ProjectManagerIssuesPage", () => {
 
   it("updates an issue through the edit modal", async () => {
     const user = userEvent.setup();
+    const updatedIssue = createIssue(7, { name: "Updated issue", priority: 3, progressPercentage: 80 });
+    issuesApiMock.listIssues
+      .mockResolvedValueOnce({
+        issues: [
+          createIssue(7, { name: "In Progress High", priority: 2, progressPercentage: 35 }),
+          createIssue(8, { name: "Open Low", priority: 1, progressPercentage: 10, status: "ISSUE_STATUS_OPEN" }),
+          createIssue(9, { name: "Blocked Urgent", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
+          createIssue(10, {
+            closedAt: DEFAULT_TIMESTAMP,
+            closedReason: "ISSUE_CLOSED_REASON_RESOLVED",
+            name: "Closed Done",
+            progressPercentage: 100,
+            status: "ISSUE_STATUS_CLOSED",
+          }),
+        ],
+      })
+      .mockResolvedValue({
+        issues: [
+          updatedIssue,
+          createIssue(8, { name: "Open Low", priority: 1, progressPercentage: 10, status: "ISSUE_STATUS_OPEN" }),
+          createIssue(9, { name: "Blocked Urgent", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
+          createIssue(10, {
+            closedAt: DEFAULT_TIMESTAMP,
+            closedReason: "ISSUE_CLOSED_REASON_RESOLVED",
+            name: "Closed Done",
+            progressPercentage: 100,
+            status: "ISSUE_STATUS_CLOSED",
+          }),
+        ],
+      });
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue(7, { name: "Updated issue", priority: 3, progressPercentage: 80 }),
+      issue: updatedIssue,
     });
 
     renderWithTheme(
@@ -299,14 +330,69 @@ describe("ProjectManagerIssuesPage", () => {
     expect(await screen.findByText("Updated issue")).toBeVisible();
   });
 
+  it("emits issue-updated event after successful list edit", async () => {
+    const user = userEvent.setup();
+    const eventListener = vi.fn();
+    window.addEventListener(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, eventListener);
+    issuesApiMock.updateIssue.mockResolvedValue({
+      issue: createIssue(7, { name: "Updated issue from list" }),
+    });
+
+    renderWithTheme(
+      <ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const editDialog = await screen.findByRole("dialog", { name: "Edit Issue" });
+    await user.clear(within(editDialog).getByLabelText("Name"));
+    await user.type(within(editDialog).getByLabelText("Name"), "Updated issue from list");
+    await user.click(within(editDialog).getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(eventListener).toHaveBeenCalled();
+    });
+
+    window.removeEventListener(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, eventListener);
+  });
+
   it("moves an updated issue into the matching status tab when its status changes", async () => {
     const user = userEvent.setup();
+    const blockedIssue = createIssue(7, {
+      name: "Blocked After Update",
+      progressPercentage: 55,
+      status: "ISSUE_STATUS_BLOCKED",
+    });
+    issuesApiMock.listIssues
+      .mockResolvedValueOnce({
+        issues: [
+          createIssue(7, { name: "In Progress High", priority: 2, progressPercentage: 35 }),
+          createIssue(8, { name: "Open Low", priority: 1, progressPercentage: 10, status: "ISSUE_STATUS_OPEN" }),
+          createIssue(9, { name: "Blocked Urgent", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
+          createIssue(10, {
+            closedAt: DEFAULT_TIMESTAMP,
+            closedReason: "ISSUE_CLOSED_REASON_RESOLVED",
+            name: "Closed Done",
+            progressPercentage: 100,
+            status: "ISSUE_STATUS_CLOSED",
+          }),
+        ],
+      })
+      .mockResolvedValue({
+        issues: [
+          blockedIssue,
+          createIssue(8, { name: "Open Low", priority: 1, progressPercentage: 10, status: "ISSUE_STATUS_OPEN" }),
+          createIssue(9, { name: "Blocked Urgent", priority: 3, progressPercentage: 20, status: "ISSUE_STATUS_BLOCKED" }),
+          createIssue(10, {
+            closedAt: DEFAULT_TIMESTAMP,
+            closedReason: "ISSUE_CLOSED_REASON_RESOLVED",
+            name: "Closed Done",
+            progressPercentage: 100,
+            status: "ISSUE_STATUS_CLOSED",
+          }),
+        ],
+      });
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue(7, {
-        name: "Blocked After Update",
-        progressPercentage: 55,
-        status: "ISSUE_STATUS_BLOCKED",
-      }),
+      issue: blockedIssue,
     });
 
     renderWithTheme(
@@ -357,5 +443,22 @@ describe("ProjectManagerIssuesPage", () => {
       expect(issuesApiMock.deleteIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
     });
     expect(screen.queryByText("Issue 7")).not.toBeInTheDocument();
+  });
+
+  it("reloads issue list when issue-updated event is received for the same project", async () => {
+    renderWithTheme(
+      <ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await screen.findByText("In Progress High");
+    expect(issuesApiMock.listIssues).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new CustomEvent(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, {
+      detail: { issueId: 7, projectId: 42 },
+    }));
+
+    await waitFor(() => {
+      expect(issuesApiMock.listIssues).toHaveBeenCalledTimes(2);
+    });
   });
 });

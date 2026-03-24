@@ -10,6 +10,7 @@ import {
   subscribeGanttRuntimeChartCache,
   type GanttRuntimeChartCacheEntry,
 } from "../lib/gantt-runtime-chart-cache.js";
+import { subscribeGanttRuntimeMetadataReloadRequestedEvent } from "../lib/gantt-runtime-chart-events.js";
 import {
   type GgtcTaskExtensionMissingAttributeReport,
   GgtcDhtmlxGanttExtensionsManager,
@@ -106,6 +107,32 @@ export function useGanttChartFileManager(options: {
     setRuntimeCache(getGanttRuntimeChartCacheEntry(projectId) ?? null);
     return subscribeGanttRuntimeChartCache(projectId, () => {
       setRuntimeCache(getGanttRuntimeChartCacheEntry(projectId) ?? null);
+    });
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId === null) {
+      return undefined;
+    }
+
+    return subscribeGanttRuntimeMetadataReloadRequestedEvent((detail) => {
+      if (detail.projectId !== projectId) {
+        return;
+      }
+
+      const cachedEntry = getGanttRuntimeChartCacheEntry(projectId);
+      if (!cachedEntry) {
+        return;
+      }
+
+      setChartSource({
+        content: cachedEntry.serializedXml,
+        type: cachedEntry.type,
+      });
+
+      if (lastSavedXmlRef.current !== null) {
+        setIsDirty(cachedEntry.serializedXml !== lastSavedXmlRef.current);
+      }
     });
   }, [projectId]);
 

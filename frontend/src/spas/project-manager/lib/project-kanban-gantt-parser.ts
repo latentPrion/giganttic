@@ -1,16 +1,26 @@
 import type { KanbanColumnValue } from "../components/kanban/kanban.types.js";
+import {
+  type IssueStatus,
+} from "../contracts/issue.contracts.js";
+import {
+  GGTC_TASK_STATUS_ATTRIBUTE,
+  GGTC_TASK_STATUS_OPEN,
+} from "./ggtc-dhtmlx-gantt-extensions-manager.js";
+import { inferMilestoneStatusesFromXml } from "./project-tasks-history-parser.js";
 
 export interface ParsedGanttKanbanTask {
   column: KanbanColumnValue;
   id: string;
+  isMilestone: boolean;
   progressPercentage: number;
   startDate: string;
+  status: IssueStatus;
   title: string;
 }
 
 const GANTT_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
-const IN_PROGRESS_COLUMN: KanbanColumnValue = "ISSUE_STATUS_IN_PROGRESS";
 const MAX_PROGRESS_RATIO = 1;
+const MILESTONE_TYPE = "milestone";
 
 function parseGanttDate(value: string): Date | null {
   const match = GANTT_DATE_PATTERN.exec(value.trim());
@@ -55,28 +65,71 @@ function hasTaskBegun(startDate: Date | null, now: Date): boolean {
   return startDate !== null && startDate.getTime() <= now.getTime();
 }
 
-function isCompletedTask(progressRatio: number): boolean {
-  return progressRatio >= MAX_PROGRESS_RATIO;
+function parseTaskStatus(taskElement: Element): IssueStatus {
+  const value = taskElement.getAttribute(GGTC_TASK_STATUS_ATTRIBUTE);
+  switch (value) {
+    case "ISSUE_STATUS_IN_PROGRESS":
+    case "ISSUE_STATUS_BLOCKED":
+    case "ISSUE_STATUS_CLOSED":
+    case "ISSUE_STATUS_OPEN":
+      return value;
+    default:
+      return GGTC_TASK_STATUS_OPEN;
+  }
+}
+
+function isMilestone(taskElement: Element): boolean {
+  return taskElement.getAttribute("type")?.trim().toLowerCase() === MILESTONE_TYPE;
+}
+
+function shouldDisplayTask(
+  startDate: Date | null,
+  status: IssueStatus,
+  now: Date,
+): boolean {
+  if (startDate === null) {
+    return false;
+  }
+
+  if (hasTaskBegun(startDate, now)) {
+    return true;
+  }
+
+  return status !== GGTC_TASK_STATUS_OPEN;
 }
 
 function parseVisibleTask(
   taskElement: Element,
   now: Date,
+  inferredMilestoneStatuses: ReadonlyMap<string, IssueStatus>,
 ): ParsedGanttKanbanTask | null {
   const title = parseTaskTitle(taskElement);
   const taskId = taskElement.getAttribute("id")?.trim() ?? "";
   const startDate = parseGanttDate(taskElement.getAttribute("start_date") ?? "");
   const progressRatio = parseTaskProgress(taskElement);
+  const milestone = isMilestone(taskElement);
+  const rawStatus = parseTaskStatus(taskElement);
+  const status = milestone
+    ? (inferredMilestoneStatuses.get(taskId) ?? rawStatus)
+    : rawStatus;
+  const progressPercentage = Math.round(progressRatio * 100);
 
-  if (!title || !taskId || !hasTaskBegun(startDate, now) || isCompletedTask(progressRatio)) {
+  if (!title || !taskId || !shouldDisplayTask(startDate, status, now)) {
+    return null;
+  }
+
+  // Milestones are hidden from Kanban until their start date is reached.
+  if (milestone && !hasTaskBegun(startDate, now)) {
     return null;
   }
 
   return {
-    column: IN_PROGRESS_COLUMN,
+    column: status,
     id: taskId,
-    progressPercentage: Math.round(progressRatio * 100),
+    isMilestone: milestone,
+    progressPercentage,
     startDate: startDate!.toISOString(),
+    status,
     title,
   };
 }
@@ -92,7 +145,8 @@ export function parseProjectKanbanTasksFromXml(
     throw new Error("Project chart XML could not be parsed");
   }
 
+  const inferredMilestoneStatuses = inferMilestoneStatusesFromXml(xmlContent);
   return Array.from(xmlDocument.querySelectorAll("task"))
-    .map((taskElement) => parseVisibleTask(taskElement, now))
+    .map((taskElement) => parseVisibleTask(taskElement, now, inferredMilestoneStatuses))
     .filter((task): task is ParsedGanttKanbanTask => task !== null);
 }

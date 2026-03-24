@@ -44,8 +44,10 @@ describe("KanbanBoard", () => {
               kind: "ganttTask",
               task: {
                 id: "101",
+                isMilestone: false,
                 progressPercentage: 45,
                 startDate: DEFAULT_TIMESTAMP,
+                status: "ISSUE_STATUS_IN_PROGRESS",
                 title: "Started task",
               },
               title: "Started task",
@@ -61,6 +63,9 @@ describe("KanbanBoard", () => {
             value: "ISSUE_STATUS_CLOSED",
           },
         ]}
+        isBusy={false}
+        onIssueStatusChange={() => undefined}
+        onTaskStatusChange={() => undefined}
       />,
     );
 

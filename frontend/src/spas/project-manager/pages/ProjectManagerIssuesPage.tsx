@@ -30,6 +30,10 @@ import { IssueEditModal } from "../components/issues/IssueEditModal.js";
 import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { createProjectIssueRoute } from "../routes/project-route-paths.js";
+import {
+  emitProjectManagerIssueUpdatedEvent,
+  subscribeProjectManagerIssueUpdatedEvent,
+} from "../lib/issue-updated-events.js";
 
 interface ProjectManagerIssuesPageProps {
   projectId: number | null;
@@ -122,6 +126,7 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [issueSummaryTargetId, setIssueSummaryTargetId] = useState<number | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [reloadIssuesNonce, setReloadIssuesNonce] = useState(0);
 
   const visibleIssues = useMemo(
     () => sortIssues(filterIssuesByStatus(issues, activeStatusTab), issueSortMode),
@@ -167,7 +172,20 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [props.projectId, props.token]);
+  }, [props.projectId, props.token, reloadIssuesNonce]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      return undefined;
+    }
+
+    return subscribeProjectManagerIssueUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+      setReloadIssuesNonce((current) => current + 1);
+    });
+  }, [props.projectId]);
 
   function closeCreateModal(): void {
     setIsCreateModalOpen(false);
@@ -225,6 +243,10 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
       const response = await issuesApi.updateIssue(props.token, props.projectId, issueId, payload);
       setIssues((current) => upsertIssueById(current, response.issue));
       setIssueSummaryRefreshKey((current) => current + 1);
+      emitProjectManagerIssueUpdatedEvent({
+        issueId: response.issue.id,
+        projectId: response.issue.projectId,
+      });
       return response.issue;
     } finally {
       setBusyKey(null);

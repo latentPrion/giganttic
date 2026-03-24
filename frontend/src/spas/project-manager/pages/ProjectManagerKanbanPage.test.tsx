@@ -1,5 +1,6 @@
 import React from "react";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../../common/api/api-error.js";
@@ -8,21 +9,27 @@ import { ganttApi } from "../api/gantt-api.js";
 import { issuesApi } from "../api/issues-api.js";
 import { ProjectManagerKanbanPage } from "./ProjectManagerKanbanPage.js";
 import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
-import { emitGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-events.js";
+import {
+  emitGanttRuntimeChartUpdatedEvent,
+  GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT,
+} from "../lib/gantt-runtime-chart-events.js";
+import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
 
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 const ACTIVE_GANTT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
-  <task id="101" start_date="2000-03-03 09:00" progress="0.65"><![CDATA[Started task]]></task>
-  <task id="102" start_date="2999-03-20 09:00" progress="0.1"><![CDATA[Future task]]></task>
-  <task id="103" start_date="2000-03-01 09:00" progress="1"><![CDATA[Completed task]]></task>
+  <task id="101" start_date="2000-03-03 09:00" progress="0.65" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS"><![CDATA[Started task]]></task>
+  <task id="102" start_date="2999-03-20 09:00" progress="0.1" ggtc_task_status="ISSUE_STATUS_OPEN"><![CDATA[Future open task]]></task>
+  <task id="103" start_date="2000-03-01 09:00" progress="1" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[Completed task]]></task>
+  <task id="104" start_date="2999-03-21 09:00" progress="0.2" ggtc_task_status="ISSUE_STATUS_BLOCKED"><![CDATA[Future blocked task]]></task>
 </data>
 `;
 
 vi.mock("../api/issues-api.js", () => ({
   issuesApi: {
     listIssues: vi.fn(),
+    updateIssue: vi.fn(),
   },
 }));
 
@@ -64,6 +71,7 @@ describe("ProjectManagerKanbanPage", () => {
   beforeEach(() => {
     clearGanttRuntimeChartCache();
     issuesApiMock.listIssues.mockReset();
+    issuesApiMock.updateIssue.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
@@ -80,6 +88,12 @@ describe("ProjectManagerKanbanPage", () => {
         }),
       ],
     });
+    issuesApiMock.updateIssue.mockImplementation(async (_token, _projectId, issueId, payload) => ({
+      issue: createIssue({
+        id: issueId,
+        status: (payload.status ?? "ISSUE_STATUS_IN_PROGRESS"),
+      }),
+    }));
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: ACTIVE_GANTT_XML,
       type: "xml",
@@ -96,16 +110,17 @@ describe("ProjectManagerKanbanPage", () => {
     expect(within(getColumn("In Progress")).getByText("Progress issue")).toBeVisible();
     expect(await within(getColumn("In Progress")).findByText("Started task")).toBeVisible();
     expect(within(getColumn("Blocked")).getByText("Blocked issue")).toBeVisible();
+    expect(within(getColumn("Blocked")).getByText("Future blocked task")).toBeVisible();
     expect(within(getColumn("Closed")).getByText("Closed issue")).toBeVisible();
+    expect(within(getColumn("Closed")).getByText("Completed task")).toBeVisible();
   });
 
-  it("filters out future and completed gantt tasks", async () => {
+  it("filters out future open gantt tasks", async () => {
     renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
 
     await screen.findByText("Started task");
 
-    expect(screen.queryByText("Future task")).not.toBeInTheDocument();
-    expect(screen.queryByText("Completed task")).not.toBeInTheDocument();
+    expect(screen.queryByText("Future open task")).not.toBeInTheDocument();
   });
 
   it("continues rendering the issue board when the chart route returns 404", async () => {
@@ -134,16 +149,17 @@ describe("ProjectManagerKanbanPage", () => {
 
     expect(await screen.findByText("Started task")).toBeVisible();
 
-    const completedStartedTaskXml = ACTIVE_GANTT_XML.replace('id="101" start_date="2000-03-03 09:00" progress="0.65"', 'id="101" start_date="2000-03-03 09:00" progress="1"');
+    const completedStartedTaskXml = ACTIVE_GANTT_XML.replace(
+      'id="101" start_date="2000-03-03 09:00" progress="0.65" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS"',
+      'id="101" start_date="2000-03-03 09:00" progress="1" ggtc_task_status="ISSUE_STATUS_CLOSED"',
+    );
 
     emitGanttRuntimeChartUpdatedEvent({
       projectId: 42,
       serializedXml: completedStartedTaskXml,
     });
 
-    await waitFor(() => {
-      expect(screen.queryByText("Started task")).not.toBeInTheDocument();
-    });
+    expect(await within(getColumn("Closed")).findByText("Started task")).toBeVisible();
   });
 
   it("shows an error when issue loading fails", async () => {
@@ -183,6 +199,57 @@ describe("ProjectManagerKanbanPage", () => {
     await waitFor(() => {
       expect(issuesApiMock.listIssues).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
       expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+    });
+  });
+
+  it("updates issue status on double click and persists to backend", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const issueCard = await screen.findByTestId("kanban-issue-card-1");
+    fireEvent.doubleClick(issueCard);
+    await user.click(await screen.findByRole("menuitem", { name: "blocked" }));
+
+    await waitFor(() => {
+      expect(issuesApiMock.updateIssue).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        42,
+        1,
+        expect.objectContaining({ status: "ISSUE_STATUS_BLOCKED" }),
+      );
+    });
+  });
+
+  it("updates non-milestone task status in cache and emits gantt metadata reload event", async () => {
+    const user = userEvent.setup();
+    const metadataReloadListener = vi.fn();
+    window.addEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, metadataReloadListener);
+
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    fireEvent.doubleClick(taskCard);
+    await user.click(await screen.findByRole("menuitem", { name: "blocked" }));
+
+    await waitFor(() => {
+      expect(metadataReloadListener).toHaveBeenCalled();
+    });
+    expect(within(getColumn("Blocked")).getByText("Started task")).toBeVisible();
+
+    window.removeEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, metadataReloadListener);
+  });
+
+  it("reloads issues when issue-updated event is emitted", async () => {
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    await screen.findByText("Open issue");
+    expect(issuesApiMock.listIssues).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new CustomEvent(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, {
+      detail: { issueId: 1, projectId: 42 },
+    }));
+
+    await waitFor(() => {
+      expect(issuesApiMock.listIssues).toHaveBeenCalledTimes(2);
     });
   });
 });

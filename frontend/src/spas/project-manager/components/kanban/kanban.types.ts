@@ -7,8 +7,10 @@ export type KanbanColumnValue = IssueStatus;
 
 export interface GanttTaskCardData {
   id: string;
+  isMilestone: boolean;
   progressPercentage: number;
   startDate: string;
+  status: IssueStatus;
   title: string;
 }
 

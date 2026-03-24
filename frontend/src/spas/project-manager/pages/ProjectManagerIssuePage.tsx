@@ -27,6 +27,10 @@ import {
   createProjectIssueRoute,
   createProjectIssuesRoute,
 } from "../routes/project-route-paths.js";
+import {
+  emitProjectManagerIssueUpdatedEvent,
+  subscribeProjectManagerIssueUpdatedEvent,
+} from "../lib/issue-updated-events.js";
 
 interface ProjectManagerIssuePageProps {
   issueId: number | null;
@@ -53,6 +57,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [reloadIssueNonce, setReloadIssueNonce] = useState(0);
 
   useEffect(() => {
     if (props.issueId === null || props.projectId === null) {
@@ -89,7 +94,20 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     return () => {
       isMounted = false;
     };
-  }, [props.issueId, props.projectId, props.token]);
+  }, [props.issueId, props.projectId, props.token, reloadIssueNonce]);
+
+  useEffect(() => {
+    if (props.projectId === null || props.issueId === null) {
+      return undefined;
+    }
+
+    return subscribeProjectManagerIssueUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId || detail.issueId !== props.issueId) {
+        return;
+      }
+      setReloadIssueNonce((current) => current + 1);
+    });
+  }, [props.issueId, props.projectId]);
 
   function goBackToIssues(): void {
     if (props.projectId === null) {
@@ -113,6 +131,10 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
       const response = await issuesApi.updateIssue(props.token, props.projectId, issueId, payload);
       setIssue(response.issue);
       setIssueSummaryRefreshKey((current) => current + 1);
+      emitProjectManagerIssueUpdatedEvent({
+        issueId: response.issue.id,
+        projectId: response.issue.projectId,
+      });
       return response.issue;
     } finally {
       setBusyKey(null);

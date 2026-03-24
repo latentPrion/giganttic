@@ -12,7 +12,11 @@ import {
 } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import { useGanttChartFileManager } from "./use-gantt-chart-file-manager.js";
-import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
+import {
+  clearGanttRuntimeChartCache,
+  setGanttRuntimeChartCacheEntry,
+} from "../lib/gantt-runtime-chart-cache.js";
+import { emitGanttRuntimeMetadataReloadRequestedEvent } from "../lib/gantt-runtime-chart-events.js";
 
 function stubGanttRef(
   current: { getSerializedXml: () => string } | null,
@@ -428,6 +432,39 @@ describe("useGanttChartFileManager", () => {
       type: "xml",
     });
     expect(result.current.hasServerChart).toBe(true);
+  });
+
+  it("reloads chart source from cache when metadata reload event is emitted", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: SERVER_XML,
+      type: "xml",
+    });
+    const ganttRef = stubGanttRef(null);
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 42,
+        token: "tok-reload",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    setGanttRuntimeChartCacheEntry(42, {
+      serializedXml: "<data><task id=\"cache-task\"/></data>",
+      type: "xml",
+    });
+
+    act(() => {
+      emitGanttRuntimeMetadataReloadRequestedEvent({ projectId: 42 });
+    });
+
+    await waitFor(() => {
+      expect(result.current.chartSource?.content).toContain("cache-task");
+    });
   });
 
   it("sets isPersisting true while putProjectChart is in flight", async () => {

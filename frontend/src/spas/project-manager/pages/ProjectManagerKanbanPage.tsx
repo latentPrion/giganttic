@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -13,12 +13,25 @@ import { KanbanBoard } from "../components/kanban/KanbanBoard.js";
 import { createKanbanColumns } from "../components/kanban/kanban-models.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import type { Issue } from "../contracts/issue.contracts.js";
+import type { IssueStatus } from "../contracts/issue.contracts.js";
 import {
   parseProjectKanbanTasksFromXml,
   type ParsedGanttKanbanTask,
 } from "../lib/project-kanban-gantt-parser.js";
 import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
+import {
+  emitProjectManagerIssueUpdatedEvent,
+  subscribeProjectManagerIssueUpdatedEvent,
+} from "../lib/issue-updated-events.js";
+import {
+  getGanttRuntimeChartCacheEntry,
+  setGanttRuntimeChartCacheEntry,
+} from "../lib/gantt-runtime-chart-cache.js";
+import {
+  emitGanttRuntimeMetadataReloadRequestedEvent,
+} from "../lib/gantt-runtime-chart-events.js";
+import { updateTaskStatusInChartXml } from "../lib/kanban-task-status-cache-update.js";
 
 interface ProjectManagerKanbanPageProps {
   projectId: number | null;
@@ -49,6 +62,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
+  const [isUpdatingCardStatus, setIsUpdatingCardStatus] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [tasks, setTasks] = useState<ParsedGanttKanbanTask[]>([]);
 
@@ -57,10 +71,29 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     [issues, tasks],
   );
 
-  useEffect(() => {
-    const { projectId, token } = props;
+  const reloadIssuesFromBackend = useCallback(async () => {
+    if (props.projectId === null) {
+      setIssues([]);
+      setIsLoading(false);
+      return;
+    }
 
-    if (projectId === null) {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const issuesResponse = await issuesApi.listIssues(props.token, props.projectId);
+      setIssues(issuesResponse.issues);
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      setIssues([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [props.projectId, props.token]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
       setErrorMessage(null);
       setIsLoading(false);
       setIssues([]);
@@ -68,37 +101,22 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       return;
     }
 
-    // Keep issues loading independent from chart-cache loading.
-    setIsLoading(true);
-    setErrorMessage(null);
+    void reloadIssuesFromBackend();
+  }, [props.projectId, reloadIssuesFromBackend]);
 
-    let isMounted = true;
-    issuesApi
-      .listIssues(token, projectId)
-      .then((issuesResponse) => {
-        if (!isMounted) {
-          return;
-        }
-        setIssues(issuesResponse.issues);
-      })
-      .catch((error) => {
-        if (!isMounted) {
-          return;
-        }
-        setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
-        setIssues([]);
-      })
-      .finally(() => {
-        if (!isMounted) {
-          return;
-        }
-        setIsLoading(false);
-      });
+  useEffect(() => {
+    if (props.projectId === null) {
+      return undefined;
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [props.projectId, props.token]);
+    return subscribeProjectManagerIssueUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+
+      void reloadIssuesFromBackend();
+    });
+  }, [props.projectId, reloadIssuesFromBackend]);
 
   useEffect(() => {
     if (props.projectId === null) {
@@ -128,6 +146,65 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     props.projectId,
   ]);
 
+  async function handleIssueStatusChange(issueId: number, status: IssueStatus): Promise<void> {
+    if (props.projectId === null) {
+      return;
+    }
+
+    const targetIssue = issues.find((issue) => issue.id === issueId);
+    if (!targetIssue || targetIssue.status === status) {
+      return;
+    }
+
+    setIsUpdatingCardStatus(true);
+    const previousIssues = issues;
+    setIssues((current) => current.map((issue) => (
+      issue.id === issueId
+        ? { ...issue, status }
+        : issue
+    )));
+
+    try {
+      const response = await issuesApi.updateIssue(props.token, props.projectId, issueId, { status });
+      setIssues((current) => current.map((issue) => (
+        issue.id === issueId
+          ? response.issue
+          : issue
+      )));
+      emitProjectManagerIssueUpdatedEvent({
+        issueId: response.issue.id,
+        projectId: response.issue.projectId,
+      });
+    } catch (error) {
+      setIssues(previousIssues);
+      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+    } finally {
+      setIsUpdatingCardStatus(false);
+    }
+  }
+
+  function handleTaskStatusChange(taskId: string, status: IssueStatus): void {
+    if (props.projectId === null) {
+      return;
+    }
+
+    const cacheEntry = getGanttRuntimeChartCacheEntry(props.projectId);
+    if (!cacheEntry) {
+      return;
+    }
+
+    try {
+      const updatedXml = updateTaskStatusInChartXml(cacheEntry.serializedXml, taskId, status);
+      setGanttRuntimeChartCacheEntry(props.projectId, {
+        serializedXml: updatedXml,
+        type: "xml",
+      });
+      emitGanttRuntimeMetadataReloadRequestedEvent({ projectId: props.projectId });
+    } catch (error) {
+      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+    }
+  }
+
   function renderContent() {
     if (props.projectId === null) {
       return <Alert severity="info">{MISSING_PROJECT_MESSAGE}</Alert>;
@@ -146,7 +223,16 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       return <Alert severity="error">{errorMessage}</Alert>;
     }
 
-    return <KanbanBoard columns={columns} />;
+    return (
+      <KanbanBoard
+        columns={columns}
+        isBusy={isUpdatingCardStatus}
+        onIssueStatusChange={(issueId, status) => {
+          void handleIssueStatusChange(issueId, status);
+        }}
+        onTaskStatusChange={handleTaskStatusChange}
+      />
+    );
   }
 
   return (

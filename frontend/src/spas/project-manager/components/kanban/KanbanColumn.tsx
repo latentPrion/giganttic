@@ -1,6 +1,7 @@
 import React from "react";
 import { Paper, Stack, Typography } from "@mui/material";
 
+import type { IssueStatus } from "../../contracts/issue.contracts.js";
 import {
   KANBAN_COLUMN_LABELS,
   KANBAN_EMPTY_COLUMN_MESSAGE,
@@ -9,17 +10,39 @@ import { KanbanIssueCard } from "./KanbanIssueCard.js";
 import { KanbanTaskCard } from "./KanbanTaskCard.js";
 import type { KanbanColumnModel } from "./kanban.types.js";
 
-function renderKanbanCard(card: KanbanColumnModel["cards"][number]) {
+function renderKanbanCard(
+  card: KanbanColumnModel["cards"][number],
+  onIssueStatusChange: (issueId: number, status: IssueStatus) => void,
+  onTaskStatusChange: (taskId: string, status: IssueStatus) => void,
+  isBusy: boolean,
+) {
   switch (card.kind) {
     case "ganttTask":
-      return <KanbanTaskCard card={card} />;
+      return (
+        <KanbanTaskCard
+          card={card}
+          disabled={isBusy}
+          onUpdateStatus={onTaskStatusChange}
+        />
+      );
     case "issue":
     default:
-      return <KanbanIssueCard card={card} />;
+      return (
+        <KanbanIssueCard
+          card={card}
+          disabled={isBusy}
+          onUpdateStatus={onIssueStatusChange}
+        />
+      );
   }
 }
 
-export function KanbanColumn(props: { column: KanbanColumnModel }) {
+export function KanbanColumn(props: {
+  column: KanbanColumnModel;
+  isBusy: boolean;
+  onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
+  onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
+}) {
   const { column } = props;
 
   return (
@@ -39,7 +62,12 @@ export function KanbanColumn(props: { column: KanbanColumnModel }) {
           <Stack spacing={1.5}>
             {column.cards.map((card) => (
               <React.Fragment key={card.id}>
-                {renderKanbanCard(card)}
+                {renderKanbanCard(
+                  card,
+                  props.onIssueStatusChange,
+                  props.onTaskStatusChange,
+                  props.isBusy,
+                )}
               </React.Fragment>
             ))}
           </Stack>

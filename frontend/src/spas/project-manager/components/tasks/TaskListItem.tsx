@@ -41,6 +41,13 @@ export function TaskListItem(props: TaskListItemProps) {
   return (
     <EntityListItemCard
       description={`Task ID: ${task.id}`}
+      paperSx={{
+        border: (theme) => (
+          task.type === "milestone"
+            ? `2px solid ${theme.palette.warning.main}`
+            : undefined
+        ),
+      }}
       title={task.title}
       viewMode={props.viewMode}
     >

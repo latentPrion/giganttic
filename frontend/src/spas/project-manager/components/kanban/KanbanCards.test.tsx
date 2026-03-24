@@ -1,6 +1,6 @@
 import React from "react";
-import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderWithTheme } from "../../../../test/render-with-theme.js";
 import { KanbanIssueCard } from "./KanbanIssueCard.js";
@@ -34,6 +34,7 @@ describe("kanban cards", () => {
           kind: "issue",
           title: "Blocked issue",
         }}
+        onUpdateStatus={vi.fn()}
       />,
     );
 
@@ -51,17 +52,45 @@ describe("kanban cards", () => {
           kind: "ganttTask",
           task: {
             id: "101",
+            isMilestone: false,
             progressPercentage: 65,
             startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_IN_PROGRESS",
             title: "Started task",
           },
           title: "Started task",
         }}
+        onUpdateStatus={vi.fn()}
       />,
     );
 
     expect(screen.getByText("Started task")).toBeVisible();
     expect(screen.getByText("Gantt Task")).toBeVisible();
     expect(screen.getByText("Progress 65%")).toBeVisible();
+  });
+
+  it("does not open status menu for milestone cards on double click", async () => {
+    renderWithTheme(
+      <KanbanTaskCard
+        card={{
+          column: "ISSUE_STATUS_CLOSED",
+          id: "ganttTask:mile-1",
+          kind: "ganttTask",
+          task: {
+            id: "mile-1",
+            isMilestone: true,
+            progressPercentage: 100,
+            startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_CLOSED",
+            title: "Milestone Alpha",
+          },
+          title: "Milestone Alpha",
+        }}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-mile-1"));
+    expect(screen.queryByRole("menuitem", { name: "open" })).not.toBeInTheDocument();
   });
 });

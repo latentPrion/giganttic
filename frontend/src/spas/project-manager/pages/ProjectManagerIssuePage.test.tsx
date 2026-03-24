@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
+import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
 import { ProjectManagerIssuePage } from "./ProjectManagerIssuePage.js";
 
 const navigateMock = vi.fn();
@@ -89,8 +90,10 @@ describe("ProjectManagerIssuePage", () => {
 
   it("updates the issue and refreshes the detail preview row", async () => {
     const user = userEvent.setup();
+    const updatedIssue = createIssue({ name: "Issue 7 Updated", priority: 3, progressPercentage: 90 });
+    issuesApiMock.getIssue.mockResolvedValue({ issue: updatedIssue });
     issuesApiMock.updateIssue.mockResolvedValue({
-      issue: createIssue({ name: "Issue 7 Updated", priority: 3, progressPercentage: 90 }),
+      issue: updatedIssue,
     });
 
     renderWithTheme(
@@ -155,5 +158,47 @@ describe("ProjectManagerIssuePage", () => {
     );
 
     expect(await screen.findByText("Provide both a valid issue id and projectId to view an issue.")).toBeVisible();
+  });
+
+  it("reloads issue detail when an issue-updated event is received for same issue", async () => {
+    renderWithTheme(
+      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await screen.findByText("Issue 7");
+    expect(issuesApiMock.getIssue).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new CustomEvent(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, {
+      detail: { issueId: 7, projectId: 42 },
+    }));
+
+    await waitFor(() => {
+      expect(issuesApiMock.getIssue).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("emits issue-updated event after successful issue edit", async () => {
+    const user = userEvent.setup();
+    const eventListener = vi.fn();
+    window.addEventListener(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, eventListener);
+    issuesApiMock.updateIssue.mockResolvedValue({
+      issue: createIssue({ name: "Issue 7 Retitled" }),
+    });
+
+    renderWithTheme(
+      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const editDialog = await screen.findByRole("dialog", { name: "Edit Issue" });
+    await user.clear(within(editDialog).getByLabelText("Name"));
+    await user.type(within(editDialog).getByLabelText("Name"), "Issue 7 Retitled");
+    await user.click(within(editDialog).getByRole("button", { name: "Save Changes" }));
+
+    await waitFor(() => {
+      expect(eventListener).toHaveBeenCalled();
+    });
+
+    window.removeEventListener(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, eventListener);
   });
 });

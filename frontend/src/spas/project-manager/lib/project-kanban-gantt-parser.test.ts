@@ -4,25 +4,32 @@ import { parseProjectKanbanTasksFromXml } from "./project-kanban-gantt-parser.js
 
 const MIXED_TASK_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
-  <task id="1" start_date="2026-03-05 09:00" progress="0.4"><![CDATA[Active task]]></task>
-  <task id="2" start_date="2026-03-20 09:00" progress="0"><![CDATA[Future task]]></task>
-  <task id="3" start_date="2026-03-03 09:00" progress="1"><![CDATA[Done task]]></task>
+  <task id="1" start_date="2026-03-05 09:00" progress="0.4" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS"><![CDATA[Active task]]></task>
+  <task id="2" start_date="2026-03-20 09:00" progress="0" ggtc_task_status="ISSUE_STATUS_OPEN"><![CDATA[Future open task]]></task>
+  <task id="3" start_date="2026-03-03 09:00" progress="1" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[Done task]]></task>
+  <task id="4" start_date="2026-03-20 09:00" progress="0" ggtc_task_status="ISSUE_STATUS_BLOCKED"><![CDATA[Future blocked task]]></task>
 </data>
 `;
 const NOW = new Date("2026-03-10T12:00:00.000Z");
 
 describe("project kanban gantt parser", () => {
-  it("keeps only started and incomplete gantt tasks in the in-progress column", () => {
+  it("maps gantt tasks into columns from ggtc status", () => {
     const tasks = parseProjectKanbanTasksFromXml(MIXED_TASK_XML, NOW);
 
-    expect(tasks).toEqual([
+    expect(tasks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         column: "ISSUE_STATUS_IN_PROGRESS",
         id: "1",
+        status: "ISSUE_STATUS_IN_PROGRESS",
         progressPercentage: 40,
         title: "Active task",
       }),
-    ]);
+      expect.objectContaining({
+        column: "ISSUE_STATUS_CLOSED",
+        id: "3",
+        status: "ISSUE_STATUS_CLOSED",
+      }),
+    ]));
   });
 
   it("ignores task nodes that are missing ids, titles, or parseable start dates", () => {
@@ -70,24 +77,39 @@ describe("project kanban gantt parser", () => {
     ]);
   });
 
-  it("filters out tasks whose progress is complete in ratio or percent-like form", () => {
+  it("hides future open tasks but keeps future non-open tasks", () => {
+    const tasks = parseProjectKanbanTasksFromXml(MIXED_TASK_XML, NOW);
+
+    expect(tasks.find((task) => task.id === "2")).toBeUndefined();
+    expect(tasks.find((task) => task.id === "4")).toEqual(
+      expect.objectContaining({
+        column: "ISSUE_STATUS_BLOCKED",
+        id: "4",
+      }),
+    );
+  });
+
+  it("hides future milestones while still including started milestones", () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
-  <task id="30" start_date="2026-03-05 09:00" progress="1.0"><![CDATA[Ratio complete]]></task>
-  <task id="31" start_date="2026-03-05 09:00" progress="100"><![CDATA[Percent complete]]></task>
-  <task id="32" start_date="2026-03-05 09:00" progress="0.99"><![CDATA[Almost done]]></task>
+  <task id="task-1" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_CLOSED"><![CDATA[Task 1]]></task>
+  <task id="future-m" type="milestone" start_date="2026-03-20 09:00"><![CDATA[Future Milestone]]></task>
+  <task id="started-m" type="milestone" start_date="2026-03-02 09:00"><![CDATA[Started Milestone]]></task>
+  <link id="1" source="task-1" target="future-m" />
+  <link id="2" source="task-1" target="started-m" />
 </data>
 `;
 
     const tasks = parseProjectKanbanTasksFromXml(xml, NOW);
 
-    expect(tasks).toEqual([
+    expect(tasks.find((task) => task.id === "future-m")).toBeUndefined();
+    expect(tasks.find((task) => task.id === "started-m")).toEqual(
       expect.objectContaining({
-        id: "32",
-        progressPercentage: 99,
-        title: "Almost done",
+        id: "started-m",
+        isMilestone: true,
+        status: "ISSUE_STATUS_CLOSED",
       }),
-    ]);
+    );
   });
 
   it("parses valid tasks from nested task structures and ignores unrelated xml nodes", () => {
