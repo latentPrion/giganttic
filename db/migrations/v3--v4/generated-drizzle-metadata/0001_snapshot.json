@@ -1,256 +1,9 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f0df7351-f44a-4ce2-b6c4-ee306a5fd0a4",
+  "id": "5d306cd9-9898-41e7-ab72-e5f4f1a2a3bf",
   "prevId": "b2891a69-0622-4f48-b11c-87f96905ec51",
   "tables": {
-    "ScopedAccessObjectTypes": {
-      "name": "ScopedAccessObjectTypes",
-      "columns": {
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "displayName": {
-          "name": "displayName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "ScopedAccessTokenCredentials_Objects": {
-      "name": "ScopedAccessTokenCredentials_Objects",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "scopedAccessTokenCredentialId": {
-          "name": "scopedAccessTokenCredentialId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scopedAccessObjectTypeCode": {
-          "name": "scopedAccessObjectTypeCode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scopedAccessObjectId": {
-          "name": "scopedAccessObjectId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
-        }
-      },
-      "indexes": {
-        "ScopedAccessTokenCredentials_Objects_tokenCredentialId_objectTypeCode_objectId_unique": {
-          "name": "ScopedAccessTokenCredentials_Objects_tokenCredentialId_objectTypeCode_objectId_unique",
-          "columns": [
-            "scopedAccessTokenCredentialId",
-            "scopedAccessObjectTypeCode",
-            "scopedAccessObjectId"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "ScopedAccessTokenCredentials_Objects_scopedAccessTokenCredentialId_Users_ScopedAccessTokenCredentials_id_fk": {
-          "name": "ScopedAccessTokenCredentials_Objects_scopedAccessTokenCredentialId_Users_ScopedAccessTokenCredentials_id_fk",
-          "tableFrom": "ScopedAccessTokenCredentials_Objects",
-          "tableTo": "Users_ScopedAccessTokenCredentials",
-          "columnsFrom": [
-            "scopedAccessTokenCredentialId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "ScopedAccessTokenCredentials_Objects_scopedAccessObjectTypeCode_ScopedAccessObjectTypes_code_fk": {
-          "name": "ScopedAccessTokenCredentials_Objects_scopedAccessObjectTypeCode_ScopedAccessObjectTypes_code_fk",
-          "tableFrom": "ScopedAccessTokenCredentials_Objects",
-          "tableTo": "ScopedAccessObjectTypes",
-          "columnsFrom": [
-            "scopedAccessObjectTypeCode"
-          ],
-          "columnsTo": [
-            "code"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "Users_ScopedAccessTokenCredentials": {
-      "name": "Users_ScopedAccessTokenCredentials",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
-        },
-        "ownerUserId": {
-          "name": "ownerUserId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "userCredentialTypeId": {
-          "name": "userCredentialTypeId",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tokenHash": {
-          "name": "tokenHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expiresAt": {
-          "name": "expiresAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "revokedAt": {
-          "name": "revokedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "lastUsedAt": {
-          "name": "lastUsedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
-        },
-        "updatedAt": {
-          "name": "updatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
-        }
-      },
-      "indexes": {
-        "Users_ScopedAccessTokenCredentials_tokenHash_unique": {
-          "name": "Users_ScopedAccessTokenCredentials_tokenHash_unique",
-          "columns": [
-            "tokenHash"
-          ],
-          "isUnique": true
-        },
-        "Users_ScopedAccessTokenCredentials_userCredentialTypeId_unique": {
-          "name": "Users_ScopedAccessTokenCredentials_userCredentialTypeId_unique",
-          "columns": [
-            "userCredentialTypeId"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "Users_ScopedAccessTokenCredentials_ownerUserId_Users_id_fk": {
-          "name": "Users_ScopedAccessTokenCredentials_ownerUserId_Users_id_fk",
-          "tableFrom": "Users_ScopedAccessTokenCredentials",
-          "tableTo": "Users",
-          "columnsFrom": [
-            "ownerUserId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "Users_ScopedAccessTokenCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk": {
-          "name": "Users_ScopedAccessTokenCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk",
-          "tableFrom": "Users_ScopedAccessTokenCredentials",
-          "tableTo": "Users_CredentialTypes",
-          "columnsFrom": [
-            "userCredentialTypeId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "ClosedReasons": {
       "name": "ClosedReasons",
       "columns": {
@@ -1095,6 +848,136 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "ScopedAccessObjectTypes": {
+      "name": "ScopedAccessObjectTypes",
+      "columns": {
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "ScopedAccessTokenCredentials_Objects": {
+      "name": "ScopedAccessTokenCredentials_Objects",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "scopedAccessTokenCredentialId": {
+          "name": "scopedAccessTokenCredentialId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "scopedAccessObjectTypeCode": {
+          "name": "scopedAccessObjectTypeCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "scopedAccessObjectId": {
+          "name": "scopedAccessObjectId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "ScopedAccessTokenCredentials_Objects_tokenCredentialId_objectTypeCode_objectId_unique": {
+          "name": "ScopedAccessTokenCredentials_Objects_tokenCredentialId_objectTypeCode_objectId_unique",
+          "columns": [
+            "scopedAccessTokenCredentialId",
+            "scopedAccessObjectTypeCode",
+            "scopedAccessObjectId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "ScopedAccessTokenCredentials_Objects_scopedAccessTokenCredentialId_Users_ScopedAccessTokenCredentials_id_fk": {
+          "name": "ScopedAccessTokenCredentials_Objects_scopedAccessTokenCredentialId_Users_ScopedAccessTokenCredentials_id_fk",
+          "tableFrom": "ScopedAccessTokenCredentials_Objects",
+          "tableTo": "Users_ScopedAccessTokenCredentials",
+          "columnsFrom": [
+            "scopedAccessTokenCredentialId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "ScopedAccessTokenCredentials_Objects_scopedAccessObjectTypeCode_ScopedAccessObjectTypes_code_fk": {
+          "name": "ScopedAccessTokenCredentials_Objects_scopedAccessObjectTypeCode_ScopedAccessObjectTypes_code_fk",
+          "tableFrom": "ScopedAccessTokenCredentials_Objects",
+          "tableTo": "ScopedAccessObjectTypes",
+          "columnsFrom": [
+            "scopedAccessObjectTypeCode"
+          ],
+          "columnsTo": [
+            "code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "SystemRoles": {
       "name": "SystemRoles",
       "columns": {
@@ -1829,6 +1712,123 @@
             "code"
           ],
           "onDelete": "restrict",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "Users_ScopedAccessTokenCredentials": {
+      "name": "Users_ScopedAccessTokenCredentials",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "ownerUserId": {
+          "name": "ownerUserId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userCredentialTypeId": {
+          "name": "userCredentialTypeId",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastUsedAt": {
+          "name": "lastUsedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch('subsec') * 1000 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "Users_ScopedAccessTokenCredentials_tokenHash_unique": {
+          "name": "Users_ScopedAccessTokenCredentials_tokenHash_unique",
+          "columns": [
+            "tokenHash"
+          ],
+          "isUnique": true
+        },
+        "Users_ScopedAccessTokenCredentials_userCredentialTypeId_unique": {
+          "name": "Users_ScopedAccessTokenCredentials_userCredentialTypeId_unique",
+          "columns": [
+            "userCredentialTypeId"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "Users_ScopedAccessTokenCredentials_ownerUserId_Users_id_fk": {
+          "name": "Users_ScopedAccessTokenCredentials_ownerUserId_Users_id_fk",
+          "tableFrom": "Users_ScopedAccessTokenCredentials",
+          "tableTo": "Users",
+          "columnsFrom": [
+            "ownerUserId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "Users_ScopedAccessTokenCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk": {
+          "name": "Users_ScopedAccessTokenCredentials_userCredentialTypeId_Users_CredentialTypes_id_fk",
+          "tableFrom": "Users_ScopedAccessTokenCredentials",
+          "tableTo": "Users_CredentialTypes",
+          "columnsFrom": [
+            "userCredentialTypeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "cascade"
         }
       },
