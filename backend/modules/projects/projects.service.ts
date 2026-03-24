@@ -57,7 +57,9 @@ import {
   assertProjectAccessibleWithScopedPolicy,
   intersectProjectIds,
   isScopedAccessSession,
+  listScopedTokenOrganizationIds,
   listScopedTokenProjectIds,
+  listScopedTokenTeamIds,
 } from "../scoped-access/scoped-access.policy.js";
 import type {
   CreateProjectRequest,
@@ -313,10 +315,10 @@ export class ProjectsService {
 
     return {
       members: this.listProjectMembers(projectId),
-      organizations: this.listProjectOrganizations(projectId),
+      organizations: this.listProjectOrganizations(authContext, projectId),
       project: this.getProjectRecordByIdOrThrow(projectId),
       projectManagers: this.listProjectManagers(projectId),
-      teams: this.listProjectTeams(projectId),
+      teams: this.listProjectTeams(authContext, projectId),
     };
   }
 
@@ -462,7 +464,7 @@ export class ProjectsService {
 
     return {
       projectId,
-      teams: this.listProjectTeams(projectId),
+      teams: this.listProjectTeams(authContext, projectId),
     };
   }
 
@@ -486,7 +488,7 @@ export class ProjectsService {
     });
 
     return {
-      organizations: this.listProjectOrganizations(projectId),
+      organizations: this.listProjectOrganizations(authContext, projectId),
       projectId,
     };
   }
@@ -1054,8 +1056,20 @@ export class ProjectsService {
     return sourceKinds;
   }
 
-  private listProjectTeams(projectId: number): ProjectTeam[] {
-    const teamIds = listTeamIdsForProject(this.databaseService.db, projectId);
+  private listProjectTeams(
+    authContext: AuthContext,
+    projectId: number,
+  ): ProjectTeam[] {
+    let teamIds = listTeamIdsForProject(this.databaseService.db, projectId);
+    if (isScopedAccessSession(authContext)) {
+      const scopedTeamIds = new Set(
+        listScopedTokenTeamIds(
+          this.databaseService.db,
+          authContext.sessionAuth.scopedAccessTokenCredentialId,
+        ),
+      );
+      teamIds = teamIds.filter((teamId) => scopedTeamIds.has(teamId));
+    }
     if (teamIds.length === 0) {
       return [];
     }
@@ -1069,11 +1083,25 @@ export class ProjectsService {
       .map(toProjectTeamResponse);
   }
 
-  private listProjectOrganizations(projectId: number): ProjectOrganization[] {
-    const organizationIds = listOrganizationIdsForProject(
+  private listProjectOrganizations(
+    authContext: AuthContext,
+    projectId: number,
+  ): ProjectOrganization[] {
+    let organizationIds = listOrganizationIdsForProject(
       this.databaseService.db,
       projectId,
     );
+    if (isScopedAccessSession(authContext)) {
+      const scopedOrganizationIds = new Set(
+        listScopedTokenOrganizationIds(
+          this.databaseService.db,
+          authContext.sessionAuth.scopedAccessTokenCredentialId,
+        ),
+      );
+      organizationIds = organizationIds.filter((organizationId) =>
+        scopedOrganizationIds.has(organizationId)
+      );
+    }
     if (organizationIds.length === 0) {
       return [];
     }

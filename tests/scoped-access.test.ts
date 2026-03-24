@@ -238,6 +238,29 @@ describe("scoped access tokens", () => {
     expect(await listProjectIds(scopedLogin.accessToken)).toEqual([projectA]);
   });
 
+  it("hides project organizations and teams not in the scoped token object set", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const projectA = await pickFirstAccessibleProject(standardLogin.accessToken);
+
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+    const scopedLogin = await redeemScopedToken(created.token);
+    const scopedProjectResponse = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectA}`,
+    });
+    expect(scopedProjectResponse.statusCode).toBe(200);
+    const scopedBody = parseJson<{
+      organizations: Array<{ id: number }>;
+      teams: Array<{ id: number }>;
+    }>(scopedProjectResponse.payload);
+
+    expect(scopedBody.organizations).toEqual([]);
+    expect(scopedBody.teams).toEqual([]);
+  });
+
   it("supports multiple assigned projects as a union", async () => {
     const standardLogin = await loginAs("testadminuser");
     const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
@@ -383,9 +406,15 @@ describe("scoped access tokens", () => {
       url: `/stc-proj-mgmt/api/users/${selfId}`,
     });
     expect(selfProfile.statusCode).toBe(200);
-    const selfBody = parseJson<{ projects: Array<{ id: number }> }>(selfProfile.payload);
+    const selfBody = parseJson<{
+      organizations: Array<{ id: number }>;
+      projects: Array<{ id: number }>;
+      teams: Array<{ id: number }>;
+    }>(selfProfile.payload);
     expect(selfBody.projects.map((project) => project.id).sort((a, b) => a - b)).toEqual([projectA]);
     expect(selfBody.projects.some((project) => project.id === projectB)).toBe(false);
+    expect(selfBody.organizations).toEqual([]);
+    expect(selfBody.teams).toEqual([]);
 
     const otherUserId = selfId === 1 ? 2 : 1;
     const otherProfile = await app.inject({

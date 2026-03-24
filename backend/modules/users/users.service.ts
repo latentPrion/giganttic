@@ -32,11 +32,10 @@ import {
   listDirectProjectOwnerUserIds,
   listEffectiveProjectManagerUserIds,
   listEffectiveTeamManagerUserIds,
-  listOrganizationIdsForProject,
+  listOrganizationIdsVisibleByMembership,
   listProjectIdsForOrganization,
   listProjectIdsForTeam,
   listProjectIdsVisibleByMembership,
-  listTeamIdsForProject,
   listTeamIdsVisibleByMembership,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
@@ -45,8 +44,11 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
+  intersectProjectIds,
   isScopedAccessSession,
+  listScopedTokenOrganizationIds,
   listScopedTokenProjectIds,
+  listScopedTokenTeamIds,
 } from "../scoped-access/scoped-access.policy.js";
 import {
   BLOCKING_OBJECT_KIND_PROJECT,
@@ -121,14 +123,26 @@ export class UsersService {
     };
 
     if (isScopedAccessSession(authContext)) {
-      const scopedProjectIds = listScopedTokenProjectIds(
-        this.databaseService.db,
-        authContext.sessionAuth.scopedAccessTokenCredentialId,
+      const credentialId = authContext.sessionAuth.scopedAccessTokenCredentialId;
+      const database = this.databaseService.db;
+      const scopedProjectIds = listScopedTokenProjectIds(database, credentialId);
+      const scopedOrganizationIds = listScopedTokenOrganizationIds(database, credentialId);
+      const scopedTeamIds = listScopedTokenTeamIds(database, credentialId);
+      const visibleOrganizationIds = new Set(
+        listOrganizationIdsVisibleByMembership(database, userId),
       );
+      const visibleTeamIds = new Set(listTeamIdsVisibleByMembership(database, userId));
+      const visibleProjectIds = listProjectIdsVisibleByMembership(database, userId);
+      const allowedProjectIds = intersectProjectIds(scopedProjectIds, visibleProjectIds);
+      const allowedOrganizationIds = scopedOrganizationIds.filter((organizationId) =>
+        visibleOrganizationIds.has(organizationId)
+      );
+      const allowedTeamIds = scopedTeamIds.filter((teamId) => visibleTeamIds.has(teamId));
+
       return {
-        organizations: this.listUserOrganizationsScoped(userId, scopedProjectIds),
-        projects: this.listUserProjectSummariesForProjectIds(scopedProjectIds),
-        teams: this.listUserTeamsScoped(userId, scopedProjectIds),
+        organizations: this.listUserOrganizationSummariesForIds(allowedOrganizationIds),
+        projects: this.listUserProjectSummariesForProjectIds(allowedProjectIds),
+        teams: this.listUserTeamSummariesForIds(allowedTeamIds),
         user: userPayload,
       };
     }
@@ -454,22 +468,6 @@ export class UsersService {
       }));
   }
 
-  private listTeamIdsReachableFromProjects(projectIds: number[]): number[] {
-    return uniqueNumberValues(
-      projectIds.flatMap((projectId) =>
-        listTeamIdsForProject(this.databaseService.db, projectId)
-      ),
-    );
-  }
-
-  private listOrganizationIdsReachableFromProjects(projectIds: number[]): number[] {
-    return uniqueNumberValues(
-      projectIds.flatMap((projectId) =>
-        listOrganizationIdsForProject(this.databaseService.db, projectId)
-      ),
-    );
-  }
-
   private listUserProjectSummariesForProjectIds(
     projectIds: number[],
   ): GetUserResponse["projects"] {
@@ -498,21 +496,8 @@ export class UsersService {
       }));
   }
 
-  private listUserTeamsScoped(
-    userId: number,
-    scopedProjectIds: number[],
-  ): GetUserResponse["teams"] {
-    if (scopedProjectIds.length === 0) {
-      return [];
-    }
-
-    const visibleTeamIds = new Set(
-      listTeamIdsVisibleByMembership(this.databaseService.db, userId),
-    );
-    const allowedTeamIds = this.listTeamIdsReachableFromProjects(scopedProjectIds).filter((teamId) =>
-      visibleTeamIds.has(teamId)
-    );
-    if (allowedTeamIds.length === 0) {
+  private listUserTeamSummariesForIds(teamIds: number[]): GetUserResponse["teams"] {
+    if (teamIds.length === 0) {
       return [];
     }
 
@@ -525,7 +510,7 @@ export class UsersService {
         updatedAt: teams.updatedAt,
       })
       .from(teams)
-      .where(inArray(teams.id, allowedTeamIds))
+      .where(inArray(teams.id, teamIds))
       .all()
       .sort((left, right) => left.id - right.id)
       .map((row) => ({
@@ -537,26 +522,10 @@ export class UsersService {
       }));
   }
 
-  private listUserOrganizationsScoped(
-    userId: number,
-    scopedProjectIds: number[],
+  private listUserOrganizationSummariesForIds(
+    organizationIds: number[],
   ): GetUserResponse["organizations"] {
-    if (scopedProjectIds.length === 0) {
-      return [];
-    }
-
-    const memberOrgIds = new Set(
-      this.databaseService.db
-        .select({ organizationId: usersOrganizations.organizationId })
-        .from(usersOrganizations)
-        .where(eq(usersOrganizations.userId, userId))
-        .all()
-        .map((row) => row.organizationId),
-    );
-    const allowedOrgIds = this.listOrganizationIdsReachableFromProjects(scopedProjectIds).filter((
-      organizationId,
-    ) => memberOrgIds.has(organizationId));
-    if (allowedOrgIds.length === 0) {
+    if (organizationIds.length === 0) {
       return [];
     }
 
@@ -569,7 +538,7 @@ export class UsersService {
         updatedAt: organizations.updatedAt,
       })
       .from(organizations)
-      .where(inArray(organizations.id, allowedOrgIds))
+      .where(inArray(organizations.id, organizationIds))
       .all()
       .sort((left, right) => left.id - right.id)
       .map((row) => ({

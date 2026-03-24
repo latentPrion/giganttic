@@ -142,6 +142,52 @@ export function listScopedTokenProjectIds(
     .map((row) => row.projectId);
 }
 
+export function listScopedTokenOrganizationIds(
+  database: AppDatabase,
+  scopedAccessTokenCredentialId: number,
+): number[] {
+  return database
+    .select({ organizationId: scopedAccessTokenCredentialsObjects.scopedAccessObjectId })
+    .from(scopedAccessTokenCredentialsObjects)
+    .where(
+      and(
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessTokenCredentialId,
+          scopedAccessTokenCredentialId,
+        ),
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessObjectTypeCode,
+          scopedAccessObjectTypeCodes.organization,
+        ),
+      ),
+    )
+    .all()
+    .map((row) => row.organizationId);
+}
+
+export function listScopedTokenTeamIds(
+  database: AppDatabase,
+  scopedAccessTokenCredentialId: number,
+): number[] {
+  return database
+    .select({ teamId: scopedAccessTokenCredentialsObjects.scopedAccessObjectId })
+    .from(scopedAccessTokenCredentialsObjects)
+    .where(
+      and(
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessTokenCredentialId,
+          scopedAccessTokenCredentialId,
+        ),
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessObjectTypeCode,
+          scopedAccessObjectTypeCodes.team,
+        ),
+      ),
+    )
+    .all()
+    .map((row) => row.teamId);
+}
+
 export function intersectProjectIds(
   left: ReadonlyArray<number>,
   right: ReadonlyArray<number>,
