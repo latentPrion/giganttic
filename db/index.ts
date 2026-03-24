@@ -8,11 +8,13 @@ import {
 import * as v1 from "./v1/index.js";
 import * as v2 from "./v2/index.js";
 import * as v3 from "./v3/index.js";
+import * as v4 from "./v4/index.js";
 
 const schemaModules = {
   v1,
   v2,
   v3,
+  v4,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -23,7 +25,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v3;
+] as typeof v4;
 
 export {
   availableSchemaVersions,
@@ -112,6 +114,13 @@ export const {
   teamsUsersInsertSchema,
   teamsUsersRelations,
   teamsUsersSelectSchema,
+  scopedAccessObjectTypeCodes,
+  scopedAccessObjectTypes,
+  scopedAccessObjectTypesRelations,
+  scopedAccessTokenCredentialsObjects,
+  scopedAccessTokenCredentialsObjectsRelations,
+  usersScopedAccessTokenCredentials,
+  usersScopedAccessTokenCredentialsRelations,
   users,
   usersCredentialTypes,
   usersCredentialTypesInsertSchema,
@@ -205,6 +214,16 @@ export type NewUserPasswordCredential =
   typeof usersPasswordCredentials.$inferInsert;
 export type UserSession = typeof usersSessions.$inferSelect;
 export type NewUserSession = typeof usersSessions.$inferInsert;
+export type ScopedAccessObjectType = typeof scopedAccessObjectTypes.$inferSelect;
+export type NewScopedAccessObjectType = typeof scopedAccessObjectTypes.$inferInsert;
+export type ScopedAccessTokenCredential =
+  typeof usersScopedAccessTokenCredentials.$inferSelect;
+export type NewScopedAccessTokenCredential =
+  typeof usersScopedAccessTokenCredentials.$inferInsert;
+export type ScopedAccessTokenCredentialObject =
+  typeof scopedAccessTokenCredentialsObjects.$inferSelect;
+export type NewScopedAccessTokenCredentialObject =
+  typeof scopedAccessTokenCredentialsObjects.$inferInsert;
 
 export type UserInsertInput = z.infer<typeof usersInsertSchema>;
 export type UserRecord = z.infer<typeof usersSelectSchema>;

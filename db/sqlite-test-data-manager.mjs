@@ -537,8 +537,8 @@ function ensureSeededTestData(
     purgeTrackedTopLevelEntities(db, trackedIds);
     runDelete(db, `DELETE FROM ${MANAGED_TEST_DATA_RECORDS_TABLE};`);
 
-    if (schemaName !== "v2" && schemaName !== "v3") {
-      throw new Error(`Test data seeding is only supported for schema v2/v3, received ${schemaName}.`);
+    if (schemaName !== "v2" && schemaName !== "v3" && schemaName !== "v4") {
+      throw new Error(`Test data seeding is only supported for schema v2/v3/v4, received ${schemaName}.`);
     }
 
     createV2StyleTestData(db, schemaName, profile, chartsDir);

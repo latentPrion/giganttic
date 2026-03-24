@@ -27,6 +27,23 @@ import {
 const MIGRATIONS_DIR_NAME = "migrations";
 const SUPPORTED_DB_TARGETS = ["dev", "proddev", "prod"];
 
+async function sqliteDbFileExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyProdToProddevIfMissing(sourceDbPath, targetDbPath) {
+  if (await sqliteDbFileExists(targetDbPath)) {
+    return;
+  }
+
+  await copyDbForProddev(sourceDbPath, targetDbPath);
+}
+
 function createMigrationUsageError() {
   return new Error(
     "Usage: node db/migrate.mjs --on-db <dev|proddev|prod> --with-migration <from>--<to>",
@@ -291,7 +308,7 @@ async function migrateDatabase({
   } = resolveDbTargetPaths(projectRoot, dbTarget, migrationPairName);
 
   if (dbTarget === "proddev") {
-    await copyDbForProddev(sourceDbPath, targetDbPath);
+    await copyProdToProddevIfMissing(sourceDbPath, targetDbPath);
   }
 
   await applyMigrationToSqliteDatabase({

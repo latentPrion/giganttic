@@ -149,6 +149,17 @@ This gives dynamic access management while preserving token continuity.
 - Type-aware validators should reject mismatched type/id pairs.
 - Route handlers must not trust `projectId` in request body alone; re-resolve from route params and enforce scope checks there.
 
+## Reference data and `db:prepare`
+
+After the database is migrated to **v4**, `db/config.json` should set `CONFIG_GGTC_DB_RT_SCHEMA_SNAPSHOT_SUBDIR` to `v4` so runtime tooling matches the file schema.
+
+Running `npm run db:prepare -- --on dev` (or `prod` / `proddev`) reconciles reference rows for the active schema via `db/sqlite-reference-data-manager.mjs`. For v4 this upserts:
+
+- `CredentialTypes`: `CREDTYPE_SCOPED_ACCESS_TOKEN` (and existing types).
+- `ScopedAccessObjectTypes`: `SCOPED_ACCESS_OBJECT_TYPE_PROJECT`, `SCOPED_ACCESS_OBJECT_TYPE_TEAM`, `SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION`.
+
+Seed definitions live in `db/reference-seed-data.mjs` under the `v4` key.
+
 ## Rollout Plan (Incremental)
 
 1. Add schema and migrations for token + object type + polymorphic join.

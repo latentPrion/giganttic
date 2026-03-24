@@ -326,6 +326,47 @@ describe("db lifecycle scripts", () => {
     });
   }, 20_000);
 
+  it("prepareDatabase upserts scoped access credential and ScopedAccessObjectTypes enum rows", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await createRuntimeSchemaDb(tempDir, "dev");
+    await prepareDatabase({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+    });
+
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "CredentialTypes",
+        "code = 'CREDTYPE_SCOPED_ACCESS_TOKEN'",
+      ),
+    ).toBe(1);
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ScopedAccessObjectTypes",
+        "code = 'SCOPED_ACCESS_OBJECT_TYPE_PROJECT'",
+      ),
+    ).toBe(1);
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ScopedAccessObjectTypes",
+        "code = 'SCOPED_ACCESS_OBJECT_TYPE_TEAM'",
+      ),
+    ).toBe(1);
+    expect(
+      await countRowsWhere(
+        dbPath,
+        "ScopedAccessObjectTypes",
+        "code = 'SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION'",
+      ),
+    ).toBe(1);
+  }, 20_000);
+
   it("supports the explicit historical dev flow of createfrom then migrate then prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
@@ -346,6 +387,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "dev",
       migrationPairName: "v2--v3",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v3--v4",
       projectRoot: tempDir,
     });
 
@@ -380,6 +426,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "proddev",
       migrationPairName: "v2--v3",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v3--v4",
       projectRoot: tempDir,
     });
 
@@ -718,7 +769,7 @@ describe("db lifecycle scripts", () => {
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
   }, 20_000);
 
-  it("prepareDatabase on v3 re-seeds a missing project owner reference row", async () => {
+  it("prepareDatabase on v4 re-seeds a missing project owner reference row", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -752,7 +803,7 @@ describe("db lifecycle scripts", () => {
     ).toBe(1);
   }, 20_000);
 
-  it("migrates v2 to v3 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+  it("migrates v2 through v4 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -778,12 +829,17 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v2--v3",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v3--v4",
+      projectRoot: tempDir,
+    });
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe("v3");
+    expect(await readSchemaName(dbPath)).toBe("v4");
     expect(
       await countRowsWhere(
         dbPath,
