@@ -7,6 +7,7 @@ import { LoginModal } from "./LoginModal.js";
 interface LoginButtonProps {
   isBusy: boolean;
   onLogin(payload: LoginRequest): Promise<void>;
+  onLoginWithScopedAccessToken(token: string): Promise<void>;
   size?: "large" | "medium" | "small";
   triggerButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
@@ -39,6 +40,7 @@ export function LoginButton(props: LoginButtonProps) {
         isOpen={isOpen}
         onClose={closeDialog}
         onLogin={props.onLogin}
+        onLoginWithScopedAccessToken={props.onLoginWithScopedAccessToken}
       />
     </>
   );

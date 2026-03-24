@@ -12,6 +12,7 @@ interface LoggedOutSessionManagerProps {
   buttonSize?: "large" | "medium" | "small";
   isBusy: boolean;
   onLogin(payload: LoginRequest): Promise<void>;
+  onLoginWithScopedAccessToken(token: string): Promise<void>;
   onRegister(payload: RegisterRequest): Promise<void>;
 }
 
@@ -29,6 +30,7 @@ export function LoggedOutSessionManager(
       <LoginButton
         isBusy={props.isBusy}
         onLogin={props.onLogin}
+        onLoginWithScopedAccessToken={props.onLoginWithScopedAccessToken}
         size={props.buttonSize}
         triggerButtonRef={loginButtonReference}
       />

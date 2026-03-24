@@ -97,6 +97,7 @@ export function HomeHero() {
             buttonSize="large"
             isBusy={isBusy}
             onLogin={actions.login}
+            onLoginWithScopedAccessToken={actions.loginWithScopedAccessToken}
             onRegister={actions.register}
           />
         ) : null}

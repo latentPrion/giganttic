@@ -13,6 +13,7 @@ vi.mock("../api/auth-api.js", () => ({
   authApi: {
     getCurrentSession: vi.fn(),
     login: vi.fn(),
+    loginWithScopedAccessToken: vi.fn(),
     register: vi.fn(),
     revokeCurrentSession: vi.fn(),
     revokeSessions: vi.fn(),
@@ -42,6 +43,8 @@ const LOGIN_BUTTON_LABEL = "Login";
 const REGISTER_BUTTON_LABEL = "Register";
 const MENU_BUTTON_LABEL = "Menu";
 const LOG_IN_BUTTON_LABEL = "Log In";
+const SCOPED_ACCESS_TOKEN_TAB_LABEL = "Scoped Access Token";
+const TOKEN_OR_URL_LABEL = "Token or login URL";
 const CREATE_ACCOUNT_BUTTON_LABEL = "Create Account";
 const CLOSE_BUTTON_LABEL = "Close";
 const CANCEL_BUTTON_LABEL = "Cancel";
@@ -128,6 +131,7 @@ describe("SessionManager", () => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.getCurrentSession.mockReset();
     authApiMock.login.mockReset();
+    authApiMock.loginWithScopedAccessToken.mockReset();
     authApiMock.register.mockReset();
     authApiMock.revokeCurrentSession.mockReset();
     authTokenStorageMock.clear.mockReset();
@@ -205,6 +209,24 @@ describe("SessionManager", () => {
         password: "secret",
         username: "demo-user",
       });
+    });
+    expect(authTokenStorageMock.write).toHaveBeenCalledWith("fresh-token");
+    expect(await screen.findByText("demo-user")).toBeVisible();
+  });
+
+  it("logs in with scoped access token from the modal tab", async () => {
+    const user = userEvent.setup();
+    authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
+
+    renderWithTheme(<App />);
+
+    await openLoginDialog(user);
+    await user.click(screen.getByRole("tab", { name: SCOPED_ACCESS_TOKEN_TAB_LABEL }));
+    await user.type(screen.getByLabelText(TOKEN_OR_URL_LABEL), "scoped-token-abc");
+    await user.click(screen.getByRole("button", { name: LOG_IN_BUTTON_LABEL }));
+
+    await waitFor(() => {
+      expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
     });
     expect(authTokenStorageMock.write).toHaveBeenCalledWith("fresh-token");
     expect(await screen.findByText("demo-user")).toBeVisible();
