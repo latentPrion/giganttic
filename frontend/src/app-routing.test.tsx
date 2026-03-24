@@ -116,6 +116,7 @@ function createAuthenticatedResponse() {
       expirationTimestamp: "2026-03-08T00:00:00.000Z",
       id: "session-1",
       ipAddress: "127.0.0.1",
+      isScopedAccessSession: false,
       location: null,
       revokedAt: null,
       startTimestamp: "2026-03-07T00:00:00.000Z",
@@ -303,7 +304,7 @@ describe("app routing", () => {
 
     expect(
       await screen.findByRole("link", { name: "Go to your lobby" }),
-    ).toHaveAttribute("href", "/lobby");
+    ).toHaveAttribute("href", "/user/lobby");
   });
 
   it("navigates to the lobby when the authenticated username chip is clicked", async () => {
@@ -319,9 +320,9 @@ describe("app routing", () => {
     expect(await screen.findByText("Your projects, teams, and organizations")).toBeVisible();
   });
 
-  it("redirects unauthenticated lobby requests to the public home route", async () => {
+  it("redirects unauthenticated user lobby requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/lobby"],
+      initialEntries: ["/user/lobby"],
     });
 
     expect(
@@ -334,7 +335,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/lobby"],
+      initialEntries: ["/user/lobby"],
     });
 
     expect(await screen.findByText("User Lobby")).toBeVisible();
@@ -430,7 +431,7 @@ describe("app routing", () => {
     expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
   });
 
-  it("redeems scoped token login route and redirects to /user", async () => {
+  it("redeems scoped token login route and redirects to the home page", async () => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
@@ -438,7 +439,7 @@ describe("app routing", () => {
       initialEntries: ["/auth/scoped-token-login?token=scoped-token-abc"],
     });
 
-    expect(await screen.findByText("User SPA")).toBeVisible();
+    expect(await screen.findByText("Giganttic, built by LatentPrion")).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
     expect(authTokenStorageMock.write).toHaveBeenCalledWith("scoped-login-token");
   });

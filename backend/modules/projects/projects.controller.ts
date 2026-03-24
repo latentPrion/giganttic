@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   HttpCode,
-  Header,
   Get,
   Inject,
   Param,
@@ -11,6 +10,7 @@ import {
   Post,
   Put,
   Req,
+  Res,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
@@ -77,12 +77,13 @@ export class ProjectsController {
   }
 
   @Get(":projectId/chart")
-  @Header("Content-Type", "application/xml; charset=utf-8")
   async getProjectChart(
     @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: { type: (contentType: string) => void },
     @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
   ) {
     const { projectId } = projectIdParamSchema.parse(params);
+    response.type("application/xml; charset=utf-8");
 
     return await this.projectsService.getProjectChart(
       request.authContext!,

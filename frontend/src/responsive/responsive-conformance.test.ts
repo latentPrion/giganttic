@@ -21,9 +21,9 @@ const PUBLIC_HOME_LAYOUTS_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
   "spas/public-home/layouts",
 );
-const USER_LOBBY_ROUTES_DIRECTORY = path.resolve(
+const USER_SPA_PAGES_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
-  "spas/user-lobby/routes",
+  "spas/user/pages",
 );
 const PROJECT_MANAGER_ROUTES_DIRECTORY = path.resolve(
   FRONTEND_SOURCE_DIRECTORY,
@@ -66,9 +66,9 @@ function readPublicHomeLayoutFile(filename: string) {
   );
 }
 
-function readUserLobbyRouteFile(filename: string) {
+function readUserSpaPageFile(filename: string) {
   return fs.readFileSync(
-    path.resolve(USER_LOBBY_ROUTES_DIRECTORY, filename),
+    path.resolve(USER_SPA_PAGES_DIRECTORY, filename),
     "utf8",
   );
 }
@@ -133,12 +133,12 @@ describe("responsive layout contracts", () => {
   it("wires the landing shell through the shared app entry point", () => {
     const appSource = readFrontendFile("App.tsx");
     const publicLayoutSource = readPublicHomeLayoutFile("PublicHomeLayout.tsx");
-    const lobbyRouteSource = readUserLobbyRouteFile("LobbyRoute.tsx");
+    const userSpaPageSource = readUserSpaPageFile("UserSpaPage.tsx");
     const projectRouteSource = readProjectManagerRouteFile("ProjectRoute.tsx");
 
     expect(appSource).toContain("<AppRoutes />");
     expect(publicLayoutSource).toContain("<AppShell");
-    expect(lobbyRouteSource).toContain("<UserLobbyPage");
+    expect(userSpaPageSource).toContain("<UserLobbyPage");
     expect(projectRouteSource).toContain("<ProjectManagerProjectPage");
   });
 });

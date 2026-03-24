@@ -291,6 +291,12 @@ export function listProjectIdsVisibleByMembership(
     .where(eq(projectsUsers.userId, userId))
     .all()
     .map((row) => row.projectId);
+  const roleVisibleProjectIds = database
+    .select({ projectId: usersProjectsProjectRoles.projectId })
+    .from(usersProjectsProjectRoles)
+    .where(eq(usersProjectsProjectRoles.userId, userId))
+    .all()
+    .map((row) => row.projectId);
   const teamDerivedProjectIds = listTeamIdsVisibleByMembership(database, userId)
     .flatMap((teamId) => listProjectIdsForTeam(database, teamId));
   const organizationDerivedProjectIds = listOrganizationIdsVisibleByMembership(database, userId)
@@ -298,6 +304,7 @@ export function listProjectIdsVisibleByMembership(
 
   return uniqueNumberValues([
     ...directProjectIds,
+    ...roleVisibleProjectIds,
     ...teamDerivedProjectIds,
     ...organizationDerivedProjectIds,
   ]);

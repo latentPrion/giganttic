@@ -24,7 +24,7 @@ export function ScopedAccessTokenLoginRoute() {
       try {
         await actions.loginWithScopedAccessToken(scopedAccessToken);
         if (!cancelled) {
-          navigate("/user", { replace: true });
+          navigate("/", { replace: true });
         }
       } catch (error) {
         if (!cancelled) {

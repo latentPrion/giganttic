@@ -23,6 +23,7 @@ export const sessionSummarySchema = z.object({
   expirationTimestamp: z.string(),
   id: z.string(),
   ipAddress: z.string(),
+  isScopedAccessSession: z.boolean(),
   location: z.string().nullable(),
   revokedAt: z.string().nullable(),
   startTimestamp: z.string(),

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   USER_CREDENTIALS_TAB_VALUES,
   USER_TOP_TAB_VALUES,
+  isUserLobbyPath,
   type UserCredentialsTab,
   type UserTopTab,
 } from "../routes/user-route-paths.js";
@@ -28,10 +29,19 @@ export function parseUserIdFromSearchParameters(searchParameters: URLSearchParam
   return parsePositiveIntegerSearchParameter(searchParameters, "userId");
 }
 
-export function parseUserTopTab(searchParameters: URLSearchParams): UserTopTab {
+export function parseUserTopTab(searchParameters: URLSearchParams, pathname: string): UserTopTab {
+  if (isUserLobbyPath(pathname)) {
+    return "lobby";
+  }
   const rawValue = searchParameters.get("tab");
   const parseResult = userTopTabSchema.safeParse(rawValue);
-  return parseResult.success ? parseResult.data : "details";
+  if (parseResult.success) {
+    if (parseResult.data === "lobby") {
+      return "details";
+    }
+    return parseResult.data;
+  }
+  return "details";
 }
 
 export function parseUserCredentialsTab(searchParameters: URLSearchParams): UserCredentialsTab {

@@ -48,6 +48,7 @@ function createAuthenticatedResponse(roles: string[] = []) {
       expirationTimestamp: "2026-03-08T00:00:00.000Z",
       id: TEST_SESSION_ID,
       ipAddress: "127.0.0.1",
+      isScopedAccessSession: false,
       location: null,
       revokedAt: null,
       startTimestamp: "2026-03-07T00:00:00.000Z",

@@ -20,7 +20,6 @@ import { TasksRoute } from "../spas/project-manager/routes/TasksRoute.js";
 import { TeamRoute } from "../spas/project-manager/routes/TeamRoute.js";
 import { PublicHomeLayout } from "../spas/public-home/layouts/PublicHomeLayout.js";
 import { UserSpaRoute } from "../spas/user/routes/UserSpaRoute.js";
-import { LobbyRoute } from "../spas/user-lobby/routes/LobbyRoute.js";
 
 function LegacyProjectRouteRedirect() {
   const params = useParams<{ projectId?: string }>();
@@ -41,13 +40,12 @@ export function AppRoutes() {
         <Route element={<ContactPage />} path="/contact" />
         <Route element={<AboutPage />} path="/about" />
       </Route>
-      <Route element={<LobbyRoute />} path="/lobby" />
       <Route element={<ScopedAccessTokenLoginRoute />} path="/auth/scoped-token-login" />
       <Route element={<LegacyProjectRouteRedirect />} path="/project/:projectId" />
       <Route element={<ProjectRoute />} path="/pm/project" />
       <Route element={<TeamRoute />} path="/pm/team" />
       <Route element={<OrganizationRoute />} path="/pm/organization" />
-      <Route element={<UserSpaRoute />} path="/user" />
+      <Route element={<UserSpaRoute />} path="/user/*" />
       <Route element={<GanttRoute />} path="/pm/project/gantt" />
       <Route element={<KanbanRoute />} path="/pm/project/kanban" />
       <Route element={<IssuesRoute />} path="/pm/project/issues" />

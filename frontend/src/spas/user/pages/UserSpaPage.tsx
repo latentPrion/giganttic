@@ -51,6 +51,7 @@ import {
 } from "../../project-manager/routes/project-route-paths.js";
 import { scopedTokensApi } from "../api/scoped-tokens-api.js";
 import type { ScopedAccessToken } from "../contracts/scoped-token.contracts.js";
+import { UserLobbyPage } from "../../../lobby/components/UserLobbyPage.js";
 import { UserCredentialsTabs } from "../components/UserCredentialsTabs.js";
 import { UserTopNavigation } from "../components/UserTopNavigation.js";
 import {
@@ -63,6 +64,7 @@ interface UserSpaPageProps {
   credentialsTab: UserCredentialsTab;
   currentUserId: number;
   currentUserRoles: string[];
+  isScopedAccessSession: boolean;
   onSelfPasswordRevoked?(): Promise<void>;
   token: string;
   topTab: UserTopTab;
@@ -70,6 +72,7 @@ interface UserSpaPageProps {
 }
 
 const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
+const USER_SELF_ONLY_TOP_TABS: readonly UserTopTab[] = ["credentials", "sessions", "settings"];
 const ASSOCIATIONS_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const SESSION_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const TOKEN_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
@@ -81,6 +84,20 @@ const TOKEN_SCOPE_TAB_VALUES = [
 ] as const;
 type TokenScopeTab = typeof TOKEN_SCOPE_TAB_VALUES[number];
 const SCOPED_ACCESS_LOGIN_PATH = "/auth/scoped-token-login";
+
+function resolveUserTopTab(
+  topTab: UserTopTab,
+  isSelfView: boolean,
+  isScopedAccessSession: boolean,
+): UserTopTab {
+  if (!isSelfView && (topTab === "lobby" || USER_SELF_ONLY_TOP_TABS.includes(topTab))) {
+    return "details";
+  }
+  if (isScopedAccessSession && USER_SELF_ONLY_TOP_TABS.includes(topTab)) {
+    return "details";
+  }
+  return topTab;
+}
 
 export function UserSpaPage(props: UserSpaPageProps) {
   const navigate = useNavigate();
@@ -107,9 +124,13 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const [userResponse, setUserResponse] = useState<GetUserResponse | null>(null);
 
   const isSelfView = props.userId !== null && props.currentUserId === props.userId;
-  const resolvedTopTab: UserTopTab = !isSelfView && (props.topTab === "credentials" || props.topTab === "sessions" || props.topTab === "settings")
-    ? "details"
-    : props.topTab;
+  const showLobbyTab = isSelfView;
+  const showSelfOnlyTabs = isSelfView && !props.isScopedAccessSession;
+  const resolvedTopTab: UserTopTab = resolveUserTopTab(
+    props.topTab,
+    isSelfView,
+    props.isScopedAccessSession,
+  );
   const selectedScopeToken = useMemo(
     () => tokens.find((token) => token.id === scopeModalTokenId) ?? null,
     [scopeModalTokenId, tokens],
@@ -141,6 +162,11 @@ export function UserSpaPage(props: UserSpaPageProps) {
       setIsLoading(false);
       return;
     }
+    if (props.topTab === "lobby") {
+      setUserResponse(null);
+      setIsLoading(false);
+      return;
+    }
     let isMounted = true;
 
     async function loadUser(): Promise<void> {
@@ -167,28 +193,32 @@ export function UserSpaPage(props: UserSpaPageProps) {
     return () => {
       isMounted = false;
     };
-  }, [props.token, props.userId]);
+  }, [props.token, props.userId, props.topTab]);
 
   useEffect(() => {
-    if (!isSelfView && props.userId !== null && (props.topTab === "credentials" || props.topTab === "sessions" || props.topTab === "settings")) {
-      navigate(createUserRoute(props.userId, "details"), { replace: true });
+    if (props.userId === null) {
+      return;
     }
-  }, [isSelfView, navigate, props.topTab, props.userId]);
+    const nextTab = resolveUserTopTab(props.topTab, isSelfView, props.isScopedAccessSession);
+    if (nextTab !== props.topTab) {
+      navigate(createUserRoute(props.userId, nextTab), { replace: true });
+    }
+  }, [isSelfView, navigate, props.isScopedAccessSession, props.topTab, props.userId]);
 
   useEffect(() => {
-    if (!isSelfView || resolvedTopTab !== "credentials" || props.credentialsTab !== "scoped-access-tokens") {
+    if (!showSelfOnlyTabs || resolvedTopTab !== "credentials" || props.credentialsTab !== "scoped-access-tokens") {
       return;
     }
 
     void refreshTokens();
-  }, [isSelfView, props.credentialsTab, resolvedTopTab, props.token]);
+  }, [showSelfOnlyTabs, props.credentialsTab, resolvedTopTab, props.token]);
 
   useEffect(() => {
-    if (!isSelfView || resolvedTopTab !== "sessions" || props.userId === null) {
+    if (!showSelfOnlyTabs || resolvedTopTab !== "sessions" || props.userId === null) {
       return;
     }
     void refreshSessions();
-  }, [isSelfView, props.token, props.userId, resolvedTopTab]);
+  }, [showSelfOnlyTabs, props.token, props.userId, resolvedTopTab]);
 
   async function refreshTokens(): Promise<void> {
     setIsRefreshingTokens(true);
@@ -222,6 +252,10 @@ export function UserSpaPage(props: UserSpaPageProps) {
   }
 
   function navigateTopTab(nextTab: UserTopTab): void {
+    if (nextTab === "lobby") {
+      navigate(createUserRoute(props.currentUserId, "lobby"));
+      return;
+    }
     if (props.userId === null) {
       return;
     }
@@ -632,6 +666,14 @@ export function UserSpaPage(props: UserSpaPageProps) {
     if (props.userId === null) {
       return <Alert severity="info">Provide a valid userId to view a user profile.</Alert>;
     }
+    if (resolvedTopTab === "lobby") {
+      return (
+        <UserLobbyPage
+          currentUserId={props.currentUserId}
+          token={props.token}
+        />
+      );
+    }
     if (isLoading) {
       return (
         <Stack alignItems="center" direction="row" spacing={1.25}>
@@ -705,19 +747,22 @@ export function UserSpaPage(props: UserSpaPageProps) {
     <Stack spacing={2}>
       <div>
         <Typography color="text.secondary" variant="overline">User SPA</Typography>
-        <Typography variant="h4">User Profile</Typography>
+        <Typography variant="h4">
+          {resolvedTopTab === "lobby" ? "Lobby" : "User Profile"}
+        </Typography>
         <Typography color="text.secondary" variant="body2">
           Selected user: {props.userId ?? "None"}
         </Typography>
       </div>
 
       <UserTopNavigation
-        isSelfView={isSelfView}
         onChange={navigateTopTab}
+        showLobbyTab={showLobbyTab}
+        showSelfOnlyTabs={showSelfOnlyTabs}
         value={resolvedTopTab}
       />
 
-      {resolvedTopTab === "credentials" && isSelfView ? (
+      {resolvedTopTab === "credentials" && showSelfOnlyTabs ? (
         <UserCredentialsTabs
           onChange={navigateCredentialsTab}
           value={props.credentialsTab}

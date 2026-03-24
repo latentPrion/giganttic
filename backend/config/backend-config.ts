@@ -40,6 +40,7 @@ export function buildBackendConfig(
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
     scopedSessionRouteAllowlist: [
       { method: "GET", pattern: "/auth/session/me" },
+      { method: "GET", pattern: "/users/:userId" },
       { method: "GET", pattern: "/projects" },
       { method: "GET", pattern: "/projects/chart-export-capabilities" },
       { method: "GET", pattern: "/projects/:projectId" },

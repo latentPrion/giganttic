@@ -6,6 +6,7 @@ import { LoggedInUserMenu } from "./LoggedInUserMenu.js";
 
 interface LoggedInSessionManagerProps {
   isBusy: boolean;
+  isScopedAccessSession?: boolean;
   onLogout(): Promise<void>;
   roles: string[];
   username: string;
@@ -16,7 +17,10 @@ export function LoggedInSessionManager(
 ) {
   return (
     <Stack alignItems="center" direction="row" spacing={1.5}>
-      <LoggedInUsername username={props.username} />
+      <LoggedInUsername
+        isScopedAccessSession={props.isScopedAccessSession}
+        username={props.username}
+      />
       <LoggedInUserMenu
         isBusy={props.isBusy}
         onLogout={props.onLogout}

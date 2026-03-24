@@ -24,13 +24,14 @@ export const revokeSessionsRequestSchema = z.object({
 });
 
 export const sessionSummarySchema = z.object({
-  id: z.string(),
-  userId: z.number().int().positive(),
-  startTimestamp: z.string(),
   expirationTimestamp: z.string(),
-  revokedAt: z.string().nullable(),
+  id: z.string(),
   ipAddress: z.string(),
+  isScopedAccessSession: z.boolean(),
   location: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+  startTimestamp: z.string(),
+  userId: z.number().int().positive(),
 });
 
 export const authUserSchema = z.object({

@@ -18,6 +18,7 @@ export function SessionNavSlot() {
     return (
       <LoggedInSessionManager
         isBusy={isBusy}
+        isScopedAccessSession={authState.auth.session.isScopedAccessSession}
         onLogout={actions.logout}
         roles={authState.auth.user.roles}
         username={authState.auth.user.username}

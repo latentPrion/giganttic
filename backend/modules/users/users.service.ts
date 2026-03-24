@@ -32,9 +32,11 @@ import {
   listDirectProjectOwnerUserIds,
   listEffectiveProjectManagerUserIds,
   listEffectiveTeamManagerUserIds,
+  listOrganizationIdsForProject,
   listProjectIdsForOrganization,
   listProjectIdsForTeam,
   listProjectIdsVisibleByMembership,
+  listTeamIdsForProject,
   listTeamIdsVisibleByMembership,
   TEAM_MANAGER_ROLE_CODE,
   TEAM_PROJECT_MANAGER_ROLE_CODE,
@@ -42,6 +44,10 @@ import {
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import {
+  isScopedAccessSession,
+  listScopedTokenProjectIds,
+} from "../scoped-access/scoped-access.policy.js";
 import {
   BLOCKING_OBJECT_KIND_PROJECT,
   BLOCKING_OBJECT_KIND_TEAM,
@@ -81,7 +87,14 @@ export class UsersService {
     authContext: AuthContext,
     userId: number,
   ): Promise<GetUserResponse> {
-    this.assertCanViewUser(authContext);
+    if (isScopedAccessSession(authContext) && userId !== authContext.userId) {
+      throw new ForbiddenException(
+        "Scoped access sessions may only view their own user profile",
+      );
+    }
+    if (!isScopedAccessSession(authContext)) {
+      this.assertCanViewUser(authContext);
+    }
 
     const userRecord = this.databaseService.db
       .select({
@@ -99,17 +112,32 @@ export class UsersService {
       throw new NotFoundException("User not found");
     }
 
+    const userPayload = {
+      createdAt: userRecord.createdAt.toISOString(),
+      id: userRecord.id,
+      isActive: userRecord.isActive,
+      updatedAt: userRecord.updatedAt.toISOString(),
+      username: userRecord.username,
+    };
+
+    if (isScopedAccessSession(authContext)) {
+      const scopedProjectIds = listScopedTokenProjectIds(
+        this.databaseService.db,
+        authContext.sessionAuth.scopedAccessTokenCredentialId,
+      );
+      return {
+        organizations: this.listUserOrganizationsScoped(userId, scopedProjectIds),
+        projects: this.listUserProjectSummariesForProjectIds(scopedProjectIds),
+        teams: this.listUserTeamsScoped(userId, scopedProjectIds),
+        user: userPayload,
+      };
+    }
+
     return {
       organizations: this.listUserOrganizations(userId),
       projects: this.listUserProjects(userId),
       teams: this.listUserTeams(userId),
-      user: {
-        createdAt: userRecord.createdAt.toISOString(),
-        id: userRecord.id,
-        isActive: userRecord.isActive,
-        updatedAt: userRecord.updatedAt.toISOString(),
-        username: userRecord.username,
-      },
+      user: userPayload,
     };
   }
 
@@ -417,6 +445,133 @@ export class UsersService {
       .innerJoin(organizations, eq(organizations.id, usersOrganizations.organizationId))
       .where(eq(usersOrganizations.userId, userId))
       .all()
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+  }
+
+  private listTeamIdsReachableFromProjects(projectIds: number[]): number[] {
+    return uniqueNumberValues(
+      projectIds.flatMap((projectId) =>
+        listTeamIdsForProject(this.databaseService.db, projectId)
+      ),
+    );
+  }
+
+  private listOrganizationIdsReachableFromProjects(projectIds: number[]): number[] {
+    return uniqueNumberValues(
+      projectIds.flatMap((projectId) =>
+        listOrganizationIdsForProject(this.databaseService.db, projectId)
+      ),
+    );
+  }
+
+  private listUserProjectSummariesForProjectIds(
+    projectIds: number[],
+  ): GetUserResponse["projects"] {
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select({
+        createdAt: projects.createdAt,
+        description: projects.description,
+        id: projects.id,
+        name: projects.name,
+        updatedAt: projects.updatedAt,
+      })
+      .from(projects)
+      .where(inArray(projects.id, projectIds))
+      .all()
+      .sort((left, right) => left.id - right.id)
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+  }
+
+  private listUserTeamsScoped(
+    userId: number,
+    scopedProjectIds: number[],
+  ): GetUserResponse["teams"] {
+    if (scopedProjectIds.length === 0) {
+      return [];
+    }
+
+    const visibleTeamIds = new Set(
+      listTeamIdsVisibleByMembership(this.databaseService.db, userId),
+    );
+    const allowedTeamIds = this.listTeamIdsReachableFromProjects(scopedProjectIds).filter((teamId) =>
+      visibleTeamIds.has(teamId)
+    );
+    if (allowedTeamIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select({
+        createdAt: teams.createdAt,
+        description: teams.description,
+        id: teams.id,
+        name: teams.name,
+        updatedAt: teams.updatedAt,
+      })
+      .from(teams)
+      .where(inArray(teams.id, allowedTeamIds))
+      .all()
+      .sort((left, right) => left.id - right.id)
+      .map((row) => ({
+        createdAt: row.createdAt.toISOString(),
+        description: row.description,
+        id: row.id,
+        name: row.name,
+        updatedAt: row.updatedAt.toISOString(),
+      }));
+  }
+
+  private listUserOrganizationsScoped(
+    userId: number,
+    scopedProjectIds: number[],
+  ): GetUserResponse["organizations"] {
+    if (scopedProjectIds.length === 0) {
+      return [];
+    }
+
+    const memberOrgIds = new Set(
+      this.databaseService.db
+        .select({ organizationId: usersOrganizations.organizationId })
+        .from(usersOrganizations)
+        .where(eq(usersOrganizations.userId, userId))
+        .all()
+        .map((row) => row.organizationId),
+    );
+    const allowedOrgIds = this.listOrganizationIdsReachableFromProjects(scopedProjectIds).filter((
+      organizationId,
+    ) => memberOrgIds.has(organizationId));
+    if (allowedOrgIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select({
+        createdAt: organizations.createdAt,
+        description: organizations.description,
+        id: organizations.id,
+        name: organizations.name,
+        updatedAt: organizations.updatedAt,
+      })
+      .from(organizations)
+      .where(inArray(organizations.id, allowedOrgIds))
+      .all()
+      .sort((left, right) => left.id - right.id)
       .map((row) => ({
         createdAt: row.createdAt.toISOString(),
         description: row.description,

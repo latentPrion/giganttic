@@ -61,6 +61,7 @@ function createAuthenticatedResponse(roles: string[] = []) {
       expirationTimestamp: "2026-03-08T00:00:00.000Z",
       id: "session-1",
       ipAddress: "127.0.0.1",
+      isScopedAccessSession: false,
       location: null,
       revokedAt: null,
       startTimestamp: "2026-03-07T00:00:00.000Z",
@@ -165,6 +166,28 @@ describe("SessionManager", () => {
 
     expect(await screen.findByText("demo-user")).toBeVisible();
     expect(screen.getByRole("button", { name: MENU_BUTTON_LABEL })).toBeVisible();
+  });
+
+  it("renders a lock icon on the username chip for scoped-access sessions", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    const baseResponse = createAuthenticatedResponse();
+    authApiMock.getCurrentSession.mockResolvedValue({
+      ...baseResponse,
+      session: {
+        ...baseResponse.session,
+        isScopedAccessSession: true,
+      },
+    });
+
+    renderWithTheme(<App />);
+
+    expect(
+      await screen.findByRole("link", { name: "Go to your lobby (scoped access session)" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Go to your lobby (scoped access session)" })
+        .querySelector("svg"),
+    ).toBeTruthy();
   });
 
   it("logs in through the modal and stores the returned token", async () => {

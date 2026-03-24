@@ -421,6 +421,9 @@ export class AuthService {
       expirationTimestamp: session.expirationTimestamp.toISOString(),
       id: session.id,
       ipAddress: session.ipAddress,
+      isScopedAccessSession:
+        session.authSourceCredentialTypeCode === credentialTypeCodes.scopedAccessToken &&
+        session.authSourceCredentialId !== null,
       location: session.location ?? null,
       revokedAt: session.revokedAt ? session.revokedAt.toISOString() : null,
       startTimestamp: session.startTimestamp.toISOString(),

@@ -10,7 +10,12 @@ import { AppShell } from "../../../app/shell/AppShell.js";
 import { useSessionManager } from "../../../common/session/hooks/useSessionManager.js";
 
 interface UserAuthenticatedRouteProps {
-  children(token: string, currentUserId: number, currentUserRoles: string[]): React.ReactNode;
+  children(
+    token: string,
+    currentUserId: number,
+    currentUserRoles: string[],
+    isScopedAccessSession: boolean,
+  ): React.ReactNode;
 }
 
 export function UserAuthenticatedRoute(props: UserAuthenticatedRouteProps) {
@@ -37,6 +42,7 @@ export function UserAuthenticatedRoute(props: UserAuthenticatedRouteProps) {
         authState.auth.token,
         authState.auth.user.id,
         authState.auth.user.roles,
+        authState.auth.session.isScopedAccessSession,
       )}
     </AppShell>
   );

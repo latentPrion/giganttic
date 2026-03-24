@@ -368,6 +368,34 @@ describe("scoped access tokens", () => {
     expect(allowedMe.statusCode).toBe(200);
   });
 
+  it("allows scoped sessions to fetch only their own user profile with token-scoped associations", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+    const scopedLogin = await redeemScopedToken(created.token);
+    const selfId = scopedLogin.user.id;
+
+    const selfProfile = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/users/${selfId}`,
+    });
+    expect(selfProfile.statusCode).toBe(200);
+    const selfBody = parseJson<{ projects: Array<{ id: number }> }>(selfProfile.payload);
+    expect(selfBody.projects.map((project) => project.id).sort((a, b) => a - b)).toEqual([projectA]);
+    expect(selfBody.projects.some((project) => project.id === projectB)).toBe(false);
+
+    const otherUserId = selfId === 1 ? 2 : 1;
+    const otherProfile = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/users/${otherUserId}`,
+    });
+    expect(otherProfile.statusCode).toBe(403);
+  });
+
   it("rejects invalid, revoked, and expired token redemption", async () => {
     const invalidRedeem = await app.inject({
       method: "POST",

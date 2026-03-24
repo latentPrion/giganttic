@@ -4,8 +4,9 @@ import { Tab, Tabs } from "@mui/material";
 import type { UserTopTab } from "../routes/user-route-paths.js";
 
 interface UserTopNavigationProps {
-  isSelfView: boolean;
   onChange(nextTab: UserTopTab): void;
+  showLobbyTab: boolean;
+  showSelfOnlyTabs: boolean;
   value: UserTopTab;
 }
 
@@ -16,11 +17,12 @@ export function UserTopNavigation(props: UserTopNavigationProps) {
       value={props.value}
       variant="scrollable"
     >
+      {props.showLobbyTab ? <Tab label="Lobby" value="lobby" /> : null}
       <Tab label="Details" value="details" />
       <Tab label="Associations" value="associations" />
-      {props.isSelfView ? <Tab label="Credentials" value="credentials" /> : null}
-      {props.isSelfView ? <Tab label="Sessions" value="sessions" /> : null}
-      {props.isSelfView ? <Tab label="Settings" value="settings" /> : null}
+      {props.showSelfOnlyTabs ? <Tab label="Credentials" value="credentials" /> : null}
+      {props.showSelfOnlyTabs ? <Tab label="Sessions" value="sessions" /> : null}
+      {props.showSelfOnlyTabs ? <Tab label="Settings" value="settings" /> : null}
     </Tabs>
   );
 }

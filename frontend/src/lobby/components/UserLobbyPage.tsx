@@ -26,7 +26,7 @@ import { EntityItemList } from "../../common/components/entity-list/EntityItemLi
 import { ProjectListItem } from "../../common/components/entity-list/ProjectListItem.js";
 import { TeamListItem } from "../../common/components/entity-list/TeamListItem.js";
 import type { EntityListItemViewMode } from "../../common/components/entity-list/entity-list-item.types.js";
-import { getApiErrorMessage } from "../../common/api/api-error.js";
+import { getApiErrorMessage, isApiError } from "../../common/api/api-error.js";
 import { lobbyApi } from "../api/lobby-api.js";
 import {
   type CreateOrganizationRequest,
@@ -78,6 +78,25 @@ function createInitialLobbyData(): LobbyData {
     projects: [],
     teams: [],
   };
+}
+
+function isForbiddenHttpApiError(error: unknown): boolean {
+  return isApiError(error) && error.kind === "http" && error.status === 403;
+}
+
+async function loadPermittedListOrEmpty<T>(
+  listRequest: Promise<{ [key: string]: T[] }>,
+  resultKey: string,
+): Promise<T[]> {
+  try {
+    const response = await listRequest;
+    return response[resultKey] as T[] ?? [];
+  } catch (error) {
+    if (isForbiddenHttpApiError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 function sortEntitiesById<T extends { id: number }>(entities: T[]): T[] {
@@ -265,16 +284,19 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
     setErrorMessage(null);
 
     try {
-      const [projectsResponse, teamsResponse, organizationsResponse] = await Promise.all([
-        lobbyApi.listProjects(token),
-        lobbyApi.listTeams(token),
-        lobbyApi.listOrganizations(token),
+      const [projects, teams, organizations] = await Promise.all([
+        loadPermittedListOrEmpty<LobbyProject>(lobbyApi.listProjects(token), "projects"),
+        loadPermittedListOrEmpty<LobbyTeam>(lobbyApi.listTeams(token), "teams"),
+        loadPermittedListOrEmpty<LobbyOrganization>(
+          lobbyApi.listOrganizations(token),
+          "organizations",
+        ),
       ]);
 
       setLobbyData({
-        organizations: organizationsResponse.organizations,
-        projects: projectsResponse.projects,
-        teams: teamsResponse.teams,
+        organizations,
+        projects,
+        teams,
       });
     } catch (error) {
       setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
