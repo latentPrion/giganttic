@@ -91,12 +91,7 @@ export class ScopedAccessService {
   ): { revokedTokenCredentialId: number } {
     assertStandardSession(authContext);
     this.assertOwnerTokenCredential(authContext.userId, tokenCredentialId);
-    const now = new Date();
-    this.databaseService.db.update(usersScopedAccessTokenCredentials)
-      .set({
-        revokedAt: now,
-        updatedAt: now,
-      })
+    this.databaseService.db.delete(usersScopedAccessTokenCredentials)
       .where(eq(usersScopedAccessTokenCredentials.id, tokenCredentialId))
       .run();
 

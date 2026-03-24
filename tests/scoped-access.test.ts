@@ -17,6 +17,7 @@ import {
   credentialTypeCodes,
   projects,
   projectsUsers,
+  scopedAccessTokenCredentialsObjects,
   usersSessions,
   usersScopedAccessTokenCredentials,
   usersProjectsProjectRoles,
@@ -353,7 +354,7 @@ describe("scoped access tokens", () => {
       const response = await app.inject({
         headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
         method: testCase.method,
-        payload: testCase.payload,
+        payload: "payload" in testCase ? testCase.payload : undefined,
         url: testCase.url,
       });
       expect(response.statusCode).toBe(403);
@@ -432,6 +433,55 @@ describe("scoped access tokens", () => {
       url: "/stc-proj-mgmt/api/auth/session/me",
     });
     expect(afterRevoke.statusCode).toBe(401);
+  });
+
+  it("hard-deletes revoked tokens and cascade-deletes scope objects", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const [projectA] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+
+    const scopesBeforeRevoke = databaseService.db.select({
+      id: scopedAccessTokenCredentialsObjects.id,
+    })
+      .from(scopedAccessTokenCredentialsObjects)
+      .where(
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessTokenCredentialId,
+          created.tokenCredentialId,
+        ),
+      )
+      .all();
+    expect(scopesBeforeRevoke.length).toBeGreaterThan(0);
+
+    const revokeResponse = await app.inject({
+      headers: { authorization: `Bearer ${standardLogin.accessToken}` },
+      method: "POST",
+      url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/revoke`,
+    });
+    expect(revokeResponse.statusCode).toBe(201);
+
+    const tokenAfterRevoke = databaseService.db.select({
+      id: usersScopedAccessTokenCredentials.id,
+    })
+      .from(usersScopedAccessTokenCredentials)
+      .where(eq(usersScopedAccessTokenCredentials.id, created.tokenCredentialId))
+      .get();
+    expect(tokenAfterRevoke).toBeUndefined();
+
+    const scopesAfterRevoke = databaseService.db.select({
+      id: scopedAccessTokenCredentialsObjects.id,
+    })
+      .from(scopedAccessTokenCredentialsObjects)
+      .where(
+        eq(
+          scopedAccessTokenCredentialsObjects.scopedAccessTokenCredentialId,
+          created.tokenCredentialId,
+        ),
+      )
+      .all();
+    expect(scopesAfterRevoke).toHaveLength(0);
   });
 
   it("updates token lastUsedAt on redemption", async () => {

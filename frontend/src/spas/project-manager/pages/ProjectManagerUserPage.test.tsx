@@ -110,7 +110,7 @@ describe("ProjectManagerUserPage", () => {
     const userButtons = await screen.findAllByRole("button", { name: /demo-user/i });
     await user.click(userButtons[0]!);
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/user?userId=101");
+    expect(navigateMock).toHaveBeenCalledWith("/user?userId=101");
   });
 
   it("shows a self-service password modal and submits current password plus revoke toggle", async () => {
@@ -127,6 +127,7 @@ describe("ProjectManagerUserPage", () => {
     await user.click(await screen.findByRole("button", { name: "Change Password" }));
     await user.type(screen.getByLabelText("Current Password"), "old-secret");
     await user.type(screen.getByLabelText("New Password"), "new-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "new-secret");
     await user.click(screen.getByRole("switch", { name: "Revoke sessions" }));
     await user.click(screen.getByRole("button", { name: "Save Password" }));
 
@@ -152,6 +153,7 @@ describe("ProjectManagerUserPage", () => {
     await user.click(await screen.findByRole("button", { name: "Change Password" }));
     expect(screen.queryByLabelText("Current Password")).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("New Password"), "admin-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "admin-secret");
     await user.click(screen.getByRole("button", { name: "Save Password" }));
 
     expect(lobbyApiMock.changeUserPassword).toHaveBeenCalledWith(DEFAULT_TOKEN, 101, {
@@ -191,9 +193,31 @@ describe("ProjectManagerUserPage", () => {
     await user.click(await screen.findByRole("button", { name: "Change Password" }));
     await user.type(screen.getByLabelText("Current Password"), "old-secret");
     await user.type(screen.getByLabelText("New Password"), "new-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "new-secret");
     await user.click(screen.getByRole("button", { name: "Save Password" }));
 
     expect(await screen.findByText("Unable to change that password.")).toBeVisible();
+  });
+
+  it("blocks password change when the repeated new password does not match", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerUserPage
+        currentUserId={101}
+        token={DEFAULT_TOKEN}
+        userId={101}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Change Password" }));
+    await user.type(screen.getByLabelText("Current Password"), "old-secret");
+    await user.type(screen.getByLabelText("New Password"), "new-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "different-secret");
+    await user.click(screen.getByRole("button", { name: "Save Password" }));
+
+    expect(await screen.findByText("New password entries must match.")).toBeVisible();
+    expect(lobbyApiMock.changeUserPassword).not.toHaveBeenCalled();
   });
 
   it("shows a success message after a non-revoking password change", async () => {
@@ -210,6 +234,7 @@ describe("ProjectManagerUserPage", () => {
     await user.click(await screen.findByRole("button", { name: "Change Password" }));
     await user.type(screen.getByLabelText("Current Password"), "old-secret");
     await user.type(screen.getByLabelText("New Password"), "new-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "new-secret");
     await user.click(screen.getByRole("button", { name: "Save Password" }));
 
     expect(await screen.findByText("Password updated.")).toBeVisible();
@@ -231,6 +256,7 @@ describe("ProjectManagerUserPage", () => {
     await user.click(await screen.findByRole("button", { name: "Change Password" }));
     await user.type(screen.getByLabelText("Current Password"), "old-secret");
     await user.type(screen.getByLabelText("New Password"), "new-secret");
+    await user.type(screen.getByLabelText("Repeat New Password"), "new-secret");
     await user.click(screen.getByRole("switch", { name: "Revoke sessions" }));
     await user.click(screen.getByRole("button", { name: "Save Password" }));
 

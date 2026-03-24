@@ -15,7 +15,7 @@ export function createProjectManagerOrganizationRoute(organizationId: number): s
 }
 
 export function createProjectManagerUserRoute(userId: number): string {
-  return `/pm/user?userId=${userId}`;
+  return `/user?userId=${userId}`;
 }
 
 export function createProjectGanttRoute(projectId: number): string {

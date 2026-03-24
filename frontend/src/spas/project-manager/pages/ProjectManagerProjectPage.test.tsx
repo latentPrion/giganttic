@@ -360,7 +360,7 @@ describe("ProjectManagerProjectPage", () => {
     const userButtons = await screen.findAllByRole("button", { name: /demo-user/i });
     await user.click(userButtons[0]!);
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/user?userId=101");
+    expect(navigateMock).toHaveBeenCalledWith("/user?userId=101");
   });
 
   it("associates an existing team from the teams tab", async () => {

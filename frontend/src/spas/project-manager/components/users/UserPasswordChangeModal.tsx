@@ -25,9 +25,11 @@ interface UserPasswordChangeModalProps {
 
 const CHANGE_PASSWORD_DIALOG_TITLE = "Change Password";
 const CHANGE_PASSWORD_ERROR_MESSAGE = "Unable to change that password.";
+const CHANGE_PASSWORD_MISMATCH_MESSAGE = "New password entries must match.";
 const CHANGE_PASSWORD_SUBMIT_LABEL = "Save Password";
 const DEFAULT_FORM_STATE = {
   currentPassword: "",
+  confirmNewPassword: "",
   newPassword: "",
   revokeSessions: false,
 };
@@ -41,6 +43,7 @@ function buildFailureMessage(error: unknown): string {
 }
 
 export function UserPasswordChangeModal(props: UserPasswordChangeModalProps) {
+  const [confirmNewPassword, setConfirmNewPassword] = useState(DEFAULT_FORM_STATE.confirmNewPassword);
   const [currentPassword, setCurrentPassword] = useState(DEFAULT_FORM_STATE.currentPassword);
   const [newPassword, setNewPassword] = useState(DEFAULT_FORM_STATE.newPassword);
   const [revokeSessions, setRevokeSessions] = useState(DEFAULT_FORM_STATE.revokeSessions);
@@ -62,10 +65,15 @@ export function UserPasswordChangeModal(props: UserPasswordChangeModalProps) {
   }, [props.isOpen]);
 
   function resetForm(): void {
+    setConfirmNewPassword(DEFAULT_FORM_STATE.confirmNewPassword);
     setCurrentPassword(DEFAULT_FORM_STATE.currentPassword);
     setNewPassword(DEFAULT_FORM_STATE.newPassword);
     setRevokeSessions(DEFAULT_FORM_STATE.revokeSessions);
     setErrorMessage(null);
+  }
+
+  function hasMatchingNewPassword(): boolean {
+    return newPassword === confirmNewPassword;
   }
 
   function handleClose(): void {
@@ -74,6 +82,11 @@ export function UserPasswordChangeModal(props: UserPasswordChangeModalProps) {
   }
 
   async function submitChange(): Promise<void> {
+    if (!hasMatchingNewPassword()) {
+      setErrorMessage(CHANGE_PASSWORD_MISMATCH_MESSAGE);
+      return;
+    }
+
     try {
       await props.onSubmit({
         currentPassword: props.requireCurrentPassword ? currentPassword : undefined,
@@ -109,9 +122,21 @@ export function UserPasswordChangeModal(props: UserPasswordChangeModalProps) {
             <TextField
               inputRef={props.requireCurrentPassword ? undefined : firstInputReference}
               label="New Password"
-              onChange={(event) => setNewPassword(event.target.value)}
+              onChange={(event) => {
+                setNewPassword(event.target.value);
+                setErrorMessage(null);
+              }}
               type="password"
               value={newPassword}
+            />
+            <TextField
+              label="Repeat New Password"
+              onChange={(event) => {
+                setConfirmNewPassword(event.target.value);
+                setErrorMessage(null);
+              }}
+              type="password"
+              value={confirmNewPassword}
             />
             <FormControlLabel
               control={(

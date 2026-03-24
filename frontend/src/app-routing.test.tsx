@@ -393,7 +393,7 @@ describe("app routing", () => {
     expect(await screen.findByText("Selected organization: 9")).toBeVisible();
   });
 
-  it("renders the PM user SPA for authenticated users", async () => {
+  it("does not render a user SPA for the removed legacy /pm/user route", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
@@ -401,8 +401,35 @@ describe("app routing", () => {
       initialEntries: ["/pm/user?userId=101"],
     });
 
-    expect(await screen.findByText("User Profile")).toBeVisible();
+    expect(screen.queryByText("User Profile")).not.toBeInTheDocument();
+    expect(screen.queryByText("User SPA")).not.toBeInTheDocument();
+  });
+
+  it("renders the standalone user SPA for authenticated self view", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/user?userId=101"],
+    });
+
+    expect(await screen.findByText("User SPA")).toBeVisible();
     expect(await screen.findByText("Selected user: 101")).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Credentials" })).toBeVisible();
+  });
+
+  it("hides self-only tabs for standalone user SPA non-self view", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/user?userId=202&tab=credentials"],
+    });
+
+    expect(await screen.findByText("User SPA")).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Credentials" })).not.toBeInTheDocument();
   });
 
   it("renders the PM project gantt SPA for authenticated users", async () => {
