@@ -19,7 +19,7 @@ export interface ParsedGanttKanbanTask {
 }
 
 const GANTT_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/;
-const MAX_PROGRESS_RATIO = 1;
+const MAX_PROGRESS_PERCENTAGE = 100;
 const MILESTONE_TYPE = "milestone";
 
 function parseGanttDate(value: string): Date | null {
@@ -39,13 +39,14 @@ function parseGanttDate(value: string): Date | null {
   );
 }
 
-function parseTaskProgress(taskElement: Element): number {
+function parseTaskProgressPercentage(taskElement: Element): number {
   const rawProgress = Number(taskElement.getAttribute("progress") ?? "0");
   if (!Number.isFinite(rawProgress) || rawProgress < 0) {
     return 0;
   }
 
-  return Math.min(rawProgress, MAX_PROGRESS_RATIO);
+  const normalized = rawProgress <= 1 ? rawProgress * 100 : rawProgress;
+  return Math.min(MAX_PROGRESS_PERCENTAGE, Math.round(normalized));
 }
 
 function extractOwnTextContent(taskElement: Element): string {
@@ -106,14 +107,12 @@ function parseVisibleTask(
   const title = parseTaskTitle(taskElement);
   const taskId = taskElement.getAttribute("id")?.trim() ?? "";
   const startDate = parseGanttDate(taskElement.getAttribute("start_date") ?? "");
-  const progressRatio = parseTaskProgress(taskElement);
+  const progressPercentage = parseTaskProgressPercentage(taskElement);
   const milestone = isMilestone(taskElement);
   const rawStatus = parseTaskStatus(taskElement);
   const status = milestone
     ? (inferredMilestoneStatuses.get(taskId) ?? rawStatus)
     : rawStatus;
-  const progressPercentage = Math.round(progressRatio * 100);
-
   if (!title || !taskId || !shouldDisplayTask(startDate, status, now)) {
     return null;
   }

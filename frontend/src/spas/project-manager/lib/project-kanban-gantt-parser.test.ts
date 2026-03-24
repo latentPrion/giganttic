@@ -77,6 +77,20 @@ describe("project kanban gantt parser", () => {
     ]);
   });
 
+  it("normalizes ratio and percent-like progress values consistently", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="ratio" start_date="2026-03-05 09:00" progress="0.42" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS"><![CDATA[Ratio task]]></task>
+  <task id="percent" start_date="2026-03-05 09:00" progress="42" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS"><![CDATA[Percent task]]></task>
+</data>
+`;
+
+    const tasks = parseProjectKanbanTasksFromXml(xml, NOW);
+
+    expect(tasks.find((task) => task.id === "ratio")?.progressPercentage).toBe(42);
+    expect(tasks.find((task) => task.id === "percent")?.progressPercentage).toBe(42);
+  });
+
   it("hides future open tasks but keeps future non-open tasks", () => {
     const tasks = parseProjectKanbanTasksFromXml(MIXED_TASK_XML, NOW);
 

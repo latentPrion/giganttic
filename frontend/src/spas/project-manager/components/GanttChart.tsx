@@ -462,6 +462,8 @@ function createLayoutForDisplayMode(displayMode: GanttDisplayMode): GanttLayoutC
 
 function attachEditorEvents(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  projectId: number,
+  isApplyingMilestoneInferenceRef: { current: boolean },
   onEditorChange?: () => void,
 ): string[] {
   if (!onEditorChange) {
@@ -475,6 +477,25 @@ function attachEditorEvents(
   for (const eventName of EDITOR_EVENT_NAMES) {
     const id = gantt.attachEvent(eventName, () => {
       onEditorChange();
+
+      // onLightboxSave/onLightboxDelete already go through specialized handlers.
+      if (eventName === "onLightboxSave" || eventName === "onLightboxDelete") {
+        return true;
+      }
+
+      if (isApplyingMilestoneInferenceRef.current) {
+        return true;
+      }
+
+      isApplyingMilestoneInferenceRef.current = true;
+      try {
+        inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+          projectId,
+          shouldEmit: true,
+        });
+      } finally {
+        isApplyingMilestoneInferenceRef.current = false;
+      }
       return true;
     });
     eventIds.push(id);
@@ -700,7 +721,12 @@ function initializeMountedGantt(
       projectId,
       isApplyingMilestoneInferenceRef,
     ),
-    ...attachEditorEvents(ganttInstance, onEditorChange),
+    ...attachEditorEvents(
+      ganttInstance,
+      projectId,
+      isApplyingMilestoneInferenceRef,
+      onEditorChange,
+    ),
   ];
 
   const serialized = serializeGanttXml(ganttInstance);

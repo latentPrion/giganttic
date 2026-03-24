@@ -762,6 +762,52 @@ describe("ProjectManagerGanttPage", () => {
     }
   });
 
+  it("emits runtime chart update after non-lightbox task drag edits", async () => {
+    serializedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="t1" type="task" start_date="2026-03-01 09:00" ggtc_task_status="ISSUE_STATUS_IN_PROGRESS" progress="0.65"><![CDATA[Task]]></task>
+</data>`;
+
+    const t1Task = {
+      ggtc_task_closed_reason: "",
+      ggtc_task_description: "",
+      ggtc_task_status: "ISSUE_STATUS_IN_PROGRESS",
+      id: "t1",
+      parent: 0,
+      progress: 0.65,
+      start_date: new Date("2026-03-01T09:00:00.000Z"),
+      type: "task",
+    };
+    mockGantt.getTask.mockImplementation((taskId: number | string) => {
+      if (taskId === "t1") return t1Task;
+      return undefined as unknown as never;
+    });
+
+    const emittedEvents: Event[] = [];
+    const listener = (event: Event) => emittedEvents.push(event);
+    window.addEventListener(GANTT_RUNTIME_CHART_UPDATED_EVENT, listener);
+
+    try {
+      renderWithTheme(
+        <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+      );
+
+      await waitFor(() => {
+        expect(mockGantt.init).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        triggerGanttEvent("onAfterTaskDrag", "t1");
+      });
+
+      expect(emittedEvents).toHaveLength(1);
+      const detail = (emittedEvents[0] as CustomEvent<{ serializedXml: string }>).detail;
+      expect(detail.serializedXml).toMatch(/<task[^>]*id="t1"[^>]*progress="0.65"/);
+    } finally {
+      window.removeEventListener(GANTT_RUNTIME_CHART_UPDATED_EVENT, listener);
+    }
+  });
+
   it("re-infers milestone statuses and emits runtime chart update on lightbox save via transitive task predecessors", async () => {
     serializedXml = `<?xml version="1.0" encoding="UTF-8"?>
 <data>

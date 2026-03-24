@@ -281,6 +281,39 @@ describe("useGanttChartFileManager", () => {
     expect(result.current.isPersisting).toBe(false);
   });
 
+  it("persistChart writes updated progress percentages to backend", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: SERVER_XML,
+      type: "xml",
+    });
+    ganttApiMock.putProjectChart.mockResolvedValue({ ok: true });
+    const progressXml = "<?xml version=\"1.0\"?><data><task id=\"123\" progress=\"0.73\" ggtc_task_status=\"ISSUE_STATUS_IN_PROGRESS\" ggtc_task_closed_reason=\"\" ggtc_task_description=\"\"/></data>";
+    const ganttRef = stubGanttRef({ getSerializedXml: () => progressXml });
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 77,
+        token: "tok-progress",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      const persistResult = await result.current.persistChart();
+      expect(persistResult.didPersist).toBe(true);
+    });
+
+    expect(ganttApiMock.putProjectChart).toHaveBeenCalledWith(
+      "tok-progress",
+      77,
+      expect.stringContaining("progress=\"0.73\""),
+    );
+  });
+
   it("persistChart sets persistErrorMessage on failure", async () => {
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: SERVER_XML,
