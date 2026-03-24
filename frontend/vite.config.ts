@@ -34,6 +34,7 @@ export default defineConfig({
       [API_PREFIX]: {
         changeOrigin: true,
         target: process.env.VITE_BACKEND_PROXY_TARGET ?? DEFAULT_BACKEND_TARGET,
+        xfwd: true,
       },
     },
   },

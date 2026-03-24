@@ -6,9 +6,10 @@ import { EntityListItemCard } from "./EntityListItemCard.js";
 import type { EntityListItemViewMode } from "./entity-list-item.types.js";
 
 interface TokenListItemProps {
-  onCopyTokenValue?(): void;
+  onCopyLoginLink?(): void;
   onEditScope?(): void;
   onRevoke?(): void;
+  retainedLoginLink?: string;
   retainedTokenValue?: string;
   tokenCredential: ScopedAccessToken;
   viewMode: EntityListItemViewMode;
@@ -22,8 +23,8 @@ export function TokenListItem(props: TokenListItemProps) {
   const actionContent = (
     <Stack direction="row" spacing={1}>
       {props.retainedTokenValue ? (
-        <Button onClick={props.onCopyTokenValue} size="small" variant="outlined">
-          Copy token
+        <Button onClick={props.onCopyLoginLink} size="small" variant="outlined">
+          Copy login link
         </Button>
       ) : null}
       <Button onClick={props.onEditScope} size="small" variant="outlined">
@@ -43,9 +44,24 @@ export function TokenListItem(props: TokenListItemProps) {
       viewMode={props.viewMode}
     >
       {props.retainedTokenValue ? (
-        <Typography color="warning.main" variant="body2">
-          Token value: {props.retainedTokenValue}
-        </Typography>
+        <Stack spacing={0.5}>
+          <Typography color="warning.main" variant="body2">
+            Token value retained in this SPA session.
+          </Typography>
+          {props.retainedLoginLink ? (
+            <Typography
+              color="primary"
+              component="a"
+              href={props.retainedLoginLink}
+              onClick={(event) => event.stopPropagation()}
+              rel="noopener noreferrer"
+              target="_blank"
+              variant="body2"
+            >
+              Open login link
+            </Typography>
+          ) : null}
+        </Stack>
       ) : (
         <Typography color="text.secondary" variant="body2">
           Token value is only available immediately after minting in this SPA session.

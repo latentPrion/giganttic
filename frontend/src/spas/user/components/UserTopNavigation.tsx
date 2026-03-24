@@ -18,8 +18,9 @@ export function UserTopNavigation(props: UserTopNavigationProps) {
     >
       <Tab label="Details" value="details" />
       <Tab label="Associations" value="associations" />
-      {props.isSelfView ? <Tab label="Settings" value="settings" /> : null}
       {props.isSelfView ? <Tab label="Credentials" value="credentials" /> : null}
+      {props.isSelfView ? <Tab label="Sessions" value="sessions" /> : null}
+      {props.isSelfView ? <Tab label="Settings" value="settings" /> : null}
     </Tabs>
   );
 }

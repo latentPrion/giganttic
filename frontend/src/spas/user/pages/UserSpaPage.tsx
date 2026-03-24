@@ -25,10 +25,14 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { authApi } from "../../../common/session/api/auth-api.js";
+import { useAuthSessionContext } from "../../../common/session/context/AuthSessionContext.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { OrganizationListItem } from "../../../common/components/entity-list/OrganizationListItem.js";
 import { ProjectListItem } from "../../../common/components/entity-list/ProjectListItem.js";
+import { SessionItemList } from "../../../common/components/entity-list/SessionItemList.js";
+import { SessionListItem } from "../../../common/components/entity-list/SessionListItem.js";
 import { TeamListItem } from "../../../common/components/entity-list/TeamListItem.js";
 import { TokenItemList } from "../../../common/components/entity-list/TokenItemList.js";
 import { TokenListItem } from "../../../common/components/entity-list/TokenListItem.js";
@@ -67,6 +71,7 @@ interface UserSpaPageProps {
 
 const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
 const ASSOCIATIONS_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
+const SESSION_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const TOKEN_LIST_VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const TOKEN_SCOPE_TAB_VALUES = [
   "currently-accessible-objects",
@@ -75,9 +80,11 @@ const TOKEN_SCOPE_TAB_VALUES = [
   "organizations",
 ] as const;
 type TokenScopeTab = typeof TOKEN_SCOPE_TAB_VALUES[number];
+const SCOPED_ACCESS_LOGIN_PATH = "/auth/scoped-token-login";
 
 export function UserSpaPage(props: UserSpaPageProps) {
   const navigate = useNavigate();
+  const { actions: authActions, authState } = useAuthSessionContext();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(props.userId !== null);
@@ -86,6 +93,9 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const [tokenActionError, setTokenActionError] = useState<string | null>(null);
   const [tokenActionSuccess, setTokenActionSuccess] = useState<string | null>(null);
   const [tokenIssueMessage, setTokenIssueMessage] = useState<string | null>(null);
+  const [sessionIssueMessage, setSessionIssueMessage] = useState<string | null>(null);
+  const [isRefreshingSessions, setIsRefreshingSessions] = useState(false);
+  const [sessions, setSessions] = useState<Array<import("../../../common/session/contracts/auth.contracts.js").SessionSummary>>([]);
   const [retainedMintedTokenValues, setRetainedMintedTokenValues] = useState<Record<number, string>>({});
   const [isMintedTokenModalOpen, setIsMintedTokenModalOpen] = useState(false);
   const [mintedTokenModalValue, setMintedTokenModalValue] = useState<string | null>(null);
@@ -97,7 +107,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const [userResponse, setUserResponse] = useState<GetUserResponse | null>(null);
 
   const isSelfView = props.userId !== null && props.currentUserId === props.userId;
-  const resolvedTopTab: UserTopTab = !isSelfView && (props.topTab === "credentials" || props.topTab === "settings")
+  const resolvedTopTab: UserTopTab = !isSelfView && (props.topTab === "credentials" || props.topTab === "sessions" || props.topTab === "settings")
     ? "details"
     : props.topTab;
   const selectedScopeToken = useMemo(
@@ -116,6 +126,14 @@ export function UserSpaPage(props: UserSpaPageProps) {
     () => userResponse?.projects.filter((project) => !selectedScopeProjectIds.has(project.id)) ?? [],
     [selectedScopeProjectIds, userResponse?.projects],
   );
+
+  function createScopedLoginLink(tokenValue: string): string {
+    const loginPathWithQuery = `${SCOPED_ACCESS_LOGIN_PATH}?token=${encodeURIComponent(tokenValue)}`;
+    if (typeof window === "undefined" || !window.location.origin) {
+      return loginPathWithQuery;
+    }
+    return `${window.location.origin}${loginPathWithQuery}`;
+  }
 
   useEffect(() => {
     if (props.userId === null) {
@@ -152,7 +170,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
   }, [props.token, props.userId]);
 
   useEffect(() => {
-    if (!isSelfView && props.userId !== null && (props.topTab === "credentials" || props.topTab === "settings")) {
+    if (!isSelfView && props.userId !== null && (props.topTab === "credentials" || props.topTab === "sessions" || props.topTab === "settings")) {
       navigate(createUserRoute(props.userId, "details"), { replace: true });
     }
   }, [isSelfView, navigate, props.topTab, props.userId]);
@@ -165,6 +183,13 @@ export function UserSpaPage(props: UserSpaPageProps) {
     void refreshTokens();
   }, [isSelfView, props.credentialsTab, resolvedTopTab, props.token]);
 
+  useEffect(() => {
+    if (!isSelfView || resolvedTopTab !== "sessions" || props.userId === null) {
+      return;
+    }
+    void refreshSessions();
+  }, [isSelfView, props.token, props.userId, resolvedTopTab]);
+
   async function refreshTokens(): Promise<void> {
     setIsRefreshingTokens(true);
     setTokenIssueMessage(null);
@@ -176,6 +201,23 @@ export function UserSpaPage(props: UserSpaPageProps) {
       setTokens([]);
     } finally {
       setIsRefreshingTokens(false);
+    }
+  }
+
+  async function refreshSessions(): Promise<void> {
+    if (props.userId === null) {
+      return;
+    }
+    setIsRefreshingSessions(true);
+    setSessionIssueMessage(null);
+    try {
+      const response = await authApi.listSessions(props.token, props.userId);
+      setSessions(response.sessions);
+    } catch (error) {
+      setSessionIssueMessage(getApiErrorMessage(error, "Unable to load active sessions."));
+      setSessions([]);
+    } finally {
+      setIsRefreshingSessions(false);
     }
   }
 
@@ -258,6 +300,34 @@ export function UserSpaPage(props: UserSpaPageProps) {
     }
   }
 
+  async function handleRevokeSession(sessionId: string): Promise<void> {
+    setSessionIssueMessage(null);
+    try {
+      await authApi.revokeCurrentSession(props.token, sessionId);
+      await refreshSessions();
+      setTokenActionSuccess(`Revoked session ${sessionId}.`);
+    } catch (error) {
+      setSessionIssueMessage(getApiErrorMessage(error, "Unable to revoke session."));
+    }
+  }
+
+  async function handleRevokeAllSessions(): Promise<void> {
+    setSessionIssueMessage(null);
+    try {
+      const allSessionIds = sessions.map((session) => session.id);
+      const response = await authApi.revokeSessions(props.token, allSessionIds);
+      const currentSessionId = authState.status === "authenticated" ? authState.auth.session.id : null;
+      if (currentSessionId && response.revokedSessionIds.includes(currentSessionId)) {
+        await authActions.logout();
+        return;
+      }
+      await refreshSessions();
+      setTokenActionSuccess("Revoked all active sessions.");
+    } catch (error) {
+      setSessionIssueMessage(getApiErrorMessage(error, "Unable to revoke all sessions."));
+    }
+  }
+
   function openScopeModal(tokenId: number): void {
     setScopeModalTokenId(tokenId);
     setScopeModalTab("currently-accessible-objects");
@@ -311,16 +381,17 @@ export function UserSpaPage(props: UserSpaPageProps) {
     }
   }
 
-  async function handleCopyTokenValue(tokenValue: string): Promise<void> {
+  async function handleCopyLoginLink(tokenValue: string): Promise<void> {
+    const loginLink = createScopedLoginLink(tokenValue);
     if (!navigator.clipboard) {
       setTokenActionError("Clipboard access is unavailable in this browser.");
       return;
     }
     try {
-      await navigator.clipboard.writeText(tokenValue);
-      setTokenActionSuccess("Token copied to clipboard.");
+      await navigator.clipboard.writeText(loginLink);
+      setTokenActionSuccess("Login link copied to clipboard.");
     } catch {
-      setTokenActionError("Unable to copy token to clipboard.");
+      setTokenActionError("Unable to copy login link to clipboard.");
     }
   }
 
@@ -438,8 +509,13 @@ export function UserSpaPage(props: UserSpaPageProps) {
     return (
       <Stack spacing={1.25}>
         <Alert severity="warning">
-          Minted token values are only shown once. Copy token values immediately after minting. Reloading
-          this SPA permanently loses any un-copied token values.
+          Minted token values are only shown once. Copy login links immediately after minting. Reloading this
+          SPA permanently loses any un-copied token values.
+        </Alert>
+        <Alert severity="info">
+          Login links use this format: <code>{`<origin>${SCOPED_ACCESS_LOGIN_PATH}?token=<token-value>`}</code>.
+          Replace <code>{`<origin>`}</code> with this app base URL and <code>{`<token-value>`}</code> with
+          the minted token.
         </Alert>
         {tokenIssueMessage ? <Alert severity="error">{tokenIssueMessage}</Alert> : null}
         {tokenActionError ? <Alert severity="error">{tokenActionError}</Alert> : null}
@@ -455,9 +531,12 @@ export function UserSpaPage(props: UserSpaPageProps) {
           {tokens.map((tokenCredential) => (
             <TokenListItem
               key={tokenCredential.id}
-              onCopyTokenValue={() => void handleCopyTokenValue(retainedMintedTokenValues[tokenCredential.id]!)}
+              onCopyLoginLink={() => void handleCopyLoginLink(retainedMintedTokenValues[tokenCredential.id]!)}
               onEditScope={() => openScopeModal(tokenCredential.id)}
               onRevoke={() => void handleRevokeToken(tokenCredential.id)}
+              retainedLoginLink={retainedMintedTokenValues[tokenCredential.id]
+                ? createScopedLoginLink(retainedMintedTokenValues[tokenCredential.id]!)
+                : undefined}
               retainedTokenValue={retainedMintedTokenValues[tokenCredential.id]}
               tokenCredential={tokenCredential}
               viewMode={TOKEN_LIST_VIEW_MODE}
@@ -574,6 +653,49 @@ export function UserSpaPage(props: UserSpaPageProps) {
         return isSelfView
           ? <Alert severity="info">Settings are coming soon.</Alert>
           : <Alert severity="info">Settings are only available on your own profile.</Alert>;
+      case "sessions":
+        if (!isSelfView) {
+          return <Alert severity="info">Sessions are only available on your own profile.</Alert>;
+        }
+        return (
+          <Stack spacing={1.25}>
+            <Alert
+              severity="warning"
+              sx={{ "& .MuiAlert-message": { width: "100%" } }}
+            >
+              <Stack
+                alignItems={{ md: "center", xs: "flex-start" }}
+                direction={{ md: "row", xs: "column" }}
+                justifyContent="space-between"
+                spacing={1.25}
+              >
+                <Typography variant="body2">
+                  Revoking all sessions will log you out on all devices, including this current session.
+                </Typography>
+                <Button
+                  color="warning"
+                  disabled={sessions.length === 0}
+                  onClick={() => void handleRevokeAllSessions()}
+                  variant="contained"
+                >
+                  Revoke all
+                </Button>
+              </Stack>
+            </Alert>
+            {sessionIssueMessage ? <Alert severity="error">{sessionIssueMessage}</Alert> : null}
+            {isRefreshingSessions ? <CircularProgress size={20} /> : null}
+            <SessionItemList viewMode={SESSION_LIST_VIEW_MODE}>
+              {sessions.map((session) => (
+                <SessionListItem
+                  key={session.id}
+                  onRevoke={() => void handleRevokeSession(session.id)}
+                  session={session}
+                  viewMode={SESSION_LIST_VIEW_MODE}
+                />
+              ))}
+            </SessionItemList>
+          </Stack>
+        );
       case "credentials":
         return renderCredentialsContent();
     }
@@ -639,16 +761,16 @@ export function UserSpaPage(props: UserSpaPageProps) {
         <DialogTitle>Scoped Token Minted</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 1.5 }}>
           <Alert severity="warning">
-            Copy this token now. This value is shown once and cannot be recovered after page reload.
+            Copy this login link now. This token value is shown once and cannot be recovered after page reload.
           </Alert>
           <TextField
             InputProps={{ readOnly: true }}
-            label="Token Value"
-            value={mintedTokenModalValue ?? ""}
+            label="Scoped Login Link"
+            value={mintedTokenModalValue ? createScopedLoginLink(mintedTokenModalValue) : ""}
           />
           <Button
             disabled={!mintedTokenModalValue}
-            onClick={() => mintedTokenModalValue && void handleCopyTokenValue(mintedTokenModalValue)}
+            onClick={() => mintedTokenModalValue && void handleCopyLoginLink(mintedTokenModalValue)}
             variant="outlined"
           >
             Copy to clipboard

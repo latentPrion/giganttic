@@ -754,7 +754,7 @@ describe("users delete api", () => {
         password: "secret123",
         username: creator.user.username,
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     const secondLoginBody = harness.parseJson<{
       accessToken: string;

@@ -268,16 +268,11 @@ export class AuthService {
       this.assertCanManageUserSessions(authContext, session.userId);
     }
 
-    const revocationTimestamp = new Date();
     const revocableIds = sessions.map((session) => session.id);
 
     if (revocableIds.length > 0) {
       this.databaseService.db.transaction((tx) => {
-        tx.update(usersSessions)
-          .set({
-            revokedAt: revocationTimestamp,
-            updatedAt: revocationTimestamp,
-          })
+        tx.delete(usersSessions)
           .where(inArray(usersSessions.id, revocableIds))
           .run();
       });

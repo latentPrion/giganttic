@@ -91,7 +91,7 @@ describe("backend auth api", () => {
         password: options?.password ?? "1234",
         username,
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
 
     expect(response.statusCode).toBe(201);
@@ -456,7 +456,7 @@ describe("backend auth api", () => {
         password: "1234",
         username: "doesnotexist",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(unknownUserResponse.statusCode).toBe(401);
 
@@ -466,7 +466,7 @@ describe("backend auth api", () => {
         password: "wrong-password",
         username: "testadminuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(invalidPasswordResponse.statusCode).toBe(401);
   });
@@ -489,7 +489,7 @@ describe("backend auth api", () => {
         password: "",
         username: "",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(badLogin.statusCode).toBe(400);
 
@@ -568,7 +568,7 @@ describe("backend auth api", () => {
         password: "secret123",
         username: "selfchangeuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(oldPasswordLogin.statusCode).toBe(401);
 
@@ -578,7 +578,7 @@ describe("backend auth api", () => {
         password: "newsecret456",
         username: "selfchangeuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(newPasswordLogin.statusCode).toBe(201);
   });
@@ -693,7 +693,7 @@ describe("backend auth api", () => {
         password: "adminfinalsecret",
         username: "admintargetuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(newPasswordLogin.statusCode).toBe(201);
   });
@@ -1210,7 +1210,7 @@ describe("backend auth api", () => {
         password: "secret123",
         username: "deactivateduser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
 
     expect(loginResponse.statusCode).toBe(401);
@@ -1265,7 +1265,7 @@ describe("backend auth api", () => {
         password: "1234",
         username: "testadminuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(loginResponse.statusCode).toBe(201);
   });

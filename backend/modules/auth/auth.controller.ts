@@ -28,6 +28,14 @@ import type { AuthenticatedRequest } from "./auth.types.js";
 export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
+  private extractRequestMetadata(request: AuthenticatedRequest) {
+    return this.authService.extractRequestMetadata({
+      headers: request.headers as Record<string, string | string[] | undefined>,
+      ip: request.ip,
+      socket: request.socket,
+    });
+  }
+
   @Post("register")
   async register(
     @Body(new ZodValidationPipe(registerRequestSchema)) body: unknown,
@@ -37,7 +45,7 @@ export class AuthController {
     );
   }
 
-  @Post("login")
+  @Post("login/password")
   async login(
     @Body(new ZodValidationPipe(loginRequestSchema)) body: unknown,
     @Req() request: AuthenticatedRequest,
@@ -45,11 +53,7 @@ export class AuthController {
     return loginResponseSchema.parse(
       await this.authService.login(
         body as never,
-        this.authService.extractRequestMetadata({
-          headers: request.headers as Record<string, string | string[] | undefined>,
-          ip: request.ip,
-          socket: request.socket,
-        }),
+        this.extractRequestMetadata(request),
       ),
     );
   }

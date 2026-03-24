@@ -25,6 +25,7 @@ interface SessionManagerActions {
   dismissFailure(): void;
   initialize(): Promise<void>;
   login(payload: LoginRequest): Promise<void>;
+  loginWithScopedAccessToken(token: string): Promise<void>;
   logout(): Promise<void>;
   register(payload: RegisterRequest): Promise<void>;
 }
@@ -50,6 +51,19 @@ function buildInitializationErrorMessage(error: unknown): string {
 }
 
 export function AuthSessionProvider(props: AuthSessionProviderProps) {
+  function setAuthenticatedSession(token: string, response: Awaited<ReturnType<typeof authApi.login>>): void {
+    authTokenStorage.write(token);
+    startTransition(() => {
+      setAuthState(
+        createAuthenticatedState({
+          session: response.session,
+          token,
+          user: response.user,
+        }),
+      );
+    });
+  }
+
   const [authState, setAuthState] = useState<AuthState>(createLoadingState());
   const [isBusy, setIsBusy] = useState(false);
 
@@ -99,16 +113,18 @@ export function AuthSessionProvider(props: AuthSessionProviderProps) {
 
     try {
       const response = await authApi.login(payload);
-      authTokenStorage.write(response.accessToken);
-      startTransition(() => {
-        setAuthState(
-          createAuthenticatedState({
-            session: response.session,
-            token: response.accessToken,
-            user: response.user,
-          }),
-        );
-      });
+      setAuthenticatedSession(response.accessToken, response);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function loginWithScopedAccessToken(token: string): Promise<void> {
+    setIsBusy(true);
+
+    try {
+      const response = await authApi.loginWithScopedAccessToken(token);
+      setAuthenticatedSession(response.accessToken, response);
     } finally {
       setIsBusy(false);
     }
@@ -162,6 +178,7 @@ export function AuthSessionProvider(props: AuthSessionProviderProps) {
           dismissFailure,
           initialize,
           login,
+          loginWithScopedAccessToken,
           logout,
           register,
         },

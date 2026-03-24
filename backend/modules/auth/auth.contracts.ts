@@ -11,6 +11,10 @@ export const loginRequestSchema = z.object({
   password: z.string().min(1),
 });
 
+export const scopedAccessTokenLoginRequestSchema = z.object({
+  token: z.string().min(1),
+});
+
 export const sessionQuerySchema = z.object({
   userId: z.coerce.number().int().positive(),
 });
@@ -62,6 +66,7 @@ export const revokeSessionsResponseSchema = z.object({
 
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type ScopedAccessTokenLoginRequest = z.infer<typeof scopedAccessTokenLoginRequestSchema>;
 export type SessionQuery = z.infer<typeof sessionQuerySchema>;
 export type RevokeSessionsRequest = z.infer<typeof revokeSessionsRequestSchema>;
 export type AuthUserResponse = z.infer<typeof authUserSchema>;

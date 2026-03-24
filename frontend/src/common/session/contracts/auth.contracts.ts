@@ -11,6 +11,10 @@ export const loginRequestSchema = z.object({
   username: z.string().min(1),
 });
 
+export const scopedAccessTokenLoginRequestSchema = z.object({
+  token: z.string().min(1),
+});
+
 export const revokeSessionsRequestSchema = z.object({
   sessionIds: z.array(z.string().min(1)).min(1),
 });
@@ -48,6 +52,10 @@ export const currentSessionResponseSchema = z.object({
   user: authUserSchema,
 });
 
+export const listSessionsResponseSchema = z.object({
+  sessions: z.array(sessionSummarySchema),
+});
+
 export const revokeSessionsResponseSchema = z.object({
   revokedSessionIds: z.array(z.string()),
 });
@@ -56,6 +64,8 @@ export type AuthUser = z.infer<typeof authUserSchema>;
 export type CurrentSessionResponse = z.infer<typeof currentSessionResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
+export type ListSessionsResponse = z.infer<typeof listSessionsResponseSchema>;
+export type ScopedAccessTokenLoginRequest = z.infer<typeof scopedAccessTokenLoginRequestSchema>;
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 export type RegisterResponse = z.infer<typeof registerResponseSchema>;
 export type RevokeSessionsRequest = z.infer<typeof revokeSessionsRequestSchema>;

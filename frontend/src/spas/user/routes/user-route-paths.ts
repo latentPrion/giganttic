@@ -1,4 +1,4 @@
-export const USER_TOP_TAB_VALUES = ["details", "associations", "settings", "credentials"] as const;
+export const USER_TOP_TAB_VALUES = ["details", "associations", "credentials", "sessions", "settings"] as const;
 export type UserTopTab = typeof USER_TOP_TAB_VALUES[number];
 
 export const USER_CREDENTIALS_TAB_VALUES = ["password", "scoped-access-tokens", "passkeys"] as const;

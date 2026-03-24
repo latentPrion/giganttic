@@ -17,6 +17,7 @@ vi.mock("../api/auth-api.js", () => ({
     login: vi.fn(),
     register: vi.fn(),
     revokeCurrentSession: vi.fn(),
+    revokeSessions: vi.fn(),
   },
 }));
 

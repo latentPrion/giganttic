@@ -46,6 +46,15 @@ const DEFAULT_ERROR = "Unable to load that gantt chart right now.";
 const SAVE_ERROR = "Unable to save the gantt chart right now.";
 const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
 const DEBUG_SESSION_ID = "117825";
+const LEGACY_EMPTY_PROJECT_CHART_XML_VALUES = new Set(["<project/>", "<project />"]);
+
+function normalizeKnownLegacyChartXml(xml: string): string {
+  const trimmedXml = xml.trim();
+  if (LEGACY_EMPTY_PROJECT_CHART_XML_VALUES.has(trimmedXml)) {
+    return DEFAULT_PROJECT_CHART_XML;
+  }
+  return xml;
+}
 
 function emitDebugLog(
   location: string,
@@ -182,8 +191,9 @@ export function useGanttChartFileManager(options: {
     try {
       const loaded = await ganttApi.getProjectChartOrNull(token, projectId);
       if (loaded) {
+        const normalizedLoadedXml = normalizeKnownLegacyChartXml(loaded.content);
         const normalizationResult = extensionsManagerRef.current.normalizeXmlTasksWithExtensionAttrs(
-          loaded.content,
+          normalizedLoadedXml,
         );
         emitDebugLog(
           "use-gantt-chart-file-manager.ts:loadChart",

@@ -286,13 +286,13 @@ export class ProjectsService {
   listProjects(authContext: AuthContext): ListProjectsResponse {
     let accessibleProjectIds = this.listAccessibleProjectIds(authContext.userId);
     if (isScopedAccessSession(authContext)) {
-      accessibleProjectIds = intersectProjectIds(
-        accessibleProjectIds,
-        listScopedTokenProjectIds(
-          this.databaseService.db,
-          authContext.sessionAuth.scopedAccessTokenCredentialId,
-        ),
+      const scopedProjectIds = listScopedTokenProjectIds(
+        this.databaseService.db,
+        authContext.sessionAuth.scopedAccessTokenCredentialId,
       );
+      accessibleProjectIds = hasSystemAdminRole(authContext)
+        ? scopedProjectIds
+        : intersectProjectIds(accessibleProjectIds, scopedProjectIds);
     }
 
     if (accessibleProjectIds.length === 0) {

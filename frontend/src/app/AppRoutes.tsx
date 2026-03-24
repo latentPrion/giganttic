@@ -9,6 +9,7 @@ import {
 import { AboutPage } from "../home/components/AboutPage.js";
 import { ContactPage } from "../home/components/ContactPage.js";
 import { HomeHero } from "../home/components/HomeHero.js";
+import { ScopedAccessTokenLoginRoute } from "../common/session/routes/ScopedAccessTokenLoginRoute.js";
 import { GanttRoute } from "../spas/project-manager/routes/GanttRoute.js";
 import { IssueRoute } from "../spas/project-manager/routes/IssueRoute.js";
 import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
@@ -41,6 +42,7 @@ export function AppRoutes() {
         <Route element={<AboutPage />} path="/about" />
       </Route>
       <Route element={<LobbyRoute />} path="/lobby" />
+      <Route element={<ScopedAccessTokenLoginRoute />} path="/auth/scoped-token-login" />
       <Route element={<LegacyProjectRouteRedirect />} path="/project/:projectId" />
       <Route element={<ProjectRoute />} path="/pm/project" />
       <Route element={<TeamRoute />} path="/pm/team" />

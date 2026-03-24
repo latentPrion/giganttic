@@ -175,7 +175,7 @@ export function createCrudTestHarness(
         password: seed.password,
         username: seed.username,
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
 
     if (loginResponse.statusCode !== 201) {
@@ -192,7 +192,7 @@ export function createCrudTestHarness(
         password: "1234",
         username: "testadminuser",
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
 
     if (loginResponse.statusCode !== 201) {

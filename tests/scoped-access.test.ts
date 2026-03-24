@@ -69,7 +69,7 @@ describe("scoped access tokens", () => {
         password: "1234",
         username,
       },
-      url: "/stc-proj-mgmt/api/auth/login",
+      url: "/stc-proj-mgmt/api/auth/login/password",
     });
     expect(response.statusCode).toBe(201);
     return parseJson(response.payload);
@@ -404,6 +404,29 @@ describe("scoped access tokens", () => {
       url: "/stc-proj-mgmt/api/scoped-access/redeem",
     });
     expect(expiredRedeem.statusCode).toBe(401);
+  });
+
+  it("supports auth login namespace for scoped access token login", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const [projectA] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+
+    const loginResponse = await app.inject({
+      method: "POST",
+      payload: { token: created.token },
+      url: "/stc-proj-mgmt/api/auth/login/scoped-access-token",
+    });
+    expect(loginResponse.statusCode).toBe(201);
+
+    const parsedLogin = parseJson<{ accessToken: string }>(loginResponse.payload);
+    const sessionMe = await app.inject({
+      headers: { authorization: `Bearer ${parsedLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/auth/session/me",
+    });
+    expect(sessionMe.statusCode).toBe(200);
   });
 
   it("invalidates existing scoped sessions after token revoke", async () => {

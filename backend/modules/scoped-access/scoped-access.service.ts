@@ -18,7 +18,10 @@ import {
   usersCredentialTypes,
   usersScopedAccessTokenCredentials,
 } from "../../../db/index.js";
-import { hasProjectAccess } from "../access-control/access-control.utils.js";
+import {
+  hasProjectAccess,
+  hasSystemAdminRole,
+} from "../access-control/access-control.utils.js";
 import { AuthService } from "../auth/auth.service.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import type {
@@ -106,7 +109,7 @@ export class ScopedAccessService {
     assertStandardSession(authContext);
     this.assertOwnerTokenCredential(authContext.userId, tokenCredentialId);
     this.assertProjectExists(payload.projectId);
-    this.assertOwnerCanAccessProject(authContext.userId, payload.projectId);
+    this.assertOwnerCanAccessProject(authContext, payload.projectId);
 
     try {
       this.databaseService.db.insert(scopedAccessTokenCredentialsObjects)
@@ -299,8 +302,11 @@ export class ScopedAccessService {
     }
   }
 
-  private assertOwnerCanAccessProject(ownerUserId: number, projectId: number): void {
-    if (!hasProjectAccess(this.databaseService.db, projectId, ownerUserId)) {
+  private assertOwnerCanAccessProject(authContext: AuthContext, projectId: number): void {
+    if (
+      !hasSystemAdminRole(authContext) &&
+      !hasProjectAccess(this.databaseService.db, projectId, authContext.userId)
+    ) {
       throw new ForbiddenException("Owner does not have access to project");
     }
   }

@@ -45,8 +45,10 @@ vi.mock("./common/session/api/auth-api.js", () => ({
   authApi: {
     getCurrentSession: vi.fn(),
     login: vi.fn(),
+    loginWithScopedAccessToken: vi.fn(),
     register: vi.fn(),
     revokeCurrentSession: vi.fn(),
+    revokeSessions: vi.fn(),
   },
 }));
 
@@ -125,6 +127,14 @@ function createAuthenticatedResponse() {
       roles: ["GGTC_SYSTEMROLE_ADMIN"],
       username: "demo-user",
     },
+  };
+}
+
+function createLoginResponse() {
+  return {
+    accessToken: "scoped-login-token",
+    ...createAuthenticatedResponse(),
+    tokenType: "Bearer" as const,
   };
 }
 
@@ -415,8 +425,22 @@ describe("app routing", () => {
 
     expect(await screen.findByText("User SPA")).toBeVisible();
     expect(await screen.findByText("Selected user: 101")).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
     expect(screen.getByRole("tab", { name: "Credentials" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Sessions" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
+  });
+
+  it("redeems scoped token login route and redirects to /user", async () => {
+    authTokenStorageMock.read.mockReturnValue(null);
+    authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/auth/scoped-token-login?token=scoped-token-abc"],
+    });
+
+    expect(await screen.findByText("User SPA")).toBeVisible();
+    expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
+    expect(authTokenStorageMock.write).toHaveBeenCalledWith("scoped-login-token");
   });
 
   it("hides self-only tabs for standalone user SPA non-self view", async () => {
@@ -430,6 +454,7 @@ describe("app routing", () => {
     expect(await screen.findByText("User SPA")).toBeVisible();
     expect(screen.queryByRole("tab", { name: "Settings" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Credentials" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Sessions" })).not.toBeInTheDocument();
   });
 
   it("renders the PM project gantt SPA for authenticated users", async () => {
