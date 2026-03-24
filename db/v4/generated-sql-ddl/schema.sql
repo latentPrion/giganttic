@@ -276,6 +276,8 @@ CREATE TABLE `Users_Sessions` (
 	`oauthAuthorizationCode` text,
 	`oauthAccessToken` text,
 	`oauthRefreshToken` text,
+	`authSourceCredentialTypeCode` text,
+	`authSourceCredentialId` integer,
 	`revokedAt` integer,
 	`createdAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
 	`updatedAt` integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,

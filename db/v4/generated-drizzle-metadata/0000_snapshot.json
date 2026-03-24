@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0d57b595-c2d5-46ea-a59d-ad09644528cf",
+  "id": "7aa441b0-3c9b-4153-84a6-628917b9c6ae",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "ClosedReasons": {
@@ -1905,6 +1905,20 @@
         "oauthRefreshToken": {
           "name": "oauthRefreshToken",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "authSourceCredentialTypeCode": {
+          "name": "authSourceCredentialTypeCode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "authSourceCredentialId": {
+          "name": "authSourceCredentialId",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

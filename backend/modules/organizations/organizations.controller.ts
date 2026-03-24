@@ -10,11 +10,10 @@ import {
   Post,
   Put,
   Req,
-  UseGuards,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
-import { BearerAuthGuard } from "../auth/auth.guard.js";
+import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import {
   assignOrganizationTeamRequestSchema,
@@ -37,7 +36,7 @@ import {
 } from "./organizations.contracts.js";
 import { OrganizationsService } from "./organizations.service.js";
 
-@UseGuards(BearerAuthGuard)
+@Authenticated()
 @Controller("organizations")
 export class OrganizationsController {
   constructor(

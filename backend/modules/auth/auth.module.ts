@@ -4,6 +4,7 @@ import { DatabaseModule } from "../database/database.module.js";
 import { AuthController } from "./auth.controller.js";
 import { BearerAuthGuard } from "./auth.guard.js";
 import { AuthService } from "./auth.service.js";
+import { ScopedAccessRouteGuard } from "./scoped-access-route.guard.js";
 
 @Module({
   controllers: [AuthController],
@@ -11,10 +12,12 @@ import { AuthService } from "./auth.service.js";
   providers: [
     AuthService,
     BearerAuthGuard,
+    ScopedAccessRouteGuard,
   ],
   exports: [
     AuthService,
     BearerAuthGuard,
+    ScopedAccessRouteGuard,
   ],
 })
 export class AuthModule {}

@@ -6,7 +6,6 @@ import {
   Post,
   Query,
   Req,
-  UseGuards,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
@@ -21,8 +20,8 @@ import {
   revokeSessionsResponseSchema,
   sessionQuerySchema,
 } from "./auth.contracts.js";
+import { Authenticated } from "./authenticated.decorator.js";
 import { AuthService } from "./auth.service.js";
-import { BearerAuthGuard } from "./auth.guard.js";
 import type { AuthenticatedRequest } from "./auth.types.js";
 
 @Controller("auth")
@@ -55,7 +54,7 @@ export class AuthController {
     );
   }
 
-  @UseGuards(BearerAuthGuard)
+  @Authenticated()
   @Get("session/me")
   getCurrentSession(@Req() request: AuthenticatedRequest) {
     return currentSessionResponseSchema.parse(
@@ -63,7 +62,7 @@ export class AuthController {
     );
   }
 
-  @UseGuards(BearerAuthGuard)
+  @Authenticated()
   @Get("session")
   listSessions(
     @Req() request: AuthenticatedRequest,
@@ -77,7 +76,7 @@ export class AuthController {
     );
   }
 
-  @UseGuards(BearerAuthGuard)
+  @Authenticated()
   @Post("session/revoke")
   async revokeSessions(
     @Req() request: AuthenticatedRequest,

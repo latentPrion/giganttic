@@ -33,3 +33,7 @@ CREATE TABLE `Users_ScopedAccessTokenCredentials` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `Users_ScopedAccessTokenCredentials_tokenHash_unique` ON `Users_ScopedAccessTokenCredentials` (`tokenHash`);--> statement-breakpoint
 CREATE UNIQUE INDEX `Users_ScopedAccessTokenCredentials_userCredentialTypeId_unique` ON `Users_ScopedAccessTokenCredentials` (`userCredentialTypeId`);
+--> statement-breakpoint
+ALTER TABLE `Users_Sessions` ADD `authSourceCredentialTypeCode` text;
+--> statement-breakpoint
+ALTER TABLE `Users_Sessions` ADD `authSourceCredentialId` integer;

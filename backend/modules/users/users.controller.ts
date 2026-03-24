@@ -9,11 +9,10 @@ import {
   Param,
   Post,
   Req,
-  UseGuards,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
-import { BearerAuthGuard } from "../auth/auth.guard.js";
+import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import {
   changeUserPasswordRequestSchema,
@@ -25,7 +24,7 @@ import {
 } from "./users.contracts.js";
 import { UsersService } from "./users.service.js";
 
-@UseGuards(BearerAuthGuard)
+@Authenticated()
 @Controller("users")
 export class UsersController {
   constructor(@Inject(UsersService) private readonly usersService: UsersService) {}

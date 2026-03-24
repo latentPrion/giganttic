@@ -24,6 +24,7 @@ import {
   usersCredentialTypes,
   usersPasswordCredentials,
   usersSessions,
+  usersScopedAccessTokenCredentials,
   usersSystemRoles,
 } from "../../../db/index.js";
 import {
@@ -41,6 +42,11 @@ import {
   type SessionSummary,
 } from "./auth.contracts.js";
 import type { AuthContext } from "./auth.types.js";
+
+interface SessionAuthSource {
+  credentialId: number;
+  credentialTypeCode: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -157,30 +163,14 @@ export class AuthService {
       throw new UnauthorizedException("Invalid username or password");
     }
 
-    const accessToken = this.generateBearerToken();
-    const sessionId = randomUUID();
-    const now = new Date();
-    const expiration = new Date(now.getTime() + this.config.sessionTtlMs);
-    const sessionTokenHash = this.hashToken(accessToken);
-
-    this.databaseService.db.transaction((tx) => {
-      tx.insert(usersSessions)
-        .values({
-          expirationTimestamp: expiration,
-          id: sessionId,
-          ipAddress: requestMetadata.ipAddress,
-          location: requestMetadata.location,
-          sessionTokenHash,
-          startTimestamp: now,
-          userId: credentialRow.userId,
-        })
-        .run();
-    });
+    const sessionResult = this.createSessionForUser(
+      credentialRow.userId,
+      requestMetadata,
+      null,
+    );
     return {
-      accessToken,
-      session: this.buildSessionSummary(
-        this.getSessionByIdOrThrow(sessionId),
-      ),
+      accessToken: sessionResult.accessToken,
+      session: sessionResult.session,
       tokenType: "Bearer",
       user: this.buildAuthUser(credentialRow.userId),
     };
@@ -190,6 +180,8 @@ export class AuthService {
     const now = new Date();
     const session = this.databaseService.db
       .select({
+        authSourceCredentialId: usersSessions.authSourceCredentialId,
+        authSourceCredentialTypeCode: usersSessions.authSourceCredentialTypeCode,
         id: usersSessions.id,
         userId: usersSessions.userId,
       })
@@ -218,6 +210,7 @@ export class AuthService {
     return {
       roleCodes: roleRows.map((row) => row.roleCode),
       sessionId: session.id,
+      sessionAuth: this.resolveSessionAuth(session),
       userId: session.userId,
     };
   }
@@ -358,6 +351,43 @@ export class AuthService {
       .get() ?? null;
   }
 
+  createSessionForUser(
+    userId: number,
+    requestMetadata: { ipAddress: string; location: string | null },
+    authSource: SessionAuthSource | null,
+  ): { accessToken: string; session: SessionSummary } {
+    const accessToken = this.generateBearerToken();
+    const sessionId = randomUUID();
+    const now = new Date();
+    const expiration = new Date(now.getTime() + this.config.sessionTtlMs);
+    const sessionTokenHash = this.hashToken(accessToken);
+
+    this.databaseService.db.transaction((tx) => {
+      tx.insert(usersSessions)
+        .values({
+          authSourceCredentialId: authSource?.credentialId ?? null,
+          authSourceCredentialTypeCode: authSource?.credentialTypeCode ?? null,
+          expirationTimestamp: expiration,
+          id: sessionId,
+          ipAddress: requestMetadata.ipAddress,
+          location: requestMetadata.location,
+          sessionTokenHash,
+          startTimestamp: now,
+          userId,
+        })
+        .run();
+    });
+
+    return {
+      accessToken,
+      session: this.buildSessionSummary(this.getSessionByIdOrThrow(sessionId)),
+    };
+  }
+
+  getAuthUserById(userId: number): AuthUserResponse {
+    return this.buildAuthUser(userId);
+  }
+
   private buildAuthUser(userId: number): AuthUserResponse {
     const user = this.databaseService.db
       .select({
@@ -417,6 +447,45 @@ export class AuthService {
     }
 
     return session;
+  }
+
+  private resolveSessionAuth(session: {
+    authSourceCredentialId: number | null;
+    authSourceCredentialTypeCode: string | null;
+  }): AuthContext["sessionAuth"] {
+    if (
+      session.authSourceCredentialTypeCode !== credentialTypeCodes.scopedAccessToken ||
+      session.authSourceCredentialId === null
+    ) {
+      return { kind: "standard" };
+    }
+
+    const scopedCredential = this.databaseService.db
+      .select({
+        expiresAt: usersScopedAccessTokenCredentials.expiresAt,
+        id: usersScopedAccessTokenCredentials.id,
+        revokedAt: usersScopedAccessTokenCredentials.revokedAt,
+      })
+      .from(usersScopedAccessTokenCredentials)
+      .where(eq(usersScopedAccessTokenCredentials.id, session.authSourceCredentialId))
+      .get();
+
+    if (!scopedCredential) {
+      throw new UnauthorizedException("Invalid or expired session");
+    }
+
+    const now = new Date();
+    if (
+      scopedCredential.revokedAt !== null ||
+      (scopedCredential.expiresAt !== null && scopedCredential.expiresAt <= now)
+    ) {
+      throw new UnauthorizedException("Invalid or expired session");
+    }
+
+    return {
+      kind: "scoped_access_token",
+      scopedAccessTokenCredentialId: scopedCredential.id,
+    };
   }
 
   private generateBearerToken(): string {

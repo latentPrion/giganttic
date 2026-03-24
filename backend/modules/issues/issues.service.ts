@@ -18,6 +18,7 @@ import {
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import type {
   CreateIssueRequest,
   DeleteIssueResponse,
@@ -255,17 +256,33 @@ export class IssuesService {
   }
 
   private assertCanManageIssues(authContext: AuthContext, projectId: number): void {
-    if (hasEffectiveProjectManagerRole(this.databaseService.db, projectId, authContext.userId)) {
-      return;
-    }
-    throw new ForbiddenException(ISSUE_MANAGE_FORBIDDEN_MESSAGE);
+    assertProjectAccessibleWithScopedPolicy(
+      this.databaseService.db,
+      authContext,
+      projectId,
+      () => this.assertCanManageIssuesNormally(authContext, projectId),
+    );
   }
 
   private assertCanViewProject(authContext: AuthContext, projectId: number): void {
-    if (hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
-      return;
+    assertProjectAccessibleWithScopedPolicy(
+      this.databaseService.db,
+      authContext,
+      projectId,
+      () => this.assertCanViewProjectNormally(authContext, projectId),
+    );
+  }
+
+  private assertCanManageIssuesNormally(authContext: AuthContext, projectId: number): void {
+    if (!hasEffectiveProjectManagerRole(this.databaseService.db, projectId, authContext.userId)) {
+      throw new ForbiddenException(ISSUE_MANAGE_FORBIDDEN_MESSAGE);
     }
-    throw new ForbiddenException(PROJECT_VIEW_FORBIDDEN_MESSAGE);
+  }
+
+  private assertCanViewProjectNormally(authContext: AuthContext, projectId: number): void {
+    if (!hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
+      throw new ForbiddenException(PROJECT_VIEW_FORBIDDEN_MESSAGE);
+    }
   }
 
   private getIssueEntityByIdOrThrow(projectId: number, issueId: number): IssueRecord {

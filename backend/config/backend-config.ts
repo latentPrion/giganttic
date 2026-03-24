@@ -16,6 +16,10 @@ export interface BackendConfig {
   runtimeSchemaSnapshotSubdir: string;
   sessionTtlMs: number;
   createDbIfMissing: boolean;
+  scopedSessionRouteAllowlist: ReadonlyArray<{
+    method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
+    pattern: string;
+  }>;
 }
 
 export const BACKEND_CONFIG = Symbol("BACKEND_CONFIG");
@@ -34,6 +38,19 @@ export function buildBackendConfig(
     routePrefix: "stc-proj-mgmt/api",
     runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
+    scopedSessionRouteAllowlist: [
+      { method: "GET", pattern: "/auth/session/me" },
+      { method: "GET", pattern: "/projects" },
+      { method: "GET", pattern: "/projects/chart-export-capabilities" },
+      { method: "GET", pattern: "/projects/:projectId" },
+      { method: "GET", pattern: "/projects/:projectId/chart" },
+      { method: "PUT", pattern: "/projects/:projectId/chart" },
+      { method: "GET", pattern: "/projects/:projectId/issues" },
+      { method: "POST", pattern: "/projects/:projectId/issues" },
+      { method: "GET", pattern: "/projects/:projectId/issues/:issueId" },
+      { method: "PATCH", pattern: "/projects/:projectId/issues/:issueId" },
+      { method: "DELETE", pattern: "/projects/:projectId/issues/:issueId" },
+    ],
     ...overrides,
   };
 }

@@ -10,6 +10,7 @@ import {
 // Full v4 schema: copy of db/v3/schema.ts plus v4 tables. Merge v3 changes here when evolving.
 
 export const credentialTypeCodes = {
+  scopedAccessToken: "CREDTYPE_SCOPED_ACCESS_TOKEN",
   usernamePassword: "GGTC_CREDTYPE_USERNAME_PASSWORD",
 } as const;
 
@@ -576,6 +577,8 @@ export const usersSessions = sqliteTable(
     oauthAuthorizationCode: text("oauthAuthorizationCode"),
     oauthAccessToken: text("oauthAccessToken"),
     oauthRefreshToken: text("oauthRefreshToken"),
+    authSourceCredentialTypeCode: text("authSourceCredentialTypeCode"),
+    authSourceCredentialId: integer("authSourceCredentialId"),
     revokedAt: integer("revokedAt", { mode: "timestamp_ms" }),
     ...createTimestampColumns(),
   },

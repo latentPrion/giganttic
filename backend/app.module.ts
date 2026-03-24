@@ -7,6 +7,7 @@ import { DatabaseModule } from "./modules/database/database.module.js";
 import { IssuesModule } from "./modules/issues/issues.module.js";
 import { OrganizationsModule } from "./modules/organizations/organizations.module.js";
 import { ProjectsModule } from "./modules/projects/projects.module.js";
+import { ScopedAccessModule } from "./modules/scoped-access/scoped-access.module.js";
 import { TeamsModule } from "./modules/teams/teams.module.js";
 import { UsersModule } from "./modules/users/users.module.js";
 
@@ -21,6 +22,7 @@ export class AppModule {
         AuthModule,
         TeamsModule,
         ProjectsModule,
+        ScopedAccessModule,
         IssuesModule,
         OrganizationsModule,
         UsersModule,

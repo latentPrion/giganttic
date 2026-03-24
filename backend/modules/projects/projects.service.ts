@@ -53,6 +53,12 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { ProjectChartsService } from "../project-charts/project-charts.service.js";
+import {
+  assertProjectAccessibleWithScopedPolicy,
+  intersectProjectIds,
+  isScopedAccessSession,
+  listScopedTokenProjectIds,
+} from "../scoped-access/scoped-access.policy.js";
 import type {
   CreateProjectRequest,
   DeleteProjectResponse,
@@ -278,7 +284,17 @@ export class ProjectsService {
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {
-    const accessibleProjectIds = this.listAccessibleProjectIds(authContext.userId);
+    let accessibleProjectIds = this.listAccessibleProjectIds(authContext.userId);
+    if (isScopedAccessSession(authContext)) {
+      accessibleProjectIds = intersectProjectIds(
+        accessibleProjectIds,
+        listScopedTokenProjectIds(
+          this.databaseService.db,
+          authContext.sessionAuth.scopedAccessTokenCredentialId,
+        ),
+      );
+    }
+
     if (accessibleProjectIds.length === 0) {
       return { projects: [] };
     }
@@ -646,11 +662,20 @@ export class ProjectsService {
   }
 
   private assertCanViewProject(authContext: AuthContext, projectId: number): void {
-    if (hasSystemAdminRole(authContext)) {
-      return;
-    }
+    assertProjectAccessibleWithScopedPolicy(
+      this.databaseService.db,
+      authContext,
+      projectId,
+      () => this.assertUserCanViewProjectNormally(authContext, projectId),
+    );
+  }
 
-    if (!hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
+  private assertUserCanViewProjectNormally(
+    authContext: AuthContext,
+    projectId: number,
+  ): void {
+    if (!hasSystemAdminRole(authContext) &&
+      !hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
       throw new ForbiddenException("Not permitted to access that project");
     }
   }
