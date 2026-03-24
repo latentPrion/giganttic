@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import {
   credentialTypeCodes,
+  organizations,
   projects,
   scopedAccessObjectTypeCodes,
   scopedAccessTokenCredentialsObjects,
@@ -21,6 +22,7 @@ import {
 import {
   hasProjectAccess,
   hasSystemAdminRole,
+  listOrganizationIdsVisibleByMembership,
 } from "../access-control/access-control.utils.js";
 import { AuthService } from "../auth/auth.service.js";
 import type { AuthContext } from "../auth/auth.types.js";
@@ -30,6 +32,7 @@ import type {
 } from "../auth/auth.contracts.js";
 import { DatabaseService } from "../database/database.service.js";
 import type {
+  AddScopedAccessOrganizationScopeRequest,
   AddScopedAccessProjectScopeRequest,
   CreateScopedAccessTokenRequest,
 } from "./scoped-access.contracts.js";
@@ -151,6 +154,65 @@ export class ScopedAccessService {
             scopedAccessObjectTypeCodes.project,
           ),
           eq(scopedAccessTokenCredentialsObjects.scopedAccessObjectId, projectId),
+        ),
+      )
+      .run();
+
+    return {
+      tokenCredential: this.getTokenCredential(authContext.userId, tokenCredentialId),
+    };
+  }
+
+  addOrganizationScope(
+    authContext: AuthContext,
+    tokenCredentialId: number,
+    payload: AddScopedAccessOrganizationScopeRequest,
+  ): { tokenCredential: ScopedTokenResponse } {
+    assertStandardSession(authContext);
+    this.assertOwnerTokenCredential(authContext.userId, tokenCredentialId);
+    this.assertOrganizationExists(payload.organizationId);
+    this.assertOwnerCanAccessOrganization(authContext, payload.organizationId);
+
+    try {
+      this.databaseService.db.insert(scopedAccessTokenCredentialsObjects)
+        .values({
+          scopedAccessObjectId: payload.organizationId,
+          scopedAccessObjectTypeCode: scopedAccessObjectTypeCodes.organization,
+          scopedAccessTokenCredentialId: tokenCredentialId,
+        })
+        .run();
+    } catch (error) {
+      if (String(error).includes("unique")) {
+        throw new ConflictException("Organization scope already exists for token");
+      }
+      throw error;
+    }
+
+    return {
+      tokenCredential: this.getTokenCredential(authContext.userId, tokenCredentialId),
+    };
+  }
+
+  removeOrganizationScope(
+    authContext: AuthContext,
+    tokenCredentialId: number,
+    organizationId: number,
+  ): { tokenCredential: ScopedTokenResponse } {
+    assertStandardSession(authContext);
+    this.assertOwnerTokenCredential(authContext.userId, tokenCredentialId);
+
+    this.databaseService.db.delete(scopedAccessTokenCredentialsObjects)
+      .where(
+        and(
+          eq(
+            scopedAccessTokenCredentialsObjects.scopedAccessTokenCredentialId,
+            tokenCredentialId,
+          ),
+          eq(
+            scopedAccessTokenCredentialsObjects.scopedAccessObjectTypeCode,
+            scopedAccessObjectTypeCodes.organization,
+          ),
+          eq(scopedAccessTokenCredentialsObjects.scopedAccessObjectId, organizationId),
         ),
       )
       .run();
@@ -308,6 +370,33 @@ export class ScopedAccessService {
       !hasProjectAccess(this.databaseService.db, projectId, authContext.userId)
     ) {
       throw new ForbiddenException("Owner does not have access to project");
+    }
+  }
+
+  private assertOrganizationExists(organizationId: number): void {
+    const organizationRow = this.databaseService.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .get();
+    if (!organizationRow) {
+      throw new NotFoundException("Organization not found");
+    }
+  }
+
+  private assertOwnerCanAccessOrganization(
+    authContext: AuthContext,
+    organizationId: number,
+  ): void {
+    const visibleIds = listOrganizationIdsVisibleByMembership(
+      this.databaseService.db,
+      authContext.userId,
+    );
+    if (
+      !hasSystemAdminRole(authContext) &&
+      !visibleIds.includes(organizationId)
+    ) {
+      throw new ForbiddenException("Owner does not have access to organization");
     }
   }
 

@@ -41,6 +41,7 @@ import { TokenObjectListItem } from "../../../common/components/entity-list/Toke
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import type {
   GetUserResponse,
+  LobbyOrganization,
   LobbyProject,
 } from "../../../lobby/contracts/lobby.contracts.js";
 import { UserPasswordChangeModal } from "../../project-manager/components/users/UserPasswordChangeModal.js";
@@ -84,6 +85,9 @@ const TOKEN_SCOPE_TAB_VALUES = [
 ] as const;
 type TokenScopeTab = typeof TOKEN_SCOPE_TAB_VALUES[number];
 const SCOPED_ACCESS_LOGIN_PATH = "/auth/scoped-token-login";
+const SCOPED_ACCESS_OBJECT_TYPE_PROJECT = "SCOPED_ACCESS_OBJECT_TYPE_PROJECT";
+const SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION = "SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION";
+const SCOPED_ACCESS_OBJECT_TYPE_TEAM = "SCOPED_ACCESS_OBJECT_TYPE_TEAM";
 
 function resolveUserTopTab(
   topTab: UserTopTab,
@@ -120,6 +124,9 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const [scopeModalTokenId, setScopeModalTokenId] = useState<number | null>(null);
   const [scopeModalTab, setScopeModalTab] = useState<TokenScopeTab>("currently-accessible-objects");
   const [selectedProjectScopeCandidate, setSelectedProjectScopeCandidate] = useState<LobbyProject | null>(null);
+  const [selectedOrganizationScopeCandidate, setSelectedOrganizationScopeCandidate] = useState<LobbyOrganization | null>(
+    null,
+  );
   const [tokens, setTokens] = useState<ScopedAccessToken[]>([]);
   const [userResponse, setUserResponse] = useState<GetUserResponse | null>(null);
 
@@ -138,7 +145,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const selectedScopeProjectIds = useMemo(
     () => new Set(
       selectedScopeToken?.scopes
-        .filter((scope) => scope.objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_PROJECT")
+        .filter((scope) => scope.objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_PROJECT)
         .map((scope) => scope.objectId) ?? [],
     ),
     [selectedScopeToken],
@@ -146,6 +153,19 @@ export function UserSpaPage(props: UserSpaPageProps) {
   const selectableScopeProjects = useMemo(
     () => userResponse?.projects.filter((project) => !selectedScopeProjectIds.has(project.id)) ?? [],
     [selectedScopeProjectIds, userResponse?.projects],
+  );
+  const selectedScopeOrganizationIds = useMemo(
+    () => new Set(
+      selectedScopeToken?.scopes
+        .filter((scope) => scope.objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION)
+        .map((scope) => scope.objectId) ?? [],
+    ),
+    [selectedScopeToken],
+  );
+  const selectableScopeOrganizations = useMemo(
+    () => userResponse?.organizations.filter((organization) => !selectedScopeOrganizationIds.has(organization.id)) ??
+      [],
+    [selectedScopeOrganizationIds, userResponse?.organizations],
   );
 
   function createScopedLoginLink(tokenValue: string): string {
@@ -366,6 +386,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
     setScopeModalTokenId(tokenId);
     setScopeModalTab("currently-accessible-objects");
     setSelectedProjectScopeCandidate(null);
+    setSelectedOrganizationScopeCandidate(null);
     setIsScopeModalOpen(true);
   }
 
@@ -374,6 +395,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
     setScopeModalTokenId(null);
     setScopeModalTab("currently-accessible-objects");
     setSelectedProjectScopeCandidate(null);
+    setSelectedOrganizationScopeCandidate(null);
   }
 
   async function handleAddProjectScopeFromModal(): Promise<void> {
@@ -395,6 +417,25 @@ export function UserSpaPage(props: UserSpaPageProps) {
     }
   }
 
+  async function handleAddOrganizationScopeFromModal(): Promise<void> {
+    if (!selectedScopeToken || !selectedOrganizationScopeCandidate) {
+      setTokenActionError("Select an organization to add to this token scope.");
+      return;
+    }
+    try {
+      await scopedTokensApi.addOrganizationScope(
+        props.token,
+        selectedScopeToken.id,
+        selectedOrganizationScopeCandidate.id,
+      );
+      await refreshTokens();
+      setSelectedOrganizationScopeCandidate(null);
+      setTokenActionSuccess(`Added organization ${selectedOrganizationScopeCandidate.id} to token scope.`);
+    } catch (error) {
+      setTokenActionError(getApiErrorMessage(error, "Unable to add organization scope."));
+    }
+  }
+
   async function handleRemoveScopeObject(
     objectTypeCode: string,
     objectId: number,
@@ -402,17 +443,27 @@ export function UserSpaPage(props: UserSpaPageProps) {
     if (!selectedScopeToken) {
       return;
     }
-    if (objectTypeCode !== "SCOPED_ACCESS_OBJECT_TYPE_PROJECT") {
-      setTokenActionError("Only project scope removal is currently supported.");
+    if (objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_PROJECT) {
+      try {
+        await scopedTokensApi.removeProjectScope(props.token, selectedScopeToken.id, objectId);
+        await refreshTokens();
+        setTokenActionSuccess(`Removed project ${objectId} from token scope.`);
+      } catch (error) {
+        setTokenActionError(getApiErrorMessage(error, "Unable to remove project scope."));
+      }
       return;
     }
-    try {
-      await scopedTokensApi.removeProjectScope(props.token, selectedScopeToken.id, objectId);
-      await refreshTokens();
-      setTokenActionSuccess(`Removed project ${objectId} from token scope.`);
-    } catch (error) {
-      setTokenActionError(getApiErrorMessage(error, "Unable to remove project scope."));
+    if (objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION) {
+      try {
+        await scopedTokensApi.removeOrganizationScope(props.token, selectedScopeToken.id, objectId);
+        await refreshTokens();
+        setTokenActionSuccess(`Removed organization ${objectId} from token scope.`);
+      } catch (error) {
+        setTokenActionError(getApiErrorMessage(error, "Unable to remove organization scope."));
+      }
+      return;
     }
+    setTokenActionError("Only project and organization scope removal is currently supported.");
   }
 
   async function handleCopyLoginLink(tokenValue: string): Promise<void> {
@@ -430,13 +481,13 @@ export function UserSpaPage(props: UserSpaPageProps) {
   }
 
   function createObjectHref(objectTypeCode: string, objectId: number): string | null {
-    if (objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_PROJECT") {
+    if (objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_PROJECT) {
       return createProjectDetailRoute(objectId);
     }
-    if (objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_TEAM") {
+    if (objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_TEAM) {
       return createProjectManagerTeamRoute(objectId);
     }
-    if (objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION") {
+    if (objectTypeCode === SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION) {
       return createProjectManagerOrganizationRoute(objectId);
     }
     return null;
@@ -649,6 +700,37 @@ export function UserSpaPage(props: UserSpaPageProps) {
     );
   }
 
+  function renderScopeOrganizationsTab() {
+    if (!selectedScopeToken) {
+      return <Alert severity="warning">Scoped token not found.</Alert>;
+    }
+    return (
+      <Stack spacing={1.25}>
+        <Box border={1} borderColor="divider" borderRadius={1.5} p={1.5}>
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              Add an organization from your currently accessible organization list.
+            </Typography>
+            <Autocomplete
+              getOptionLabel={(option) => `${option.name} (#${option.id})`}
+              onChange={(_, value) => setSelectedOrganizationScopeCandidate(value)}
+              options={selectableScopeOrganizations}
+              renderInput={(params) => <TextField {...params} label="Search organizations" />}
+              value={selectedOrganizationScopeCandidate}
+            />
+            <Button
+              disabled={!selectedOrganizationScopeCandidate}
+              onClick={() => void handleAddOrganizationScopeFromModal()}
+              variant="contained"
+            >
+              Add selected organization
+            </Button>
+          </Stack>
+        </Box>
+      </Stack>
+    );
+  }
+
   function renderScopeModalContent() {
     if (scopeModalTab === "currently-accessible-objects") {
       return renderCurrentScopeObjectsTab();
@@ -656,7 +738,10 @@ export function UserSpaPage(props: UserSpaPageProps) {
     if (scopeModalTab === "projects") {
       return renderScopeProjectsTab();
     }
-    if (scopeModalTab === "teams" || scopeModalTab === "organizations") {
+    if (scopeModalTab === "organizations") {
+      return renderScopeOrganizationsTab();
+    }
+    if (scopeModalTab === "teams") {
       return <Alert severity="info">Coming soon.</Alert>;
     }
     return null;

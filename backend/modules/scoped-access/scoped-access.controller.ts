@@ -14,6 +14,7 @@ import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { loginResponseSchema } from "../auth/auth.contracts.js";
 import {
+  addScopedAccessOrganizationScopeRequestSchema,
   addScopedAccessProjectScopeRequestSchema,
   createScopedAccessTokenRequestSchema,
   createScopedAccessTokenResponseSchema,
@@ -21,6 +22,7 @@ import {
   redeemScopedAccessTokenRequestSchema,
   revokeScopedAccessTokenResponseSchema,
   scopedAccessTokenIdParamSchema,
+  scopedAccessTokenOrganizationScopeParamsSchema,
   scopedAccessTokenProjectScopeParamsSchema,
   updateScopedAccessTokenScopeResponseSchema,
 } from "./scoped-access.contracts.js";
@@ -99,6 +101,39 @@ export class ScopedAccessController {
         request.authContext!,
         parsedParams.scopedAccessTokenCredentialId,
         parsedParams.projectId,
+      ),
+    );
+  }
+
+  @Authenticated()
+  @Post("tokens/:scopedAccessTokenCredentialId/scopes/organizations")
+  addOrganizationScope(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(scopedAccessTokenIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(addScopedAccessOrganizationScopeRequestSchema)) body: unknown,
+  ) {
+    const { scopedAccessTokenCredentialId } = scopedAccessTokenIdParamSchema.parse(params);
+    return updateScopedAccessTokenScopeResponseSchema.parse(
+      this.scopedAccessService.addOrganizationScope(
+        request.authContext!,
+        scopedAccessTokenCredentialId,
+        addScopedAccessOrganizationScopeRequestSchema.parse(body),
+      ),
+    );
+  }
+
+  @Authenticated()
+  @Delete("tokens/:scopedAccessTokenCredentialId/scopes/organizations/:organizationId")
+  removeOrganizationScope(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(scopedAccessTokenOrganizationScopeParamsSchema)) params: unknown,
+  ) {
+    const parsedParams = scopedAccessTokenOrganizationScopeParamsSchema.parse(params);
+    return updateScopedAccessTokenScopeResponseSchema.parse(
+      this.scopedAccessService.removeOrganizationScope(
+        request.authContext!,
+        parsedParams.scopedAccessTokenCredentialId,
+        parsedParams.organizationId,
       ),
     );
   }

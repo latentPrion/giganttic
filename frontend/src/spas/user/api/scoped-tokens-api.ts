@@ -1,5 +1,6 @@
 import { requestJson } from "../../../common/api/http-client.js";
 import {
+  addScopedAccessOrganizationScopeRequestSchema,
   addScopedAccessProjectScopeRequestSchema,
   createScopedAccessTokenRequestSchema,
   createScopedAccessTokenResponseSchema,
@@ -23,6 +24,17 @@ export const scopedTokensApi = {
       method: "POST",
       path: `${createTokenPath(tokenId)}/scopes/projects`,
       requestSchema: addScopedAccessProjectScopeRequestSchema,
+      responseSchema: updateScopedAccessTokenScopeResponseSchema,
+      token,
+    });
+  },
+
+  async addOrganizationScope(token: string, tokenId: number, organizationId: number) {
+    return await requestJson({
+      body: { organizationId },
+      method: "POST",
+      path: `${createTokenPath(tokenId)}/scopes/organizations`,
+      requestSchema: addScopedAccessOrganizationScopeRequestSchema,
       responseSchema: updateScopedAccessTokenScopeResponseSchema,
       token,
     });
@@ -52,6 +64,15 @@ export const scopedTokensApi = {
     return await requestJson({
       method: "DELETE",
       path: `${createTokenPath(tokenId)}/scopes/projects/${projectId}`,
+      responseSchema: updateScopedAccessTokenScopeResponseSchema,
+      token,
+    });
+  },
+
+  async removeOrganizationScope(token: string, tokenId: number, organizationId: number) {
+    return await requestJson({
+      method: "DELETE",
+      path: `${createTokenPath(tokenId)}/scopes/organizations/${organizationId}`,
       responseSchema: updateScopedAccessTokenScopeResponseSchema,
       token,
     });

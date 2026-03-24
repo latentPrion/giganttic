@@ -9,6 +9,11 @@ export const scopedAccessTokenProjectScopeParamsSchema = z.object({
   scopedAccessTokenCredentialId: z.coerce.number().int().positive(),
 });
 
+export const scopedAccessTokenOrganizationScopeParamsSchema = z.object({
+  organizationId: z.coerce.number().int().positive(),
+  scopedAccessTokenCredentialId: z.coerce.number().int().positive(),
+});
+
 export const createScopedAccessTokenRequestSchema = z.object({
   expiresAt: z.string().datetime().optional().nullable(),
 });
@@ -19,6 +24,10 @@ export const redeemScopedAccessTokenRequestSchema = z.object({
 
 export const addScopedAccessProjectScopeRequestSchema = z.object({
   projectId: z.number().int().positive(),
+});
+
+export const addScopedAccessOrganizationScopeRequestSchema = z.object({
+  organizationId: z.number().int().positive(),
 });
 
 export const scopedAccessTokenScopeSchema = z.object({
@@ -61,4 +70,7 @@ export type RedeemScopedAccessTokenRequest = z.infer<
 >;
 export type AddScopedAccessProjectScopeRequest = z.infer<
   typeof addScopedAccessProjectScopeRequestSchema
+>;
+export type AddScopedAccessOrganizationScopeRequest = z.infer<
+  typeof addScopedAccessOrganizationScopeRequestSchema
 >;

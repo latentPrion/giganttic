@@ -23,6 +23,10 @@ export const addScopedAccessProjectScopeRequestSchema = z.object({
   projectId: z.number().int().positive(),
 });
 
+export const addScopedAccessOrganizationScopeRequestSchema = z.object({
+  organizationId: z.number().int().positive(),
+});
+
 export const createScopedAccessTokenResponseSchema = z.object({
   token: z.string(),
   tokenCredential: scopedAccessTokenSchema,

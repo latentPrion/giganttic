@@ -15,6 +15,7 @@ import { buildBackendConfig } from "../backend/config/backend-config.js";
 import { DatabaseService } from "../backend/modules/database/database.service.js";
 import {
   credentialTypeCodes,
+  organizations,
   projects,
   projectsUsers,
   scopedAccessTokenCredentialsObjects,
@@ -224,6 +225,71 @@ describe("scoped access tokens", () => {
     return projectIds[0]!;
   }
 
+  async function pickOrganizationIdForScopeTests(token: string): Promise<number> {
+    const response = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    expect(response.statusCode).toBe(200);
+    const body = parseJson<{ organizations: Array<{ id: number }> }>(response.payload);
+    if (body.organizations.length > 0) {
+      return body.organizations[0]!.id;
+    }
+    const row = databaseService.db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .orderBy(asc(organizations.id))
+      .limit(1)
+      .get();
+    expect(row).toBeDefined();
+    return row!.id;
+  }
+
+  it("allows adding and removing organization scope on owned token", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const organizationId = await pickOrganizationIdForScopeTests(standardLogin.accessToken);
+
+    const createResponse = await app.inject({
+      headers: { authorization: `Bearer ${standardLogin.accessToken}` },
+      method: "POST",
+      payload: { expiresAt: null },
+      url: "/stc-proj-mgmt/api/scoped-access/tokens",
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const minted = parseJson<{ tokenCredential: { id: number } }>(createResponse.payload);
+    const tokenCredentialId = minted.tokenCredential.id;
+
+    const addResponse = await app.inject({
+      headers: { authorization: `Bearer ${standardLogin.accessToken}` },
+      method: "POST",
+      payload: { organizationId },
+      url: `/stc-proj-mgmt/api/scoped-access/tokens/${tokenCredentialId}/scopes/organizations`,
+    });
+    expect(addResponse.statusCode).toBe(201);
+    const afterAdd = parseJson<{
+      tokenCredential: { scopes: Array<{ objectTypeCode: string; objectId: number }> };
+    }>(addResponse.payload);
+    expect(afterAdd.tokenCredential.scopes.some((scope) =>
+      scope.objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION" &&
+      scope.objectId === organizationId
+    )).toBe(true);
+
+    const removeResponse = await app.inject({
+      headers: { authorization: `Bearer ${standardLogin.accessToken}` },
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/scoped-access/tokens/${tokenCredentialId}/scopes/organizations/${organizationId}`,
+    });
+    expect(removeResponse.statusCode).toBe(200);
+    const afterRemove = parseJson<{
+      tokenCredential: { scopes: Array<{ objectTypeCode: string; objectId: number }> };
+    }>(removeResponse.payload);
+    expect(afterRemove.tokenCredential.scopes.some((scope) =>
+      scope.objectTypeCode === "SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION" &&
+      scope.objectId === organizationId
+    )).toBe(false);
+  });
+
   it("allows only assigned project objects and filters list results", async () => {
     const standardLogin = await loginAs("testadminuser");
     const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
@@ -356,6 +422,7 @@ describe("scoped access tokens", () => {
   it("applies deny-first allowlist to non-project and sensitive endpoints", async () => {
     const standardLogin = await loginAs("testadminuser");
     const [projectA] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const organizationId = await pickOrganizationIdForScopeTests(standardLogin.accessToken);
     const created = await createScopedTokenForUser(standardLogin.accessToken, {
       projectIds: [projectA],
     });
@@ -371,6 +438,15 @@ describe("scoped access tokens", () => {
       { method: "POST", url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/revoke` },
       { method: "POST", url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/scopes/projects`, payload: { projectId: projectA } },
       { method: "DELETE", url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/scopes/projects/${projectA}` },
+      {
+        method: "POST",
+        url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/scopes/organizations`,
+        payload: { organizationId },
+      },
+      {
+        method: "DELETE",
+        url: `/stc-proj-mgmt/api/scoped-access/tokens/${created.tokenCredentialId}/scopes/organizations/${organizationId}`,
+      },
     ] as const;
 
     for (const testCase of deniedCases) {

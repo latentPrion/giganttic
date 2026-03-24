@@ -447,25 +447,11 @@ export class UsersService {
   }
 
   private listUserOrganizations(userId: number): GetUserResponse["organizations"] {
-    return this.databaseService.db
-      .select({
-        createdAt: organizations.createdAt,
-        description: organizations.description,
-        id: organizations.id,
-        name: organizations.name,
-        updatedAt: organizations.updatedAt,
-      })
-      .from(usersOrganizations)
-      .innerJoin(organizations, eq(organizations.id, usersOrganizations.organizationId))
-      .where(eq(usersOrganizations.userId, userId))
-      .all()
-      .map((row) => ({
-        createdAt: row.createdAt.toISOString(),
-        description: row.description,
-        id: row.id,
-        name: row.name,
-        updatedAt: row.updatedAt.toISOString(),
-      }));
+    const visibleOrganizationIds = listOrganizationIdsVisibleByMembership(
+      this.databaseService.db,
+      userId,
+    );
+    return this.listUserOrganizationSummariesForIds(visibleOrganizationIds);
   }
 
   private listUserProjectSummariesForProjectIds(
