@@ -133,6 +133,73 @@ export async function requestJson<TResponse, TRequestSchema extends ZodType | un
   return parseResponseBody(options.responseSchema, responseBody);
 }
 
+export async function postMultipartAndParseJson<TResponse>(
+  options: {
+    formData: FormData;
+    path: string;
+    responseSchema: ZodType<TResponse>;
+    token: string;
+  },
+): Promise<TResponse> {
+  const requestInit: RequestInit = {
+    body: options.formData,
+    headers: {
+      Authorization: `${AUTH_HEADER_PREFIX} ${options.token}`,
+    },
+    method: "POST",
+  };
+
+  const { response, responseBody } = await performRequest(
+    options.path,
+    requestInit,
+  );
+
+  if (!response.ok) {
+    throw new ApiError("http", `HTTP ${response.status}`, {
+      responseBody,
+      status: response.status,
+    });
+  }
+
+  return parseResponseBody(options.responseSchema, responseBody);
+}
+
+function buildBlobRequestHeaders(token: string | undefined): HeadersInit {
+  const headers: HeadersInit = {};
+  if (token) {
+    headers.Authorization = `${AUTH_HEADER_PREFIX} ${token}`;
+  }
+  return headers;
+}
+
+export async function requestBlob(options: {
+  path: string;
+  token?: string;
+}): Promise<Blob> {
+  const requestInit: RequestInit = {
+    headers: buildBlobRequestHeaders(options.token),
+    method: "GET",
+  };
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(options.path), requestInit);
+  } catch (error) {
+    throw new ApiError("network", "Network request failed", {
+      cause: error,
+    });
+  }
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new ApiError("http", `HTTP ${response.status}`, {
+      responseBody,
+      status: response.status,
+    });
+  }
+
+  return await response.blob();
+}
+
 export async function requestText(
   options: TextRequestOptions,
 ): Promise<string> {

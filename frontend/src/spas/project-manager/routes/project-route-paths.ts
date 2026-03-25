@@ -1,3 +1,5 @@
+import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
+
 export const PROJECT_ROUTE_SECTION_VALUES = ["detail", "gantt", "kanban", "issues", "tasks"] as const;
 
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
@@ -34,6 +36,23 @@ export function createProjectTasksRoute(projectId: number): string {
   return `/pm/project/tasks?projectId=${projectId}`;
 }
 
-export function createProjectIssueRoute(projectId: number, issueId: number): string {
-  return `/pm/project/issue?projectId=${projectId}&id=${issueId}`;
+export function createProjectIssueRoute(
+  projectId: number,
+  issueId: number,
+  options: { commentId?: number | null; tab?: IssueDetailTab } = {},
+): string {
+  const parameters = new URLSearchParams();
+  parameters.set("projectId", String(projectId));
+  parameters.set("id", String(issueId));
+
+  const tab = options.tab ?? "details";
+  if (tab !== "details") {
+    parameters.set("tab", tab);
+  }
+
+  if (options.commentId != null) {
+    parameters.set("commentId", String(options.commentId));
+  }
+
+  return `/pm/project/issue?${parameters.toString()}`;
 }

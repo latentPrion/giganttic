@@ -332,8 +332,13 @@ const SEEDED_SCOPED_FIXTURES = {
 };
 
 function getSeededTestData(schemaName, profile = TEST_DATA_PROFILE_APP) {
-  if (schemaName !== "v2" && schemaName !== "v3" && schemaName !== "v4") {
-    throw new Error(`Test data seeding is only supported for schema v2/v3/v4, received ${schemaName}.`);
+  if (
+    schemaName !== "v2"
+    && schemaName !== "v3"
+    && schemaName !== "v4"
+    && schemaName !== "v5"
+  ) {
+    throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5, received ${schemaName}.`);
   }
 
   if (!SUPPORTED_TEST_DATA_PROFILES.includes(profile)) {

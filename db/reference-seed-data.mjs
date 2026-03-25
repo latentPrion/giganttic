@@ -342,7 +342,8 @@ const REFERENCE_SEED_DATA_BY_SCHEMA = {
 };
 
 function getReferenceSeedData(schemaName) {
-  const referenceSeedData = REFERENCE_SEED_DATA_BY_SCHEMA[schemaName];
+  const resolvedSchemaName = schemaName === "v5" ? "v4" : schemaName;
+  const referenceSeedData = REFERENCE_SEED_DATA_BY_SCHEMA[resolvedSchemaName];
 
   if (!referenceSeedData) {
     throw new Error(`Unsupported schema for reference data reconciliation: ${schemaName}`);

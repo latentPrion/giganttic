@@ -31,6 +31,11 @@ vi.mock("../api/issues-api.js", () => ({
 const issuesApiMock = vi.mocked(issuesApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
+const DEFAULT_ISSUE_PAGE_PROPS = {
+  commentId: null,
+  currentUserId: 1,
+  issueTab: "details" as const,
+};
 
 function createIssue(overrides: Partial<Issue> = {}): Issue {
   return {
@@ -63,7 +68,12 @@ describe("ProjectManagerIssuePage", () => {
 
   it("renders the selected issue and detailed card", async () => {
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     expect(await screen.findByText("Issue Detail")).toBeVisible();
@@ -77,7 +87,12 @@ describe("ProjectManagerIssuePage", () => {
     const user = userEvent.setup();
 
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "View" }));
@@ -97,7 +112,12 @@ describe("ProjectManagerIssuePage", () => {
     });
 
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));
@@ -127,7 +147,12 @@ describe("ProjectManagerIssuePage", () => {
     issuesApiMock.deleteIssue.mockResolvedValue({ deletedIssueId: 7 });
 
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "Delete" }));
@@ -142,11 +167,19 @@ describe("ProjectManagerIssuePage", () => {
     const user = userEvent.setup();
 
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
-    await user.click(await screen.findByRole("tab", { name: "Details" }));
-    await user.click(screen.getByRole("tab", { name: "Gantt" }));
+    const projectWorkspaceTabs = await screen.findByRole("tablist", {
+      name: "Project workspace sections",
+    });
+    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Details" }));
+    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Gantt" }));
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
     expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
@@ -154,7 +187,12 @@ describe("ProjectManagerIssuePage", () => {
 
   it("renders a safe fallback when issue id or projectId is missing", async () => {
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={null} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={null}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     expect(await screen.findByText("Provide both a valid issue id and projectId to view an issue.")).toBeVisible();
@@ -162,7 +200,12 @@ describe("ProjectManagerIssuePage", () => {
 
   it("reloads issue detail when an issue-updated event is received for same issue", async () => {
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     await screen.findByText("Issue 7");
@@ -186,7 +229,12 @@ describe("ProjectManagerIssuePage", () => {
     });
 
     renderWithTheme(
-      <ProjectManagerIssuePage issueId={7} projectId={42} token={DEFAULT_TOKEN} />,
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
     );
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));

@@ -9,12 +9,14 @@ import * as v1 from "./v1/index.js";
 import * as v2 from "./v2/index.js";
 import * as v3 from "./v3/index.js";
 import * as v4 from "./v4/index.js";
+import * as v5 from "./v5/index.js";
 
 const schemaModules = {
   v1,
   v2,
   v3,
   v4,
+  v5,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -25,7 +27,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v4;
+] as typeof v5;
 
 export {
   availableSchemaVersions,
@@ -59,6 +61,22 @@ export const {
   issuesInsertSchema,
   issuesRelations,
   issuesSelectSchema,
+  attachments,
+  attachmentsInsertSchema,
+  attachmentsRelations,
+  attachmentsSelectSchema,
+  issueComments,
+  issueCommentsAttachments,
+  issueCommentsAttachmentsInsertSchema,
+  issueCommentsAttachmentsRelations,
+  issueCommentsAttachmentsSelectSchema,
+  issueCommentsInsertSchema,
+  issueCommentsRelations,
+  issueCommentsSelectSchema,
+  issuesAttachments,
+  issuesAttachmentsInsertSchema,
+  issuesAttachmentsRelations,
+  issuesAttachmentsSelectSchema,
   managedTestDataRecords,
   managedTestDataRecordsInsertSchema,
   managedTestDataRecordsSelectSchema,
@@ -235,6 +253,16 @@ export type OrganizationInsertInput = z.infer<typeof organizationsInsertSchema>;
 export type OrganizationRecord = z.infer<typeof organizationsSelectSchema>;
 export type IssueInsertInput = z.infer<typeof issuesInsertSchema>;
 export type IssueRecord = z.infer<typeof issuesSelectSchema>;
+export type Attachment = typeof attachments.$inferSelect;
+export type NewAttachment = typeof attachments.$inferInsert;
+export type IssuesAttachment = typeof issuesAttachments.$inferSelect;
+export type NewIssuesAttachment = typeof issuesAttachments.$inferInsert;
+export type IssueComment = typeof issueComments.$inferSelect;
+export type NewIssueComment = typeof issueComments.$inferInsert;
+export type IssueCommentAttachment =
+  typeof issueCommentsAttachments.$inferSelect;
+export type NewIssueCommentAttachment =
+  typeof issueCommentsAttachments.$inferInsert;
 export type ManagedTestDataRecordInsertInput = z.infer<
   typeof managedTestDataRecordsInsertSchema
 >;
@@ -327,3 +355,21 @@ export type UserPasswordCredentialRecord = z.infer<
 >;
 export type UserSessionInsertInput = z.infer<typeof usersSessionsInsertSchema>;
 export type UserSessionRecord = z.infer<typeof usersSessionsSelectSchema>;
+export type AttachmentInsertInput = z.infer<typeof attachmentsInsertSchema>;
+export type AttachmentRecord = z.infer<typeof attachmentsSelectSchema>;
+export type IssuesAttachmentInsertInput = z.infer<
+  typeof issuesAttachmentsInsertSchema
+>;
+export type IssuesAttachmentRecord = z.infer<
+  typeof issuesAttachmentsSelectSchema
+>;
+export type IssueCommentInsertInput = z.infer<
+  typeof issueCommentsInsertSchema
+>;
+export type IssueCommentRecord = z.infer<typeof issueCommentsSelectSchema>;
+export type IssueCommentAttachmentInsertInput = z.infer<
+  typeof issueCommentsAttachmentsInsertSchema
+>;
+export type IssueCommentAttachmentRecord = z.infer<
+  typeof issueCommentsAttachmentsSelectSchema
+>;

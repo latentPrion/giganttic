@@ -20,6 +20,8 @@ interface ProjectManagerProjectNavigationProps {
   projectId: number | null;
 }
 
+const PROJECT_WORKSPACE_TABLIST_LABEL = "Project workspace sections";
+
 const DETAIL_LABEL = "Details";
 const GANTT_LABEL = "Gantt";
 const KANBAN_LABEL = "Kanban Board";
@@ -75,6 +77,7 @@ export function ProjectManagerProjectNavigation(
       }}
     >
       <Tabs
+        aria-label={PROJECT_WORKSPACE_TABLIST_LABEL}
         onChange={handleSectionChange}
         sx={{ flex: 1, minWidth: 0 }}
         value={props.currentSection}

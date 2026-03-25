@@ -5,6 +5,8 @@ import {
   Button,
   CircularProgress,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
@@ -15,13 +17,16 @@ import { IssueListItem } from "../../../common/components/entity-list/IssueListI
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
+import { IssueAttachmentsPanel } from "../components/issues/IssueAttachmentsPanel.js";
+import { IssueCommentsPanel } from "../components/issues/IssueCommentsPanel.js";
+import { IssueDetailsCard } from "../components/issues/IssueDetailsCard.js";
+import { IssueEditModal } from "../components/issues/IssueEditModal.js";
+import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
+import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
 import type {
   Issue,
   UpdateIssueRequest,
 } from "../contracts/issue.contracts.js";
-import { IssueDetailsCard } from "../components/issues/IssueDetailsCard.js";
-import { IssueEditModal } from "../components/issues/IssueEditModal.js";
-import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import {
   createProjectIssueRoute,
@@ -33,10 +38,15 @@ import {
 } from "../lib/issue-updated-events.js";
 
 interface ProjectManagerIssuePageProps {
+  commentId: number | null;
+  currentUserId: number;
   issueId: number | null;
+  issueTab: IssueDetailTab;
   projectId: number | null;
   token: string;
 }
+
+const ISSUE_DETAIL_WORKSPACE_TABLIST_LABEL = "Issue detail workspace sections";
 
 const VIEW_MODE: EntityListItemViewMode = "main-listing-view";
 const DEFAULT_ERROR_MESSAGE = "Unable to load that issue right now.";
@@ -118,17 +128,52 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     navigate(createProjectIssuesRoute(props.projectId));
   }
 
+  function handleIssueTabChange(
+    _: React.SyntheticEvent,
+    nextTab: IssueDetailTab,
+  ): void {
+    if (props.projectId === null || props.issueId === null) {
+      return;
+    }
+
+    const nextCommentId = nextTab === "comments" ? props.commentId : null;
+    navigate(
+      createProjectIssueRoute(props.projectId, props.issueId, {
+        commentId: nextCommentId === null ? undefined : nextCommentId,
+        tab: nextTab,
+      }),
+    );
+  }
+
+  function navigateToCommentAnchor(commentId: number): void {
+    if (props.projectId === null || props.issueId === null) {
+      return;
+    }
+
+    navigate(
+      createProjectIssueRoute(props.projectId, props.issueId, {
+        commentId,
+        tab: "comments",
+      }),
+    );
+  }
+
   async function handleUpdateIssue(
-    issueId: number,
+    issueRowId: number,
     payload: UpdateIssueRequest,
   ): Promise<Issue> {
     if (props.projectId === null) {
       throw new Error(MISSING_ROUTE_MESSAGE);
     }
 
-    setBusyKey(`issue:${issueId}`);
+    setBusyKey(`issue:${issueRowId}`);
     try {
-      const response = await issuesApi.updateIssue(props.token, props.projectId, issueId, payload);
+      const response = await issuesApi.updateIssue(
+        props.token,
+        props.projectId,
+        issueRowId,
+        payload,
+      );
       setIssue(response.issue);
       setIssueSummaryRefreshKey((current) => current + 1);
       emitProjectManagerIssueUpdatedEvent({
@@ -141,16 +186,16 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     }
   }
 
-  async function handleDeleteIssue(issueId: number): Promise<void> {
+  async function handleDeleteIssue(issueRowId: number): Promise<void> {
     if (props.projectId === null) {
       return;
     }
 
-    setBusyKey(`issue:${issueId}`);
+    setBusyKey(`issue:${issueRowId}`);
     setErrorMessage(null);
 
     try {
-      await issuesApi.deleteIssue(props.token, props.projectId, issueId);
+      await issuesApi.deleteIssue(props.token, props.projectId, issueRowId);
       goBackToIssues();
     } catch (error) {
       setErrorMessage(buildErrorMessage(error, "Unable to delete that issue."));
@@ -159,7 +204,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     }
   }
 
-  function renderContent() {
+  function renderDetailsTab() {
     if (props.issueId === null || props.projectId === null) {
       return <Alert severity="info">{MISSING_ROUTE_MESSAGE}</Alert>;
     }
@@ -197,9 +242,9 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             </>
           )}
           issue={issue}
-            onNavigate={() => navigate(createProjectIssueRoute(issue.projectId, issue.id))}
-            viewMode={VIEW_MODE}
-          />
+          onNavigate={() => navigate(createProjectIssueRoute(issue.projectId, issue.id))}
+          viewMode={VIEW_MODE}
+        />
         <IssueDetailsCard issue={issue} />
       </Stack>
     );
@@ -224,21 +269,56 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             {PAGE_TITLE}
           </Typography>
           <Typography color="text.secondary" variant="body1">
-            Selected project: {props.projectId ?? "None"}
+            Selected project:
+            {" "}
+            {props.projectId ?? "None"}
           </Typography>
           <Typography color="text.secondary" variant="body1">
-            Selected issue: {props.issueId ?? "None"}
+            Selected issue:
+            {" "}
+            {props.issueId ?? "None"}
           </Typography>
         </Stack>
         <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
         <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
-          <Typography variant="h6">Issue detail with summary preview</Typography>
+          <Typography variant="h6">Issue workspace</Typography>
           <Button onClick={goBackToIssues} type="button" variant="outlined">
             Back to Issues
           </Button>
         </Stack>
+        {props.projectId !== null && props.issueId !== null ? (
+          <Tabs
+            aria-label={ISSUE_DETAIL_WORKSPACE_TABLIST_LABEL}
+            onChange={handleIssueTabChange}
+            value={props.issueTab}
+            variant="fullWidth"
+          >
+            <Tab label="Details" value="details" />
+            <Tab label="Comments" value="comments" />
+            <Tab label="Attachments" value="attachments" />
+          </Tabs>
+        ) : null}
         {errorMessage && issue ? <Alert severity="error">{errorMessage}</Alert> : null}
-        {renderContent()}
+        {props.issueTab === "details" ? renderDetailsTab() : null}
+        {props.projectId !== null && props.issueId !== null ? (
+          <>
+            <IssueCommentsPanel
+              currentUserId={props.currentUserId}
+              highlightCommentId={props.commentId}
+              issueId={props.issueId}
+              issueTab={props.issueTab}
+              onNavigateToComment={navigateToCommentAnchor}
+              projectId={props.projectId}
+              token={props.token}
+            />
+            <IssueAttachmentsPanel
+              issueId={props.issueId}
+              issueTab={props.issueTab}
+              projectId={props.projectId}
+              token={props.token}
+            />
+          </>
+        ) : null}
       </Stack>
       <IssueEditModal
         isBusy={issue !== null && busyKey === `issue:${issue.id}`}

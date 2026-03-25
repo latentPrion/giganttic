@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 
+import multipart from "@fastify/multipart";
 import {
   FastifyAdapter,
   type NestFastifyApplication,
@@ -105,13 +106,20 @@ export function createCrudTestHarness(
   }
 
   async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
-    const resolvedChartsDir = path.join(path.dirname(databasePath), "charts");
+    const sandboxRoot = path.dirname(databasePath);
+    const resolvedChartsDir = path.join(sandboxRoot, "charts");
     const config = buildBackendConfig({
       ...backendConfigOverrides,
       chartsDir: resolvedChartsDir,
       createDbIfMissing: false,
       dbPath: databasePath,
       port: 0,
+      untrustedContentAttachmentsDir: path.join(sandboxRoot, "untrusted", "attachments"),
+      untrustedContentIssueCommentsDir: path.join(
+        sandboxRoot,
+        "untrusted",
+        "issue-comments",
+      ),
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],
@@ -121,6 +129,9 @@ export function createCrudTestHarness(
       new FastifyAdapter(),
     );
     nextApp.setGlobalPrefix(config.routePrefix);
+    await nextApp.register(multipart, {
+      limits: { fileSize: config.maxAttachmentUploadBytes },
+    });
     await nextApp.init();
     await nextApp.getHttpAdapter().getInstance().ready();
 

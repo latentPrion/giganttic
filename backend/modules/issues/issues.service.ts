@@ -19,6 +19,7 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
+import { AttachmentService } from "./attachment.service.js";
 import type {
   CreateIssueRequest,
   DeleteIssueResponse,
@@ -27,6 +28,7 @@ import type {
   ListIssuesResponse,
   UpdateIssueRequest,
 } from "./issues.contracts.js";
+import { IssueCommentService } from "./issue-comment.service.js";
 
 
 const CLOSED_ISSUE_REASON_REQUIRED_MESSAGE =
@@ -169,6 +171,10 @@ export class IssuesService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(AttachmentService)
+    private readonly attachmentService: AttachmentService,
+    @Inject(IssueCommentService)
+    private readonly issueCommentService: IssueCommentService,
   ) {}
 
   async createIssue(
@@ -213,6 +219,19 @@ export class IssuesService {
     return { issue: this.getIssueRecordByIdOrThrow(projectId, issueId) };
   }
 
+  /**
+   * Ensures the project exists, the caller may view the project, and the issue belongs to it.
+   */
+  validateIssueReadableForCurrentUser(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+  ): void {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+    this.getIssueEntityByIdOrThrow(projectId, issueId);
+  }
+
   async updateIssue(
     authContext: AuthContext,
     projectId: number,
@@ -239,9 +258,11 @@ export class IssuesService {
     this.assertCanManageIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
 
+    await this.issueCommentService.deleteAllCommentBodiesForIssue(issueId);
     this.databaseService.db.delete(issues)
       .where(eq(issues.id, issueId))
       .run();
+    await this.attachmentService.removeOrphanAttachmentsAndFiles();
     return { deletedIssueId: issueId };
   }
 

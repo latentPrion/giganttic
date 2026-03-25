@@ -333,11 +333,15 @@ describe("AuthSessionContext", () => {
 
     renderWithProvider();
 
-    expect(await screen.findByTestId("status")).toHaveTextContent("authenticated");
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+    });
     await user.click(screen.getByRole("button", { name: LOGOUT_BUTTON_LABEL }));
 
     expect(authTokenStorageMock.clear).toHaveBeenCalled();
-    expect(await screen.findByTestId("status")).toHaveTextContent("anonymous");
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("anonymous");
+    });
   });
 
   it("clears storage immediately when logout is called from anonymous state", async () => {

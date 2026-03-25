@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { rm } from "node:fs/promises";
 
+import multipart from "@fastify/multipart";
 import {
   FastifyAdapter,
   type NestFastifyApplication,
@@ -53,6 +54,9 @@ describe("scoped access tokens", () => {
       new FastifyAdapter(),
     );
     nextApp.setGlobalPrefix(config.routePrefix);
+    await nextApp.register(multipart, {
+      limits: { fileSize: config.maxAttachmentUploadBytes },
+    });
     await nextApp.init();
     await nextApp.getHttpAdapter().getInstance().ready();
 
@@ -401,6 +405,40 @@ describe("scoped access tokens", () => {
       url: `/stc-proj-mgmt/api/projects/${projectB}/issues`,
     });
     expect(createB.statusCode).toBe(403);
+  });
+
+  it("enforces project scope for issue comment routes", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const issueA = await createIssueForProject(
+      standardLogin.accessToken,
+      projectA,
+      "comments-scope-a",
+    );
+    const issueB = await createIssueForProject(
+      standardLogin.accessToken,
+      projectB,
+      "comments-scope-b",
+    );
+
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+    const scopedLogin = await redeemScopedToken(created.token);
+
+    const listA = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectA}/issues/${issueA}/comments`,
+    });
+    expect(listA.statusCode).toBe(200);
+
+    const listB = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectB}/issues/${issueB}/comments`,
+    });
+    expect(listB.statusCode).toBe(403);
   });
 
   it("enforces project scope for chart routes", async () => {

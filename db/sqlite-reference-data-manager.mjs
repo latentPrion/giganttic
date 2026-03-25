@@ -78,7 +78,7 @@ function ensureV2StyleReferenceData(db, schemaName) {
     runReferenceUpsert(db, "ClosedReasons", createCodeReferenceUpsertSql("ClosedReasons", closedReason));
   }
 
-  if (schemaName === "v4") {
+  if (schemaName === "v4" || schemaName === "v5") {
     for (const scopedAccessObjectType of referenceSeedData.scopedAccessObjectTypes) {
       runReferenceUpsert(
         db,
@@ -95,7 +95,12 @@ function ensureReferenceData(db, schemaName) {
   try {
     if (schemaName === "v1") {
       ensureV1ReferenceData(db);
-    } else if (schemaName === "v2" || schemaName === "v3" || schemaName === "v4") {
+    } else if (
+      schemaName === "v2"
+      || schemaName === "v3"
+      || schemaName === "v4"
+      || schemaName === "v5"
+    ) {
       ensureV2StyleReferenceData(db, schemaName);
     } else {
       throw new Error(`Unsupported schema for reference data reconciliation: ${schemaName}`);
