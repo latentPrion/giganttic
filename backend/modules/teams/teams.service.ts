@@ -48,6 +48,10 @@ import {
   createBlockingConflictException,
 } from "../access-control/blocking-conflicts.js";
 import type { AuthContext } from "../auth/auth.types.js";
+import {
+  isScopedAccessSession,
+  listScopedTokenTeamIds,
+} from "../scoped-access/scoped-access.policy.js";
 import { DatabaseService } from "../database/database.service.js";
 import type {
   CreateTeamRequest,
@@ -180,12 +184,9 @@ export class TeamsService {
   }
 
   listTeams(authContext: AuthContext): ListTeamsResponse {
-    const teamIds = listTeamIdsVisibleByMembership(
-      this.databaseService.db,
-      authContext.userId,
-    );
+    const listableTeamIds = this.resolveListableTeamIds(authContext);
 
-    if (teamIds.length === 0) {
+    if (listableTeamIds.length === 0) {
       return { teams: [] };
     }
 
@@ -193,7 +194,7 @@ export class TeamsService {
       teams: this.databaseService.db
         .select()
         .from(teams)
-        .where(inArray(teams.id, teamIds))
+        .where(inArray(teams.id, listableTeamIds))
         .orderBy(asc(teams.id))
         .all()
         .map(toTeamResponse),
@@ -828,6 +829,22 @@ export class TeamsService {
       ))
       .orderBy(asc(users.id))
       .all();
+  }
+
+  private resolveListableTeamIds(authContext: AuthContext): number[] {
+    const visibleTeamIds = listTeamIdsVisibleByMembership(
+      this.databaseService.db,
+      authContext.userId,
+    );
+    if (!isScopedAccessSession(authContext)) {
+      return visibleTeamIds;
+    }
+    const scopedTeamIds = listScopedTokenTeamIds(
+      this.databaseService.db,
+      authContext.sessionAuth.scopedAccessTokenCredentialId,
+    );
+    const visibleSet = new Set(visibleTeamIds);
+    return scopedTeamIds.filter((teamId) => visibleSet.has(teamId));
   }
 
   private listTeamProjects(teamId: number): TeamProject[] {

@@ -14,7 +14,6 @@ import {
   projects,
   projectsOrganizations,
   teams,
-  teamsUsers,
   users,
   usersOrganizations,
   usersOrganizationsOrganizationRoles,
@@ -30,6 +29,7 @@ import {
   listDirectTeamManagerUserIds,
   listIndirectProjectManagerUserIds,
   listOrganizationIdsForProject,
+  listOrganizationIdsVisibleByMembership,
   listOrganizationRoleUserIds,
   listTeamIdsForOrganization,
   ORGANIZATION_MANAGER_ROLE_CODE,
@@ -47,6 +47,10 @@ import {
 } from "../access-control/blocking-conflicts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import {
+  isScopedAccessSession,
+  listScopedTokenOrganizationIds,
+} from "../scoped-access/scoped-access.policy.js";
 import type {
   AssignOrganizationTeamRequest,
   CreateOrganizationRequest,
@@ -189,8 +193,8 @@ export class OrganizationsService {
   }
 
   listOrganizations(authContext: AuthContext): ListOrganizationsResponse {
-    const visibleOrganizationIds = this.listVisibleOrganizationIds(authContext.userId);
-    if (visibleOrganizationIds.length === 0) {
+    const listableOrganizationIds = this.resolveListableOrganizationIds(authContext);
+    if (listableOrganizationIds.length === 0) {
       return { organizations: [] };
     }
 
@@ -198,7 +202,7 @@ export class OrganizationsService {
       organizations: this.databaseService.db
         .select()
         .from(organizations)
-        .where(inArray(organizations.id, visibleOrganizationIds))
+        .where(inArray(organizations.id, listableOrganizationIds))
         .orderBy(asc(organizations.id))
         .all()
         .map(toOrganizationResponse),
@@ -967,27 +971,19 @@ export class OrganizationsService {
     ])];
   }
 
-  private listVisibleOrganizationIds(userId: number): number[] {
-    const directIds = this.databaseService.db
-      .select({ organizationId: usersOrganizations.organizationId })
-      .from(usersOrganizations)
-      .where(eq(usersOrganizations.userId, userId))
-      .all()
-      .map((row) => row.organizationId);
-    const indirectIds = this.databaseService.db
-      .select({ organizationId: organizationsTeams.organizationId })
-      .from(organizationsTeams)
-      .innerJoin(teamsUsers, eq(teamsUsers.teamId, organizationsTeams.teamId))
-      .where(eq(teamsUsers.userId, userId))
-      .all()
-      .map((row) => row.organizationId);
-    const roleIds = this.databaseService.db
-      .select({ organizationId: usersOrganizationsOrganizationRoles.organizationId })
-      .from(usersOrganizationsOrganizationRoles)
-      .where(eq(usersOrganizationsOrganizationRoles.userId, userId))
-      .all()
-      .map((row) => row.organizationId);
-
-    return [...new Set([...directIds, ...indirectIds, ...roleIds])];
+  private resolveListableOrganizationIds(authContext: AuthContext): number[] {
+    const visibleOrganizationIds = listOrganizationIdsVisibleByMembership(
+      this.databaseService.db,
+      authContext.userId,
+    );
+    if (!isScopedAccessSession(authContext)) {
+      return visibleOrganizationIds;
+    }
+    const scopedOrganizationIds = listScopedTokenOrganizationIds(
+      this.databaseService.db,
+      authContext.sessionAuth.scopedAccessTokenCredentialId,
+    );
+    const visibleSet = new Set(visibleOrganizationIds);
+    return scopedOrganizationIds.filter((organizationId) => visibleSet.has(organizationId));
   }
 }

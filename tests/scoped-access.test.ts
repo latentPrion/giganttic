@@ -290,6 +290,29 @@ describe("scoped access tokens", () => {
     )).toBe(false);
   });
 
+  it("allowlists GET /organizations and GET /teams for scoped sessions", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const projectA = await pickFirstAccessibleProject(standardLogin.accessToken);
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+    const scopedLogin = await redeemScopedToken(created.token);
+
+    const organizationsResponse = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    expect(organizationsResponse.statusCode).toBe(200);
+
+    const teamsResponse = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "GET",
+      url: "/stc-proj-mgmt/api/teams",
+    });
+    expect(teamsResponse.statusCode).toBe(200);
+  });
+
   it("allows only assigned project objects and filters list results", async () => {
     const standardLogin = await loginAs("testadminuser");
     const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
@@ -430,8 +453,6 @@ describe("scoped access tokens", () => {
 
     const deniedCases = [
       { method: "GET", url: "/stc-proj-mgmt/api/users" },
-      { method: "GET", url: "/stc-proj-mgmt/api/teams" },
-      { method: "GET", url: "/stc-proj-mgmt/api/organizations" },
       { method: "POST", url: "/stc-proj-mgmt/api/auth/session/revoke", payload: { sessionIds: [scopedLogin.session.id] } },
       { method: "GET", url: "/stc-proj-mgmt/api/scoped-access/tokens" },
       { method: "POST", url: "/stc-proj-mgmt/api/scoped-access/tokens", payload: { expiresAt: null } },

@@ -41,6 +41,8 @@ export function buildBackendConfig(
     scopedSessionRouteAllowlist: [
       { method: "GET", pattern: "/auth/session/me" },
       { method: "GET", pattern: "/users/:userId" },
+      { method: "GET", pattern: "/organizations" },
+      { method: "GET", pattern: "/teams" },
       { method: "GET", pattern: "/projects" },
       { method: "GET", pattern: "/projects/chart-export-capabilities" },
       { method: "GET", pattern: "/projects/:projectId" },

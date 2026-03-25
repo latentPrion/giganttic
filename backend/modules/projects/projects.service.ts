@@ -286,13 +286,16 @@ export class ProjectsService {
   }
 
   listProjects(authContext: AuthContext): ListProjectsResponse {
-    let accessibleProjectIds = this.listAccessibleProjectIds(authContext.userId);
-    if (isScopedAccessSession(authContext)) {
-      accessibleProjectIds = listScopedTokenProjectIds(
-        this.databaseService.db,
-        authContext.sessionAuth.scopedAccessTokenCredentialId,
-      );
-    }
+    const membershipProjectIds = this.listAccessibleProjectIds(authContext.userId);
+    const accessibleProjectIds = isScopedAccessSession(authContext)
+      ? intersectProjectIds(
+        listScopedTokenProjectIds(
+          this.databaseService.db,
+          authContext.sessionAuth.scopedAccessTokenCredentialId,
+        ),
+        membershipProjectIds,
+      )
+      : membershipProjectIds;
 
     if (accessibleProjectIds.length === 0) {
       return { projects: [] };
