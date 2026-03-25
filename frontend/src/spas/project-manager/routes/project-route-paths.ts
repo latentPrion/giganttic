@@ -1,6 +1,13 @@
 import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
 
-export const PROJECT_ROUTE_SECTION_VALUES = ["detail", "gantt", "kanban", "issues", "tasks"] as const;
+export const PROJECT_ROUTE_SECTION_VALUES = [
+  "detail",
+  "gantt",
+  "kanban",
+  "issues",
+  "tasks",
+  "issue-detail",
+] as const;
 
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
 

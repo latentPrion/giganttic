@@ -5,12 +5,14 @@ import {
 import {
   createIssueCommentRequestSchema,
   deleteIssueCommentResponseSchema,
+  deleteIssueAttachmentResponseSchema,
   getIssueCommentResponseSchema,
   listIssueCommentsResponseSchema,
   updateIssueCommentRequestSchema,
   uploadIssueAttachmentResponseSchema,
   type CreateIssueCommentRequest,
   type DeleteIssueCommentResponse,
+  type DeleteIssueAttachmentResponse,
   type GetIssueCommentResponse,
   type ListIssueCommentsResponse,
   type UpdateIssueCommentRequest,
@@ -34,6 +36,15 @@ function issueCommentAttachmentsPath(
   commentId: number,
 ): string {
   return `${issueCommentItemPath(projectId, issueId, commentId)}/attachments`;
+}
+
+function issueCommentAttachmentItemPath(
+  projectId: number,
+  issueId: number,
+  commentId: number,
+  attachmentId: string,
+): string {
+  return `${issueCommentAttachmentsPath(projectId, issueId, commentId)}/${attachmentId}`;
 }
 
 export const issueCommentsApi = {
@@ -124,6 +135,21 @@ export const issueCommentsApi = {
       formData,
       path: issueCommentAttachmentsPath(projectId, issueId, commentId),
       responseSchema: uploadIssueAttachmentResponseSchema,
+      token,
+    });
+  },
+
+  async deleteCommentAttachment(
+    token: string,
+    projectId: number,
+    issueId: number,
+    commentId: number,
+    attachmentId: string,
+  ): Promise<DeleteIssueAttachmentResponse> {
+    return await requestJson({
+      method: "DELETE",
+      path: issueCommentAttachmentItemPath(projectId, issueId, commentId, attachmentId),
+      responseSchema: deleteIssueAttachmentResponseSchema,
       token,
     });
   },

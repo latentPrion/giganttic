@@ -6,6 +6,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { issuesApi } from "../api/issues-api.js";
@@ -14,6 +15,7 @@ import { createKanbanColumns } from "../components/kanban/kanban-models.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import type { Issue } from "../contracts/issue.contracts.js";
 import type { IssueStatus } from "../contracts/issue.contracts.js";
+import { createProjectIssueRoute } from "../routes/project-route-paths.js";
 import {
   parseProjectKanbanTasksFromXml,
   type ParsedGanttKanbanTask,
@@ -53,6 +55,7 @@ function createSelectedProjectLabel(projectId: number | null): string {
 }
 
 export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
+  const navigate = useNavigate();
   const ganttRef = useRef<GanttChartHandle | null>(null);
   const fileManager = useGanttChartFileManager({
     ganttRef,
@@ -183,6 +186,13 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     }
   }
 
+  function openIssueDetail(issueId: number): void {
+    if (props.projectId === null) {
+      return;
+    }
+    navigate(createProjectIssueRoute(props.projectId, issueId));
+  }
+
   function handleTaskStatusChange(taskId: string, status: IssueStatus): void {
     if (props.projectId === null) {
       return;
@@ -227,6 +237,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       <KanbanBoard
         columns={columns}
         isBusy={isUpdatingCardStatus}
+        onIssueNavigateToDetail={openIssueDetail}
         onIssueStatusChange={(issueId, status) => {
           void handleIssueStatusChange(issueId, status);
         }}

@@ -21,10 +21,12 @@ import {
   deleteIssueCommentResponseSchema,
   getIssueCommentResponseSchema,
   issueCommentRouteParamsSchema,
+  issueCommentAttachmentRouteParamsSchema,
   issueCommentsRouteParamsSchema,
   listIssueCommentsResponseSchema,
   updateIssueCommentRequestSchema,
   uploadIssueAttachmentResponseSchema,
+  deleteIssueAttachmentResponseSchema,
 } from "./issue-untrusted.contracts.js";
 import { IssueCommentService } from "./issue-comment.service.js";
 import { IssueUploadMultipartInterceptor } from "./issue-upload-multipart.interceptor.js";
@@ -134,6 +136,25 @@ export class IssueCommentsController {
         commentId,
       ),
     );
+  }
+
+  @Delete(":commentId/attachments/:attachmentId")
+  async deleteCommentAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(issueCommentAttachmentRouteParamsSchema)) params: unknown,
+  ) {
+    const { attachmentId, commentId, issueId, projectId } =
+      issueCommentAttachmentRouteParamsSchema.parse(params);
+
+    const response = await this.issueCommentService.deleteCommentAttachment(
+      request.authContext!,
+      projectId,
+      issueId,
+      commentId,
+      attachmentId,
+    );
+
+    return deleteIssueAttachmentResponseSchema.parse(response);
   }
 
   @Post(":commentId/attachments")

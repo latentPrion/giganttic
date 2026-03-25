@@ -41,6 +41,15 @@ vi.mock("../api/gantt-api.js", () => ({
 
 const issuesApiMock = vi.mocked(issuesApi);
 const ganttApiMock = vi.mocked(ganttApi);
+const navigateMock = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
 
 function createIssue(overrides: Partial<Awaited<ReturnType<typeof issuesApi.listIssues>>["issues"][number]> = {}) {
   return {
@@ -73,6 +82,7 @@ describe("ProjectManagerKanbanPage", () => {
     issuesApiMock.listIssues.mockReset();
     issuesApiMock.updateIssue.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
+    navigateMock.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
         createIssue({ id: 1, name: "Open issue", status: "ISSUE_STATUS_OPEN" }),
@@ -217,6 +227,36 @@ describe("ProjectManagerKanbanPage", () => {
         1,
         expect.objectContaining({ status: "ISSUE_STATUS_BLOCKED" }),
       );
+    });
+
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate when dismissing the status menu (double click then click off)", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const issueCard = await screen.findByTestId("kanban-issue-card-1");
+    fireEvent.doubleClick(issueCard);
+
+    // Clicking off the menu should dismiss it, but must not trigger
+    // delayed single-click navigation to the per-issue detail view.
+    await user.click(document.body);
+
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("opens the per-issue view on single click", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const issueCard = await screen.findByTestId("kanban-issue-card-1");
+    await user.click(issueCard);
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/pm/project/issue?projectId=42&id=1");
     });
   });
 

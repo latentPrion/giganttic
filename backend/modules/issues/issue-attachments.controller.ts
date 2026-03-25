@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -20,6 +21,7 @@ import {
 import {
   issueAttachmentRouteParamsSchema,
   issueCommentsRouteParamsSchema,
+  deleteIssueAttachmentResponseSchema,
   listIssueAttachmentsResponseSchema,
   uploadIssueAttachmentResponseSchema,
 } from "./issue-untrusted.contracts.js";
@@ -83,6 +85,25 @@ export class IssueAttachmentsController {
     });
 
     return uploadIssueAttachmentResponseSchema.parse({ attachment: summary });
+  }
+
+  @Delete(":attachmentId")
+  async deleteIssueAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(issueAttachmentRouteParamsSchema)) params: unknown,
+  ) {
+    const { attachmentId, issueId, projectId } = issueAttachmentRouteParamsSchema.parse(
+      params,
+    );
+
+    const response = await this.issuesService.deleteIssueAttachment(
+      request.authContext!,
+      projectId,
+      issueId,
+      attachmentId,
+    );
+
+    return deleteIssueAttachmentResponseSchema.parse(response);
   }
 
   @Get(":attachmentId/download")

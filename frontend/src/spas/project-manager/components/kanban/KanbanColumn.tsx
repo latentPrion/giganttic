@@ -13,6 +13,7 @@ import type { KanbanColumnModel } from "./kanban.types.js";
 function renderKanbanCard(
   card: KanbanColumnModel["cards"][number],
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void,
+  onIssueNavigateToDetail: ((issueId: number) => void) | undefined,
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void,
   isBusy: boolean,
 ) {
@@ -32,6 +33,7 @@ function renderKanbanCard(
           card={card}
           disabled={isBusy}
           onUpdateStatus={onIssueStatusChange}
+          onNavigateToIssue={onIssueNavigateToDetail}
         />
       );
   }
@@ -41,6 +43,7 @@ export function KanbanColumn(props: {
   column: KanbanColumnModel;
   isBusy: boolean;
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
+  onIssueNavigateToDetail?: (issueId: number) => void;
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
 }) {
   const { column } = props;
@@ -65,6 +68,7 @@ export function KanbanColumn(props: {
                 {renderKanbanCard(
                   card,
                   props.onIssueStatusChange,
+                  props.onIssueNavigateToDetail,
                   props.onTaskStatusChange,
                   props.isBusy,
                 )}

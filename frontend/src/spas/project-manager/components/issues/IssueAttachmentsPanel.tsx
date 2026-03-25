@@ -7,6 +7,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  Paper,
   Stack,
   Typography,
 } from "@mui/material";
@@ -93,16 +94,31 @@ export function IssueAttachmentsPanel(props: IssueAttachmentsPanelProps) {
     }
   }
 
+  async function handleDelete(attachmentId: string): Promise<void> {
+    setErrorMessage(null);
+    setBusy(true);
+    try {
+      await issueAttachmentsApi.deleteAttachment(token, projectId, issueId, attachmentId);
+      await reload();
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete attachment."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleUpload(fileList: FileList | null): Promise<void> {
-    const file = fileList?.[0];
-    if (!file) {
+    const files = fileList ? Array.from(fileList) : [];
+    if (files.length === 0) {
       return;
     }
 
     setBusy(true);
     setErrorMessage(null);
     try {
-      await issueAttachmentsApi.uploadAttachment(token, projectId, issueId, file);
+      for (const file of files) {
+        await issueAttachmentsApi.uploadAttachment(token, projectId, issueId, file);
+      }
       await reload();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Upload failed."));
@@ -119,21 +135,40 @@ export function IssueAttachmentsPanel(props: IssueAttachmentsPanelProps) {
     <Stack spacing={2}>
       <Typography variant="subtitle1">Issue-level attachments</Typography>
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
-      <Stack alignItems="flex-start" direction="row" spacing={2}>
-        <Button component="label" disabled={busy} variant="outlined">
-          Upload file
-          <input
-            accept={FILE_INPUT_ACCEPT}
-            hidden
-            onChange={(event) => void handleUpload(event.target.files)}
-            type="file"
-          />
-        </Button>
-        {busy ? <CircularProgress size={22} /> : null}
-      </Stack>
+      <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">
+        <Stack alignItems="flex-start" direction="row" spacing={2}>
+          <Button component="label" disabled={busy} variant="outlined">
+            Add attachment(s)
+            <input
+              accept={FILE_INPUT_ACCEPT}
+              hidden
+              multiple
+              onChange={(event) => void handleUpload(event.target.files)}
+              type="file"
+            />
+          </Button>
+          {busy ? <CircularProgress size={22} /> : null}
+        </Stack>
+        <Typography color="text.secondary" sx={{ mt: 1.5 }} variant="body2">
+          Choose one or more files. Maximum size and allowed types are enforced on the server.
+        </Typography>
+      </Paper>
       <List dense>
         {attachments.map((row) => (
-          <ListItem key={row.id} disablePadding sx={{ py: 0.5 }}>
+          <ListItem
+            key={row.id}
+            disablePadding
+            sx={{ alignItems: "center", justifyContent: "space-between", py: 0.5 }}
+          >
+            <Button
+              color="error"
+              disabled={busy}
+              onClick={() => void handleDelete(row.id)}
+              size="small"
+              variant="text"
+            >
+              Delete
+            </Button>
             <ListItemText
               primary={(
                 <MuiLink
@@ -145,7 +180,10 @@ export function IssueAttachmentsPanel(props: IssueAttachmentsPanelProps) {
                   {row.originalFilename}
                 </MuiLink>
               )}
+              primaryTypographyProps={{ align: "right" }}
               secondary={formatByteLength(row.byteLength)}
+              secondaryTypographyProps={{ align: "right" }}
+              sx={{ flex: "0 1 auto", textAlign: "right" }}
             />
           </ListItem>
         ))}

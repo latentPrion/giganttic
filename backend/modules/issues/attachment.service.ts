@@ -214,6 +214,83 @@ export class AttachmentService {
       .map((row) => row.attachment);
   }
 
+  async deleteIssueAttachmentLink(
+    issueId: number,
+    attachmentId: string,
+  ): Promise<string> {
+    const linked = this.databaseService.db
+      .select({ id: attachments.id })
+      .from(issuesAttachments)
+      .innerJoin(
+        attachments,
+        eq(issuesAttachments.attachmentId, attachments.id),
+      )
+      .where(
+        and(
+          eq(issuesAttachments.issueId, issueId),
+          eq(issuesAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .get();
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    this.databaseService.db
+      .delete(issuesAttachments)
+      .where(
+        and(
+          eq(issuesAttachments.issueId, issueId),
+          eq(issuesAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .run();
+
+    await this.removeOrphanAttachmentsAndFiles();
+    return linked.id;
+  }
+
+  async deleteCommentAttachmentLink(
+    issueId: number,
+    commentId: number,
+    attachmentId: string,
+  ): Promise<string> {
+    const linked = this.databaseService.db
+      .select({ id: attachments.id })
+      .from(issueCommentsAttachments)
+      .innerJoin(
+        attachments,
+        eq(issueCommentsAttachments.attachmentId, attachments.id),
+      )
+      .where(
+        and(
+          eq(issueCommentsAttachments.issueId, issueId),
+          eq(issueCommentsAttachments.commentId, commentId),
+          eq(issueCommentsAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .get();
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    this.databaseService.db
+      .delete(issueCommentsAttachments)
+      .where(
+        and(
+          eq(issueCommentsAttachments.issueId, issueId),
+          eq(issueCommentsAttachments.commentId, commentId),
+          eq(issueCommentsAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .run();
+
+    await this.removeOrphanAttachmentsAndFiles();
+    return linked.id;
+  }
+
   getAttachmentFileStream(attachmentId: string): Readable {
     return createReadStream(this.resolveBlobPath(attachmentId));
   }
@@ -227,10 +304,14 @@ export class AttachmentService {
     return path.join(this.config.untrustedContentAttachmentsDir, safeName);
   }
 
-  resolveIssueCommentMarkdownPath(issueId: number, commentId: number): string {
+  resolveIssueCommentMarkdownPath(
+    projectId: number,
+    issueId: number,
+    commentId: number,
+  ): string {
     return path.join(
       this.config.untrustedContentIssueCommentsDir,
-      `${issueId}-${commentId}.md`,
+      `${projectId}-${issueId}-${commentId}.md`,
     );
   }
 

@@ -2,9 +2,11 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   Link as MuiLink,
+  Paper,
   Stack,
   TextField,
   Typography,
@@ -40,6 +42,7 @@ function findCommentById(
 
 function CommentAttachmentsList(props: {
   onDownload: (attachmentId: string, filename: string) => void;
+  onDelete: (attachmentId: string) => void;
   rows: IssueComment["attachments"];
 }) {
   if (props.rows.length === 0) {
@@ -47,20 +50,40 @@ function CommentAttachmentsList(props: {
   }
 
   return (
-    <Stack spacing={0.5} sx={{ mt: 1 }}>
+    <Stack spacing={0.5} sx={{ mt: 1, width: "100%" }}>
       <Typography color="text.secondary" variant="caption">
         Attachments
       </Typography>
       {props.rows.map((attachment) => (
-        <MuiLink
-          component="button"
+        <Stack
+          alignItems="center"
+          direction="row"
+          justifyContent="space-between"
           key={attachment.id}
-          onClick={() => props.onDownload(attachment.id, attachment.originalFilename)}
-          type="button"
-          underline="hover"
         >
-          {attachment.originalFilename} ({attachment.byteLength} bytes)
-        </MuiLink>
+          <Button
+            color="error"
+            onClick={() => void props.onDelete(attachment.id)}
+            size="small"
+            type="button"
+            variant="text"
+          >
+            Delete
+          </Button>
+          <Box sx={{ flex: "1 1 auto", textAlign: "right" }}>
+            <MuiLink
+              component="button"
+              onClick={() =>
+                props.onDownload(attachment.id, attachment.originalFilename)
+              }
+              type="button"
+              underline="hover"
+              sx={{ textAlign: "right" }}
+            >
+              {attachment.originalFilename} ({attachment.byteLength} bytes)
+            </MuiLink>
+          </Box>
+        </Stack>
       ))}
     </Stack>
   );
@@ -199,25 +222,49 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
     }
   }
 
+  async function handleDeleteCommentAttachment(
+    commentId: number,
+    attachmentId: string,
+  ): Promise<void> {
+    setErrorMessage(null);
+    setBusy(true);
+    try {
+      await issueCommentsApi.deleteCommentAttachment(
+        token,
+        projectId,
+        issueId,
+        commentId,
+        attachmentId,
+      );
+      await reload();
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Unable to delete attachment."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleCommentAttachmentUpload(
     commentId: number,
     fileList: FileList | null,
   ): Promise<void> {
-    const file = fileList?.[0];
-    if (!file) {
+    const files = fileList ? Array.from(fileList) : [];
+    if (files.length === 0) {
       return;
     }
 
     setBusy(true);
     setErrorMessage(null);
     try {
-      await issueCommentsApi.uploadCommentAttachment(
-        token,
-        projectId,
-        issueId,
-        commentId,
-        file,
-      );
+      for (const file of files) {
+        await issueCommentsApi.uploadCommentAttachment(
+          token,
+          projectId,
+          issueId,
+          commentId,
+          file,
+        );
+      }
       await reload();
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error, "Upload failed."));
@@ -239,31 +286,36 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
     <Stack spacing={2}>
       <Typography variant="subtitle1">{PANEL_LABEL}</Typography>
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
-      <Stack spacing={1}>
-        <TextField
-          label="New comment (markdown)"
-          minRows={4}
-          multiline
-          onChange={(event) => setComposerBody(event.target.value)}
-          value={composerBody}
-        />
-        {parentCommentId !== null ? (
-          <Typography color="text.secondary" variant="body2">
-            Replying to comment #
-            {parentCommentId}
-            {" "}
-            <Button onClick={() => setParentCommentId(null)} type="button" variant="text">
-              Cancel reply
+      <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">
+        <Stack spacing={1.5}>
+          <TextField
+            fullWidth
+            label="New comment (markdown)"
+            minRows={4}
+            multiline
+            onChange={(event) => setComposerBody(event.target.value)}
+            value={composerBody}
+          />
+          {parentCommentId !== null ? (
+            <Chip
+              color="primary"
+              label={(
+                <span>
+                  Replying to comment {parentCommentId}
+                </span>
+              )}
+              onDelete={() => setParentCommentId(null)}
+              variant="outlined"
+            />
+          ) : null}
+          <Stack direction="row" spacing={1}>
+            <Button disabled={busy} onClick={() => void handleCreate()} variant="contained">
+              Post comment
             </Button>
-          </Typography>
-        ) : null}
-        <Stack direction="row" spacing={1}>
-          <Button disabled={busy} onClick={() => void handleCreate()} variant="contained">
-            Post comment
-          </Button>
-          {busy ? <CircularProgress size={22} /> : null}
+            {busy ? <CircularProgress size={22} /> : null}
+          </Stack>
         </Stack>
-      </Stack>
+      </Paper>
       <Divider />
       {busy && comments.length === 0 ? (
         <Stack alignItems="center" direction="row" spacing={1}>
@@ -278,6 +330,7 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
             : findCommentById(comments, comment.parentCommentId);
           const isHighlighted = highlightCommentId === comment.id;
           const canEdit = comment.createdByUserId === currentUserId;
+          const hasAttachments = comment.attachments.length > 0;
 
           return (
             <Box
@@ -291,33 +344,58 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
                 p: 1.5,
               }}
             >
-              {parent ? (
-                <Typography sx={{ mb: 1 }} variant="body2">
-                  Reply to
-                  {" "}
-                  <MuiLink
-                    component="button"
-                    onClick={() => onNavigateToComment(parent.id)}
-                    type="button"
-                    underline="hover"
-                  >
-                    comment #
-                    {parent.id}
-                  </MuiLink>
-                </Typography>
-              ) : null}
-              <Stack direction="row" justifyContent="space-between" spacing={1}>
-                <Typography color="text.secondary" variant="caption">
-                  #
-                  {comment.id}
-                  {" "}
-                  · user
-                  {comment.createdByUserId}
-                  {" "}
-                  ·
-                  {comment.createdAt}
-                </Typography>
-                <Stack direction="row" spacing={1}>
+              <Stack
+                alignItems="center"
+                direction="row"
+                flexWrap="wrap"
+                justifyContent="space-between"
+                spacing={1}
+              >
+                <Stack
+                  alignItems="center"
+                  direction="row"
+                  flexWrap="wrap"
+                  spacing={1}
+                  sx={{ flex: "1 1 auto", minWidth: 0 }}
+                >
+                  <Typography color="text.secondary" component="span" variant="caption">
+                    #
+                    {comment.id}
+                    {" "}
+                    · user
+                    {comment.createdByUserId}
+                    {" "}
+                    ·
+                    {comment.createdAt}
+                  </Typography>
+                  {parent ? (
+                    <Chip
+                      color="default"
+                      label={(
+                        <Typography component="span" variant="caption">
+                          Replying to comment{" "}
+                          <MuiLink
+                            component="button"
+                            onClick={() => onNavigateToComment(parent.id)}
+                            type="button"
+                            underline="hover"
+                          >
+                            {parent.id}
+                          </MuiLink>
+                        </Typography>
+                      )}
+                      size="small"
+                      sx={{
+                        height: "auto",
+                        maxWidth: "100%",
+                        py: 0.25,
+                        "& .MuiChip-label": { display: "block", px: 1, py: 0.25, whiteSpace: "normal" },
+                      }}
+                      variant="outlined"
+                    />
+                  ) : null}
+                </Stack>
+                <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                   <Button
                     onClick={() => onNavigateToComment(comment.id)}
                     size="small"
@@ -371,11 +449,6 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
                   token={token}
                 />
               )}
-              <CommentAttachmentsList
-                onDownload={(attachmentId, filename) =>
-                  void handleDownloadAttachment(attachmentId, filename)}
-                rows={comment.attachments}
-              />
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 {canEdit ? (
                   <>
@@ -404,15 +477,24 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
                   size="small"
                   variant="text"
                 >
-                  Attach file
+                  Add attachment(s)
                   <input
                     hidden
+                    multiple
                     onChange={(event) =>
                       void handleCommentAttachmentUpload(comment.id, event.target.files)}
                     type="file"
                   />
                 </Button>
               </Stack>
+              {hasAttachments ? <Divider sx={{ mt: 1.5 }} /> : null}
+              <CommentAttachmentsList
+                onDownload={(attachmentId, filename) =>
+                  void handleDownloadAttachment(attachmentId, filename)}
+                onDelete={(attachmentId) =>
+                  void handleDeleteCommentAttachment(comment.id, attachmentId)}
+                rows={comment.attachments}
+              />
             </Box>
           );
         })}

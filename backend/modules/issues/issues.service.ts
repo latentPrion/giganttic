@@ -258,12 +258,29 @@ export class IssuesService {
     this.assertCanManageIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
 
-    await this.issueCommentService.deleteAllCommentBodiesForIssue(issueId);
+    await this.issueCommentService.deleteAllCommentBodiesForIssue(projectId, issueId);
     this.databaseService.db.delete(issues)
       .where(eq(issues.id, issueId))
       .run();
     await this.attachmentService.removeOrphanAttachmentsAndFiles();
     return { deletedIssueId: issueId };
+  }
+
+  async deleteIssueAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+    attachmentId: string,
+  ): Promise<{ deletedAttachmentId: string }> {
+    this.assertProjectExists(projectId);
+    this.assertCanManageIssues(authContext, projectId);
+    this.getIssueEntityByIdOrThrow(projectId, issueId);
+
+    const deletedAttachmentId = await this.attachmentService.deleteIssueAttachmentLink(
+      issueId,
+      attachmentId,
+    );
+    return { deletedAttachmentId };
   }
 
   private assertProjectExists(projectId: number): void {

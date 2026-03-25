@@ -48,6 +48,10 @@ export const uploadIssueAttachmentResponseSchema = z.object({
   attachment: attachmentSummarySchema,
 });
 
+export const deleteIssueAttachmentResponseSchema = z.object({
+  deletedAttachmentId: z.string(),
+});
+
 export type IssueComment = z.infer<typeof issueCommentSchema>;
 export type IssueAttachmentSummary = z.infer<typeof attachmentSummarySchema>;
 export type ListIssueCommentsResponse = z.infer<typeof listIssueCommentsResponseSchema>;
@@ -56,3 +60,4 @@ export type CreateIssueCommentRequest = z.infer<typeof createIssueCommentRequest
 export type UpdateIssueCommentRequest = z.infer<typeof updateIssueCommentRequestSchema>;
 export type DeleteIssueCommentResponse = z.infer<typeof deleteIssueCommentResponseSchema>;
 export type ListIssueAttachmentsResponse = z.infer<typeof listIssueAttachmentsResponseSchema>;
+export type DeleteIssueAttachmentResponse = z.infer<typeof deleteIssueAttachmentResponseSchema>;

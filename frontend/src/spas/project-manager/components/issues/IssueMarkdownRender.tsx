@@ -112,6 +112,41 @@ export function IssueMarkdownRender(props: IssueMarkdownRenderProps) {
       ) : null}
       <ReactMarkdown
         components={{
+          h1: ({ children }) => (
+            <Typography component="h1" sx={{ mt: 1, mb: 1 }} variant="h4">
+              {children}
+            </Typography>
+          ),
+          h2: ({ children }) => (
+            <Typography component="h2" sx={{ mt: 1, mb: 1 }} variant="h5">
+              {children}
+            </Typography>
+          ),
+          h3: ({ children }) => (
+            <Typography component="h3" sx={{ mt: 1, mb: 0.75 }} variant="h6">
+              {children}
+            </Typography>
+          ),
+          h4: ({ children }) => (
+            <Typography component="h4" sx={{ mt: 1, mb: 0.75 }} variant="subtitle1">
+              {children}
+            </Typography>
+          ),
+          h5: ({ children }) => (
+            <Typography component="h5" sx={{ mt: 0.75, mb: 0.5 }} variant="subtitle2">
+              {children}
+            </Typography>
+          ),
+          h6: ({ children }) => (
+            <Typography component="h6" sx={{ mt: 0.75, mb: 0.5 }} variant="subtitle2">
+              {children}
+            </Typography>
+          ),
+          p: ({ children }) => (
+            <Typography component="p" sx={{ mb: 1 }} variant="body1">
+              {children}
+            </Typography>
+          ),
           a: ({ children, href }) => {
             if (href?.startsWith(GIGANTT_ISSUE_ATTACHMENT_URL_PREFIX)) {
               const attachmentId = href.slice(GIGANTT_ISSUE_ATTACHMENT_URL_PREFIX.length);

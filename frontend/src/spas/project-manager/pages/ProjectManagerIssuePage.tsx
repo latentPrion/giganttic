@@ -279,9 +279,22 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
             {props.issueId ?? "None"}
           </Typography>
         </Stack>
-        <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
+        <ProjectManagerProjectNavigation
+          currentSection={
+            props.projectId !== null && props.issueId !== null ? "issue-detail" : "issues"
+          }
+          issueDetailContext={
+            props.projectId !== null && props.issueId !== null
+              ? { issueId: props.issueId, onCloseIssueTab: goBackToIssues }
+              : null
+          }
+          projectId={props.projectId}
+        />
         <Stack direction={{ sm: "row", xs: "column" }} justifyContent="space-between" spacing={1.5}>
-          <Typography variant="h6">Issue workspace</Typography>
+          <Typography variant="h6">
+            Issue workspace
+            {props.issueId !== null ? ` · Issue #${props.issueId}` : ""}
+          </Typography>
           <Button onClick={goBackToIssues} type="button" variant="outlined">
             Back to Issues
           </Button>

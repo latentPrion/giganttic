@@ -14,6 +14,7 @@ export function KanbanBoard(props: {
   columns: KanbanColumnModel[];
   isBusy: boolean;
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
+  onIssueNavigateToDetail?: (issueId: number) => void;
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
 }) {
   return (
@@ -29,6 +30,7 @@ export function KanbanBoard(props: {
               column={column}
               isBusy={props.isBusy}
               onIssueStatusChange={props.onIssueStatusChange}
+                  onIssueNavigateToDetail={props.onIssueNavigateToDetail}
               onTaskStatusChange={props.onTaskStatusChange}
             />
           </Stack>

@@ -76,6 +76,17 @@ export const issueAttachmentRouteParamsSchema = z.object({
   projectId: issueIdSchema,
 });
 
+export const issueCommentAttachmentRouteParamsSchema = z.object({
+  attachmentId: z.string().min(1),
+  commentId: issueIdSchema,
+  issueId: issueIdSchema,
+  projectId: issueIdSchema,
+});
+
+export const deleteIssueAttachmentResponseSchema = z.object({
+  deletedAttachmentId: z.string(),
+});
+
 export type IssueCommentResponse = z.infer<typeof issueCommentResponseSchema>;
 export type CreateIssueCommentRequest = z.infer<
   typeof createIssueCommentRequestSchema

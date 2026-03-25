@@ -63,7 +63,7 @@ export class IssueCommentService {
       .all();
 
     const comments = await Promise.all(
-      rows.map((row) => this.buildCommentResponse(row)),
+      rows.map((row) => this.buildCommentResponse(row, projectId)),
     );
 
     return { comments };
@@ -80,7 +80,7 @@ export class IssueCommentService {
     this.assertIssueInProject(projectId, issueId);
     const record = this.getCommentRecordOrThrow(issueId, commentId);
 
-    return { comment: await this.buildCommentResponse(record) };
+    return { comment: await this.buildCommentResponse(record, projectId) };
   }
 
   async createComment(
@@ -106,13 +106,14 @@ export class IssueCommentService {
 
     await this.attachmentService.ensureUntrustedDirectoriesExist();
     const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+      projectId,
       issueId,
       created.id,
     );
     await writeFile(bodyPath, payload.body, "utf8");
 
     const record = this.getCommentRecordOrThrow(issueId, created.id);
-    return { comment: await this.buildCommentResponse(record) };
+    return { comment: await this.buildCommentResponse(record, projectId) };
   }
 
   async updateComment(
@@ -129,6 +130,7 @@ export class IssueCommentService {
     this.assertCanEditComment(authContext, projectId, record);
 
     const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+      projectId,
       issueId,
       commentId,
     );
@@ -140,10 +142,13 @@ export class IssueCommentService {
       .run();
 
     const next = this.getCommentRecordOrThrow(issueId, commentId);
-    return { comment: await this.buildCommentResponse(next) };
+    return { comment: await this.buildCommentResponse(next, projectId) };
   }
 
-  async deleteAllCommentBodiesForIssue(issueId: number): Promise<void> {
+  async deleteAllCommentBodiesForIssue(
+    projectId: number,
+    issueId: number,
+  ): Promise<void> {
     const rows = this.databaseService.db
       .select({ id: issueComments.id })
       .from(issueComments)
@@ -151,11 +156,12 @@ export class IssueCommentService {
       .all();
 
     for (const row of rows) {
-      const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+      await unlinkIssueCommentBodyFiles(
+        this.attachmentService,
+        projectId,
         issueId,
         row.id,
       );
-      await tryUnlinkQuietly(bodyPath);
     }
   }
 
@@ -184,29 +190,55 @@ export class IssueCommentService {
       .where(eq(issueComments.id, commentId))
       .run();
 
-    const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+    await unlinkIssueCommentBodyFiles(
+      this.attachmentService,
+      projectId,
       issueId,
       commentId,
     );
-    await tryUnlinkQuietly(bodyPath);
     await this.attachmentService.removeOrphanAttachmentsAndFiles();
 
     return { deletedCommentId: commentId };
   }
 
+  async deleteCommentAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+    commentId: number,
+    attachmentId: string,
+  ): Promise<{ deletedAttachmentId: string }> {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+    this.assertIssueInProject(projectId, issueId);
+
+    const record = this.getCommentRecordOrThrow(issueId, commentId);
+    this.assertCanEditComment(authContext, projectId, record);
+
+    const deletedAttachmentId = await this.attachmentService.deleteCommentAttachmentLink(
+      issueId,
+      commentId,
+      attachmentId,
+    );
+
+    return { deletedAttachmentId };
+  }
+
   private async buildCommentResponse(
     record: IssueCommentRecord,
+    projectId: number,
   ): Promise<IssueCommentResponse> {
     const attachmentRows = this.attachmentService.listAttachmentsForComment(
       record.issueId,
       record.id,
     );
 
-    const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+    const body = await readIssueCommentBody(
+      this.attachmentService,
+      projectId,
       record.issueId,
       record.id,
     );
-    const body = await readCommentText(bodyPath);
 
     return {
       attachments: attachmentRows.map(toAttachmentSummary),
@@ -319,16 +351,38 @@ export class IssueCommentService {
   }
 }
 
-async function readCommentText(filePath: string): Promise<string> {
+async function readIssueCommentBody(
+  attachmentService: AttachmentService,
+  projectId: number,
+  issueId: number,
+  commentId: number,
+): Promise<string> {
+  const primary = attachmentService.resolveIssueCommentMarkdownPath(
+    projectId,
+    issueId,
+    commentId,
+  );
   try {
-    return await readFile(filePath, "utf8");
+    return await readFile(primary, "utf8");
   } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return "";
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
     }
-
-    throw error;
   }
+
+  // Only the canonical filename format is supported.
+  return "";
+}
+
+async function unlinkIssueCommentBodyFiles(
+  attachmentService: AttachmentService,
+  projectId: number,
+  issueId: number,
+  commentId: number,
+): Promise<void> {
+  await tryUnlinkQuietly(
+    attachmentService.resolveIssueCommentMarkdownPath(projectId, issueId, commentId),
+  );
 }
 
 async function tryUnlinkQuietly(filePath: string): Promise<void> {

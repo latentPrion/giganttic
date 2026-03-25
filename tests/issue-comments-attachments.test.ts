@@ -10,6 +10,9 @@ const MINIMAL_PNG_BASE64 =
 const MINIMAL_PNG_BUFFER = Buffer.from(MINIMAL_PNG_BASE64, "base64");
 const MULTIPART_BOUNDARY = "----issueAttachmentTestBoundary";
 
+const PROJECT_MANAGER_ROLE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
+const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
+
 const harness = createCrudTestHarness("issue-comments-attachments.sqlite");
 const limitHarness = createCrudTestHarness("issue-attachment-limit.sqlite", {
   maxAttachmentsPerIssueOrComment: 2,
@@ -357,6 +360,70 @@ describe("issue comments and attachments api", () => {
     }
   });
 
+  it("enforces per-comment attachment count limits", async () => {
+    await limitHarness.setup();
+    try {
+      const user = await limitHarness.registerUser("comment-limit-user");
+      const { issueId, projectId } = await createProjectWithIssue(
+        limitHarness,
+        user.accessToken,
+        "comment-limit-proj",
+      );
+      const commentResponse = await limitHarness.app.inject({
+        headers: limitHarness.createAuthHeaders(user.accessToken),
+        method: "POST",
+        payload: { body: "Comment for attachment limits ok" },
+        url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+      });
+      expect(commentResponse.statusCode).toBe(201);
+      const commentId = limitHarness.parseJson<{ comment: { id: number } }>(
+        commentResponse.payload,
+      ).comment.id;
+
+      for (let index = 0; index < 2; index += 1) {
+        const payload = createMultipartFileBuffer({
+          boundary: MULTIPART_BOUNDARY,
+          content: MINIMAL_PNG_BUFFER,
+          contentType: "image/png",
+          fieldName: "file",
+          filename: `c${index}.png`,
+        });
+        const response = await limitHarness.app.inject({
+          headers: {
+            ...limitHarness.createAuthHeaders(user.accessToken),
+            "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+          },
+          method: "POST",
+          payload,
+          url:
+            `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments`,
+        });
+        expect(response.statusCode).toBe(201);
+      }
+
+      const overflowPayload = createMultipartFileBuffer({
+        boundary: MULTIPART_BOUNDARY,
+        content: MINIMAL_PNG_BUFFER,
+        contentType: "image/png",
+        fieldName: "file",
+        filename: "comment-overflow.png",
+      });
+      const overflowResponse = await limitHarness.app.inject({
+        headers: {
+          ...limitHarness.createAuthHeaders(user.accessToken),
+          "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+        },
+        method: "POST",
+        payload: overflowPayload,
+        url:
+          `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments`,
+      });
+      expect(overflowResponse.statusCode).toBe(400);
+    } finally {
+      await limitHarness.cleanup();
+    }
+  });
+
   it("blocks deleting comments that already have replies", async () => {
     const user = await harness.registerUser("reply-delete");
     const projectId = harness.parseJson<{ project: { id: number } }>(
@@ -413,6 +480,337 @@ describe("issue comments and attachments api", () => {
         `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${parentId}`,
     });
     expect(deleteParent.statusCode).toBe(400);
+  });
+
+  it("deletes issue attachments for effective project managers only", async () => {
+    const pmUser = await harness.registerUser("issue-attachment-delete-pm");
+    const viewOnlyUser = await harness.registerUser("issue-attachment-delete-viewer");
+
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "issue-attachment-delete-project",
+    );
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: pmUser.user.id,
+          },
+          { roleCodes: [], userId: viewOnlyUser.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const payload = createMultipartFileBuffer({
+      boundary: MULTIPART_BOUNDARY,
+      content: MINIMAL_PNG_BUFFER,
+      contentType: "image/png",
+      fieldName: "file",
+      filename: "delete-me.png",
+    });
+
+    const uploadResponse = await harness.app.inject({
+      headers: {
+        ...harness.createAuthHeaders(pmUser.accessToken),
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+
+    const uploaded = harness.parseJson<{
+      attachment: { id: string };
+    }>(uploadResponse.payload);
+
+    const deleteForbidden = await harness.app.inject({
+      headers: harness.createAuthHeaders(viewOnlyUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteForbidden.statusCode).toBe(403);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const deleted = harness.parseJson<{ deletedAttachmentId: string }>(
+      deleteResponse.payload,
+    );
+    expect(deleted.deletedAttachmentId).toBe(uploaded.attachment.id);
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments`,
+    });
+    expect(listResponse.statusCode).toBe(200);
+    const listBody = harness.parseJson<{ attachments: Array<{ id: string }> }>(
+      listResponse.payload,
+    );
+    expect(listBody.attachments).toEqual([]);
+  });
+
+  it("returns not found when deleting a missing issue attachment", async () => {
+    const pmUser = await harness.registerUser("issue-attachment-delete-missing");
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "issue-attachment-delete-missing-project",
+    );
+
+    const response = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments/00000000-0000-4000-8000-000000000000`,
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("deletes comment attachments for comment authors (and forbids non-author non-managers)", async () => {
+    const pmUser = await harness.registerUser("comment-attachment-delete-pm");
+    const authorUser = await harness.registerUser("comment-attachment-delete-author");
+    const nonAuthorUser = await harness.registerUser("comment-attachment-delete-non-author");
+
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "comment-attachment-delete-project",
+    );
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: pmUser.user.id,
+          },
+          { roleCodes: [], userId: authorUser.user.id },
+          { roleCodes: [], userId: nonAuthorUser.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(authorUser.accessToken),
+      method: "POST",
+      payload: { body: "Author comment seventeen" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+
+    const comment = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment;
+
+    const payload = createMultipartFileBuffer({
+      boundary: MULTIPART_BOUNDARY,
+      content: MINIMAL_PNG_BUFFER,
+      contentType: "image/png",
+      fieldName: "file",
+      filename: "author-attachment.png",
+    });
+
+    const uploadResponse = await harness.app.inject({
+      headers: {
+        ...harness.createAuthHeaders(authorUser.accessToken),
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const deleteForbidden = await harness.app.inject({
+      headers: harness.createAuthHeaders(nonAuthorUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteForbidden.statusCode).toBe(403);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(authorUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const deleted = harness.parseJson<{ deletedAttachmentId: string }>(
+      deleteResponse.payload,
+    );
+    expect(deleted.deletedAttachmentId).toBe(uploaded.attachment.id);
+
+    const listCommentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(listCommentsResponse.statusCode).toBe(200);
+    const listBody = harness.parseJson<{
+      comments: Array<{ id: number; attachments: Array<{ id: string }> }>;
+    }>(listCommentsResponse.payload);
+
+    const updatedComment = listBody.comments.find((c) => c.id === comment.id);
+    expect(updatedComment).toBeDefined();
+    expect(updatedComment!.attachments).toEqual([]);
+  });
+
+  it("deletes comment attachments for effective project managers (non-author)", async () => {
+    const pmUser = await harness.registerUser("comment-attachment-delete-pm-manager");
+    const authorUser = await harness.registerUser("comment-attachment-delete-pm-author");
+    const nonAuthorUser = await harness.registerUser("comment-attachment-delete-pm-non-author");
+
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "comment-attachment-delete-pm-project",
+    );
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: pmUser.user.id,
+          },
+          { roleCodes: [], userId: authorUser.user.id },
+          { roleCodes: [], userId: nonAuthorUser.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(authorUser.accessToken),
+      method: "POST",
+      payload: { body: "PM-author comment seventeen" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const comment = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment;
+
+    const payload = createMultipartFileBuffer({
+      boundary: MULTIPART_BOUNDARY,
+      content: MINIMAL_PNG_BUFFER,
+      contentType: "image/png",
+      fieldName: "file",
+      filename: "pm-attachment.png",
+    });
+
+    const uploadResponse = await harness.app.inject({
+      headers: {
+        ...harness.createAuthHeaders(authorUser.accessToken),
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const deleteForbidden = await harness.app.inject({
+      headers: harness.createAuthHeaders(nonAuthorUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteForbidden.statusCode).toBe(403);
+
+    const deleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${comment.id}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const deleted = harness.parseJson<{ deletedAttachmentId: string }>(
+      deleteResponse.payload,
+    );
+    expect(deleted.deletedAttachmentId).toBe(uploaded.attachment.id);
+
+    const listCommentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(listCommentsResponse.statusCode).toBe(200);
+    const listBody = harness.parseJson<{
+      comments: Array<{ id: number; attachments: Array<{ id: string }> }>;
+    }>(listCommentsResponse.payload);
+    const updatedComment = listBody.comments.find((c) => c.id === comment.id);
+    expect(updatedComment).toBeDefined();
+    expect(updatedComment!.attachments).toEqual([]);
+  });
+
+  it("returns not found when deleting a missing comment attachment", async () => {
+    const pmUser = await harness.registerUser("comment-attachment-delete-missing");
+    const authorUser = await harness.registerUser("comment-attachment-delete-missing-author");
+
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "comment-attachment-delete-missing-project",
+    );
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: pmUser.user.id,
+          },
+          { roleCodes: [], userId: authorUser.user.id },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(authorUser.accessToken),
+      method: "POST",
+      payload: { body: "Author comment for missing attachment" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment.id;
+
+    const response = await harness.app.inject({
+      headers: harness.createAuthHeaders(pmUser.accessToken),
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments/00000000-0000-4000-8000-000000000000`,
+    });
+    expect(response.statusCode).toBe(404);
   });
 });
 

@@ -93,12 +93,21 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
         "/projects/:projectId/issues/:issueId/comments/:commentId/attachments",
     },
     {
+      method: "DELETE",
+      pattern:
+        "/projects/:projectId/issues/:issueId/comments/:commentId/attachments/:attachmentId",
+    },
+    {
       method: "GET",
       pattern: "/projects/:projectId/issues/:issueId/attachments",
     },
     {
       method: "POST",
       pattern: "/projects/:projectId/issues/:issueId/attachments",
+    },
+    {
+      method: "DELETE",
+      pattern: "/projects/:projectId/issues/:issueId/attachments/:attachmentId",
     },
     {
       method: "GET",

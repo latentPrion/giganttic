@@ -26,9 +26,14 @@ import {
 } from "../db/index.js";
 import { requireDbTestRuntimeConfig } from "./db-test-runtime-guard.js";
 import { createDbTestExecutionSandbox } from "./db-test-execution-db.js";
+import { createMultipartFileBuffer } from "./multipart-form.helpers.js";
 import { seedExecutionDatabase } from "./db-test-seeding.js";
 
 const dbTestRuntimeConfig = requireDbTestRuntimeConfig();
+const MULTIPART_BOUNDARY = "----scopedIssueAttachmentBoundary";
+const MINIMAL_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+const MINIMAL_PNG_BUFFER = Buffer.from(MINIMAL_PNG_BASE64, "base64");
 
 function parseJson<T>(payload: string): T {
   return JSON.parse(payload) as T;
@@ -439,6 +444,51 @@ describe("scoped access tokens", () => {
       url: `/stc-proj-mgmt/api/projects/${projectB}/issues/${issueB}/comments`,
     });
     expect(listB.statusCode).toBe(403);
+  });
+
+  it("enforces project scope for issue attachment delete routes", async () => {
+    const standardLogin = await loginAs("testadminuser");
+    const [projectA, projectB] = await pickTwoAccessibleProjects(standardLogin.accessToken);
+    const issueA = await createIssueForProject(standardLogin.accessToken, projectA, "attach-scope-a");
+    const issueB = await createIssueForProject(standardLogin.accessToken, projectB, "attach-scope-b");
+
+    const uploadPayload = createMultipartFileBuffer({
+      boundary: MULTIPART_BOUNDARY,
+      content: MINIMAL_PNG_BUFFER,
+      contentType: "image/png",
+      fieldName: "file",
+      filename: "scoped-delete.png",
+    });
+    const uploadResponse = await app.inject({
+      headers: {
+        authorization: `Bearer ${standardLogin.accessToken}`,
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload: uploadPayload,
+      url: `/stc-proj-mgmt/api/projects/${projectA}/issues/${issueA}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = parseJson<{ attachment: { id: string } }>(uploadResponse.payload);
+
+    const created = await createScopedTokenForUser(standardLogin.accessToken, {
+      projectIds: [projectA],
+    });
+    const scopedLogin = await redeemScopedToken(created.token);
+
+    const deleteA = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectA}/issues/${issueA}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteA.statusCode).toBe(200);
+
+    const deleteB = await app.inject({
+      headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
+      method: "DELETE",
+      url: `/stc-proj-mgmt/api/projects/${projectB}/issues/${issueB}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(deleteB.statusCode).toBe(403);
   });
 
   it("enforces project scope for chart routes", async () => {
