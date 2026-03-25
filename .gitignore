@@ -10,6 +10,7 @@ run/*.sqlite
 run/*.sqlite-shm
 run/*.sqlite-wal
 run/*.sqlite3
+run/*.bkp
 charts/[0-9]*.xml
 untrusted-content/
 /docs/3rdParty
