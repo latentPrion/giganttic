@@ -542,8 +542,9 @@ function ensureSeededTestData(
       && schemaName !== "v3"
       && schemaName !== "v4"
       && schemaName !== "v5"
+      && schemaName !== "v6"
     ) {
-      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5, received ${schemaName}.`);
+      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6, received ${schemaName}.`);
     }
 
     createV2StyleTestData(db, schemaName, profile, chartsDir);

@@ -4,8 +4,10 @@ import {
   clearGanttRuntimeChartCache,
   clearGanttRuntimeChartCacheEntry,
   getGanttRuntimeChartCacheEntry,
+  getGanttRuntimeChartValidationError,
   setGanttRuntimeChartCacheEntry,
   subscribeGanttRuntimeChartCache,
+  trySetValidatedGanttRuntimeChartCacheEntry,
 } from "./gantt-runtime-chart-cache.js";
 
 describe("gantt-runtime-chart-cache", () => {
@@ -45,5 +47,27 @@ describe("gantt-runtime-chart-cache", () => {
     expect(getGanttRuntimeChartCacheEntry(4)).toBeUndefined();
     expect(getGanttRuntimeChartCacheEntry(9)).toBeDefined();
   });
-});
 
+  it("rejects duplicate task ids and stores a validation error without overwriting cache", () => {
+    setGanttRuntimeChartCacheEntry(4, {
+      serializedXml: "<data><task id=\"stable\"/></data>",
+      type: "xml",
+    });
+
+    const result = trySetValidatedGanttRuntimeChartCacheEntry(4, {
+      serializedXml: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
+      type: "xml",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatchObject({
+      code: "duplicate_id",
+      taskId: "dup",
+    });
+    expect(getGanttRuntimeChartCacheEntry(4)?.serializedXml).toContain("stable");
+    expect(getGanttRuntimeChartValidationError(4)).toMatchObject({
+      code: "duplicate_id",
+      taskId: "dup",
+    });
+  });
+});

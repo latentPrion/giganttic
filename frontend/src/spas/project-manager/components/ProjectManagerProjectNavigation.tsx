@@ -13,6 +13,7 @@ import {
   createProjectGanttRoute,
   createProjectIssueRoute,
   createProjectKanbanRoute,
+  createProjectTaskRoute,
   createProjectIssuesRoute,
   createProjectTasksRoute,
   type ProjectRouteSection,
@@ -23,10 +24,16 @@ export interface ProjectIssueDetailTabContext {
   onCloseIssueTab: () => void;
 }
 
+export interface ProjectTaskDetailTabContext {
+  onCloseTaskTab: () => void;
+  taskId: string;
+}
+
 interface ProjectManagerProjectNavigationProps {
   actions?: React.ReactNode;
   currentSection: ProjectRouteSection;
   issueDetailContext?: ProjectIssueDetailTabContext | null;
+  taskDetailContext?: ProjectTaskDetailTabContext | null;
   projectId: number | null;
 }
 
@@ -41,11 +48,16 @@ const TASKS_LABEL = "Tasks";
 function buildRouteForSection(
   currentSection: ProjectRouteSection,
   projectId: number | null,
-  issueDetailIssueId?: number | null,
+  options: {
+    issueDetailIssueId?: number | null;
+    taskDetailTaskId?: string | null;
+  } = {},
 ): string {
   if (projectId === null) {
     return "";
   }
+
+  const { issueDetailIssueId, taskDetailTaskId } = options;
 
   switch (currentSection) {
     case "detail":
@@ -63,7 +75,59 @@ function buildRouteForSection(
         return createProjectIssuesRoute(projectId);
       }
       return createProjectIssueRoute(projectId, issueDetailIssueId);
+    case "task-detail":
+      if (taskDetailTaskId == null) {
+        return createProjectTasksRoute(projectId);
+      }
+      return createProjectTaskRoute(projectId, taskDetailTaskId);
   }
+}
+
+function renderClosableDetailTabLabel(options: {
+  entityText: string;
+  onClose: () => void;
+}): React.ReactNode {
+  const {
+    entityText,
+    onClose,
+  } = options;
+
+  return (
+    <Stack alignItems="center" direction="row" spacing={0.5} component="span">
+      <Typography component="span" variant="button" sx={{ lineHeight: 1.2 }}>
+        {entityText}
+      </Typography>
+      <Box
+        aria-label={`Close ${entityText.toLowerCase()} tab and return to list`}
+        component="span"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        onMouseDown={(event) => {
+          event.stopPropagation();
+          event.preventDefault();
+        }}
+        role="button"
+        sx={{
+          cursor: "pointer",
+          display: "inline-flex",
+          color: "text.secondary",
+          "&:hover": { color: "text.primary" },
+        }}
+        tabIndex={0}
+      >
+        <CloseIcon fontSize="small" />
+      </Box>
+    </Stack>
+  );
 }
 
 export function ProjectManagerProjectNavigation(
@@ -79,9 +143,11 @@ export function ProjectManagerProjectNavigation(
       return;
     }
 
-    const issueDetailId = props.issueDetailContext?.issueId ?? null;
     navigate(
-      buildRouteForSection(nextSection, props.projectId, issueDetailId),
+      buildRouteForSection(nextSection, props.projectId, {
+        issueDetailIssueId: props.issueDetailContext?.issueId ?? null,
+        taskDetailTaskId: props.taskDetailContext?.taskId ?? null,
+      }),
     );
   }
 
@@ -92,43 +158,23 @@ export function ProjectManagerProjectNavigation(
 
     const { issueId, onCloseIssueTab } = props.issueDetailContext;
 
-    return (
-      <Stack alignItems="center" direction="row" spacing={0.5} component="span">
-        <Typography component="span" variant="button" sx={{ lineHeight: 1.2 }}>
-          Issue #
-          {issueId}
-        </Typography>
-        <Box
-          aria-label="Close issue tab and return to issues list"
-          component="span"
-          onClick={(event) => {
-            event.stopPropagation();
-            onCloseIssueTab();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              event.stopPropagation();
-              onCloseIssueTab();
-            }
-          }}
-          onMouseDown={(event) => {
-            event.stopPropagation();
-            event.preventDefault();
-          }}
-          role="button"
-          sx={{
-            cursor: "pointer",
-            display: "inline-flex",
-            color: "text.secondary",
-            "&:hover": { color: "text.primary" },
-          }}
-          tabIndex={0}
-        >
-          <CloseIcon fontSize="small" />
-        </Box>
-      </Stack>
-    );
+    return renderClosableDetailTabLabel({
+      entityText: `Issue #${issueId}`,
+      onClose: onCloseIssueTab,
+    });
+  }
+
+  function renderTaskDetailTabLabel(): React.ReactNode {
+    if (!props.taskDetailContext || props.projectId === null) {
+      return null;
+    }
+
+    const { onCloseTaskTab, taskId } = props.taskDetailContext;
+
+    return renderClosableDetailTabLabel({
+      entityText: `Task ${taskId}`,
+      onClose: onCloseTaskTab,
+    });
   }
 
   return (
@@ -155,6 +201,9 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />
         {props.issueDetailContext && props.projectId !== null ? (
           <Tab label={renderIssueDetailTabLabel()} value="issue-detail" />
+        ) : null}
+        {props.taskDetailContext && props.projectId !== null ? (
+          <Tab label={renderTaskDetailTabLabel()} value="task-detail" />
         ) : null}
       </Tabs>
       {props.actions ? (

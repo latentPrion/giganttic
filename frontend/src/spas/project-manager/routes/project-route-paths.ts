@@ -1,4 +1,7 @@
-import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
+import type {
+  IssueDetailTab,
+  TaskDetailTab,
+} from "../contracts/route-query.contracts.js";
 
 export const PROJECT_ROUTE_SECTION_VALUES = [
   "detail",
@@ -7,6 +10,7 @@ export const PROJECT_ROUTE_SECTION_VALUES = [
   "issues",
   "tasks",
   "issue-detail",
+  "task-detail",
 ] as const;
 
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
@@ -62,4 +66,25 @@ export function createProjectIssueRoute(
   }
 
   return `/pm/project/issue?${parameters.toString()}`;
+}
+
+export function createProjectTaskRoute(
+  projectId: number,
+  taskId: string,
+  options: { commentId?: number | null; tab?: TaskDetailTab } = {},
+): string {
+  const parameters = new URLSearchParams();
+  parameters.set("projectId", String(projectId));
+  parameters.set("id", taskId);
+
+  const tab = options.tab ?? "details";
+  if (tab !== "details") {
+    parameters.set("tab", tab);
+  }
+
+  if (options.commentId != null) {
+    parameters.set("commentId", String(options.commentId));
+  }
+
+  return `/pm/project/task?${parameters.toString()}`;
 }

@@ -101,7 +101,7 @@ export class ProjectsController {
     const { xml } = updateProjectChartRequestSchema.parse(body);
 
     return updateProjectChartResponseSchema.parse(
-      this.projectsService.updateProjectChart(
+      await this.projectsService.updateProjectChart(
         request.authContext!,
         projectId,
         xml,

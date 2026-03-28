@@ -5,8 +5,6 @@ import {
   Button,
   CircularProgress,
   Stack,
-  Tab,
-  Tabs,
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +20,7 @@ import { IssueCommentsPanel } from "../components/issues/IssueCommentsPanel.js";
 import { IssueDetailsCard } from "../components/issues/IssueDetailsCard.js";
 import { IssueEditModal } from "../components/issues/IssueEditModal.js";
 import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
+import { DiscussionWorkspaceTabs } from "../components/discussion/DiscussionWorkspaceTabs.js";
 import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
 import type {
   Issue,
@@ -300,16 +299,11 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
           </Button>
         </Stack>
         {props.projectId !== null && props.issueId !== null ? (
-          <Tabs
-            aria-label={ISSUE_DETAIL_WORKSPACE_TABLIST_LABEL}
+          <DiscussionWorkspaceTabs
+            ariaLabel={ISSUE_DETAIL_WORKSPACE_TABLIST_LABEL}
             onChange={handleIssueTabChange}
             value={props.issueTab}
-            variant="fullWidth"
-          >
-            <Tab label="Details" value="details" />
-            <Tab label="Comments" value="comments" />
-            <Tab label="Attachments" value="attachments" />
-          </Tabs>
+          />
         ) : null}
         {errorMessage && issue ? <Alert severity="error">{errorMessage}</Alert> : null}
         {props.issueTab === "details" ? renderDetailsTab() : null}

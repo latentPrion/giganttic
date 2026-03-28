@@ -1,3 +1,9 @@
+import type { ProjectChartTaskIdValidationIssue } from "../../../../../common/project-chart/project-chart-task-id-validation.js";
+import {
+  ProjectChartTaskIdValidationError,
+  validateProjectChartTaskIdsInFrontend,
+} from "./project-chart-task-id-validation.js";
+
 export interface GanttRuntimeChartCacheEntry {
   /**
    * Serialized XML representing the current frontend runtime state of the Gantt editor.
@@ -11,7 +17,16 @@ export interface GanttRuntimeChartCacheEntry {
   type: "xml";
 }
 
+export interface GanttRuntimeChartValidationResult {
+  error: ProjectChartTaskIdValidationIssue | null;
+  ok: boolean;
+}
+
 const runtimeChartCacheByProjectId = new Map<number, GanttRuntimeChartCacheEntry>();
+const runtimeChartValidationErrorByProjectId = new Map<
+  number,
+  ProjectChartTaskIdValidationIssue
+>();
 const listenersByProjectId = new Map<number, Set<() => void>>();
 
 function getOrCreateListeners(projectId: number): Set<() => void> {
@@ -30,6 +45,54 @@ export function setGanttRuntimeChartCacheEntry(
   entry: GanttRuntimeChartCacheEntry,
 ): void {
   runtimeChartCacheByProjectId.set(projectId, entry);
+  runtimeChartValidationErrorByProjectId.delete(projectId);
+  getOrCreateListeners(projectId).forEach((listener) => {
+    listener();
+  });
+}
+
+export function trySetValidatedGanttRuntimeChartCacheEntry(
+  projectId: number,
+  entry: GanttRuntimeChartCacheEntry,
+): GanttRuntimeChartValidationResult {
+  try {
+    validateProjectChartTaskIdsInFrontend(entry.serializedXml);
+    setGanttRuntimeChartCacheEntry(projectId, entry);
+    return {
+      error: null,
+      ok: true,
+    };
+  } catch (error) {
+    const issue = error instanceof ProjectChartTaskIdValidationError
+      ? error.issue
+      : createInvalidValidationIssue();
+    runtimeChartValidationErrorByProjectId.set(projectId, issue);
+    getOrCreateListeners(projectId).forEach((listener) => {
+      listener();
+    });
+    return {
+      error: issue,
+      ok: false,
+    };
+  }
+}
+
+function createInvalidValidationIssue(): ProjectChartTaskIdValidationIssue {
+  return {
+    code: "invalid_xml",
+    message: "Project chart XML could not be parsed.",
+    taskId: null,
+  };
+}
+
+export function getGanttRuntimeChartValidationError(
+  projectId: number,
+): ProjectChartTaskIdValidationIssue | null {
+  return runtimeChartValidationErrorByProjectId.get(projectId) ?? null;
+}
+
+export function clearGanttRuntimeChartValidationError(projectId: number): void {
+  runtimeChartValidationErrorByProjectId.delete(projectId);
   getOrCreateListeners(projectId).forEach((listener) => {
     listener();
   });
@@ -58,6 +121,7 @@ export function subscribeGanttRuntimeChartCache(
 
 export function clearGanttRuntimeChartCacheEntry(projectId: number): void {
   runtimeChartCacheByProjectId.delete(projectId);
+  runtimeChartValidationErrorByProjectId.delete(projectId);
   const listeners = listenersByProjectId.get(projectId);
   listeners?.forEach((listener) => {
     listener();
@@ -69,6 +133,6 @@ export function clearGanttRuntimeChartCache(): void {
     clearGanttRuntimeChartCacheEntry(projectId);
   }
   runtimeChartCacheByProjectId.clear();
+  runtimeChartValidationErrorByProjectId.clear();
   listenersByProjectId.clear();
 }
-

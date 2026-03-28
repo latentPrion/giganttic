@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   inferMilestoneStatusesFromXml,
+  parseProjectTaskDetailFromXml,
   parseProjectTasksHistoryFromXml,
 } from "./project-tasks-history-parser.js";
 
@@ -323,5 +324,23 @@ describe("project tasks history parser", () => {
     expect(() => parseProjectTasksHistoryFromXml("<data><task")).toThrow(
       /could not be parsed/i,
     );
+  });
+
+  it("parses task detail metadata including description and missing start date", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <task id="task-9" type="task" ggtc_task_status="ISSUE_STATUS_BLOCKED" ggtc_task_description="Blocked because vendor API is down"><![CDATA[Vendor sync]]></task>
+</data>`;
+
+    const task = parseProjectTaskDetailFromXml(xml, "task-9");
+
+    expect(task).toMatchObject({
+      description: "Blocked because vendor API is down",
+      id: "task-9",
+      startDate: null,
+      status: "ISSUE_STATUS_BLOCKED",
+      title: "Vendor sync",
+      type: "task",
+    });
   });
 });

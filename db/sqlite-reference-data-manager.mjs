@@ -78,7 +78,11 @@ function ensureV2StyleReferenceData(db, schemaName) {
     runReferenceUpsert(db, "ClosedReasons", createCodeReferenceUpsertSql("ClosedReasons", closedReason));
   }
 
-  if (schemaName === "v4" || schemaName === "v5") {
+  if (
+    schemaName === "v4"
+    || schemaName === "v5"
+    || schemaName === "v6"
+  ) {
     for (const scopedAccessObjectType of referenceSeedData.scopedAccessObjectTypes) {
       runReferenceUpsert(
         db,
@@ -100,6 +104,7 @@ function ensureReferenceData(db, schemaName) {
       || schemaName === "v3"
       || schemaName === "v4"
       || schemaName === "v5"
+      || schemaName === "v6"
     ) {
       ensureV2StyleReferenceData(db, schemaName);
     } else {

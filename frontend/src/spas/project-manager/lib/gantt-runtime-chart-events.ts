@@ -1,4 +1,4 @@
-import { setGanttRuntimeChartCacheEntry } from "./gantt-runtime-chart-cache.js";
+import { trySetValidatedGanttRuntimeChartCacheEntry } from "./gantt-runtime-chart-cache.js";
 
 export const GANTT_RUNTIME_CHART_UPDATED_EVENT = "gantt-runtime-chart-updated";
 export const GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT = "gantt-runtime-metadata-reload-requested";
@@ -18,18 +18,26 @@ export interface GanttRuntimeMetadataReloadRequestedEventDetail {
 
 export function emitGanttRuntimeChartUpdatedEvent(
   detail: GanttRuntimeChartUpdatedEventDetail,
-): void {
+): boolean {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
-  setGanttRuntimeChartCacheEntry(detail.projectId, { serializedXml: detail.serializedXml, type: "xml" });
+  const result = trySetValidatedGanttRuntimeChartCacheEntry(detail.projectId, {
+    serializedXml: detail.serializedXml,
+    type: "xml",
+  });
+  if (!result.ok) {
+    return false;
+  }
 
   window.dispatchEvent(
     new CustomEvent<GanttRuntimeChartUpdatedEventDetail>(GANTT_RUNTIME_CHART_UPDATED_EVENT, {
       detail,
     }),
   );
+
+  return true;
 }
 
 export function subscribeGanttRuntimeChartUpdatedEvent(
@@ -84,4 +92,3 @@ export function subscribeGanttRuntimeMetadataReloadRequestedEvent(
   window.addEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, listener);
   return () => window.removeEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, listener);
 }
-

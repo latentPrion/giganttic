@@ -399,6 +399,11 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v4--v5",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v5--v6",
+      projectRoot: tempDir,
+    });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
@@ -441,6 +446,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "proddev",
       migrationPairName: "v4--v5",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v5--v6",
       projectRoot: tempDir,
     });
 
@@ -779,7 +789,7 @@ describe("db lifecycle scripts", () => {
     expect(await countManagedTestDataRecords(dbPath)).toBe(0);
   }, 20_000);
 
-  it("prepareDatabase on v5 re-seeds a missing project owner reference row", async () => {
+  it("prepareDatabase on the active schema re-seeds a missing project owner reference row", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -813,7 +823,7 @@ describe("db lifecycle scripts", () => {
     ).toBe(1);
   }, 20_000);
 
-  it("migrates v2 through v5 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+  it("migrates v2 through v6 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -849,12 +859,17 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v4--v5",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v5--v6",
+      projectRoot: tempDir,
+    });
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe("v5");
+    expect(await readSchemaName(dbPath)).toBe("v6");
     expect(
       await countRowsWhere(
         dbPath,

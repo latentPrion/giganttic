@@ -13,6 +13,16 @@ import { emitGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-ev
 import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
 import { clearSubtabMemory } from "../lib/subtab-memory.js";
 
+const navigateMock = vi.fn();
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 const DEFAULT_TOKEN = "pm-token";
 const TASKS_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
@@ -39,6 +49,7 @@ const ganttApiMock = vi.mocked(ganttApi);
 
 describe("ProjectManagerTasksPage", () => {
   beforeEach(() => {
+    navigateMock.mockReset();
     clearGanttRuntimeChartCache();
     clearSubtabMemory();
     ganttApiMock.getProjectChartOrNull.mockReset();
@@ -270,5 +281,28 @@ describe("ProjectManagerTasksPage", () => {
     await waitFor(() => {
       expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
     });
+  });
+
+  it("navigates to the task detail route when a task row is clicked", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    await user.click(await screen.findByRole("button", { name: /In Progress Task/i }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=inprog");
+  });
+
+  it("shows runtime validation errors when the loaded chart contains duplicate task ids", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValueOnce({
+      content: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
+      type: "xml",
+    });
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(
+      await screen.findByText("Task id \"dup\" is duplicated in the chart."),
+    ).toBeVisible();
   });
 });

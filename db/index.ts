@@ -10,6 +10,7 @@ import * as v2 from "./v2/index.js";
 import * as v3 from "./v3/index.js";
 import * as v4 from "./v4/index.js";
 import * as v5 from "./v5/index.js";
+import * as v6 from "./v6/index.js";
 
 const schemaModules = {
   v1,
@@ -17,6 +18,7 @@ const schemaModules = {
   v3,
   v4,
   v5,
+  v6,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -27,7 +29,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v5;
+] as typeof v6;
 
 export {
   availableSchemaVersions,
@@ -77,6 +79,22 @@ export const {
   issuesAttachmentsInsertSchema,
   issuesAttachmentsRelations,
   issuesAttachmentsSelectSchema,
+  taskAttachments,
+  taskAttachmentsInsertSchema,
+  taskAttachmentsRelations,
+  taskAttachmentsSelectSchema,
+  taskComments,
+  taskCommentsAttachments,
+  taskCommentsAttachmentsInsertSchema,
+  taskCommentsAttachmentsRelations,
+  taskCommentsAttachmentsSelectSchema,
+  taskCommentsInsertSchema,
+  taskCommentsRelations,
+  taskCommentsSelectSchema,
+  taskMirror,
+  taskMirrorInsertSchema,
+  taskMirrorRelations,
+  taskMirrorSelectSchema,
   managedTestDataRecords,
   managedTestDataRecordsInsertSchema,
   managedTestDataRecordsSelectSchema,
@@ -263,6 +281,16 @@ export type IssueCommentAttachment =
   typeof issueCommentsAttachments.$inferSelect;
 export type NewIssueCommentAttachment =
   typeof issueCommentsAttachments.$inferInsert;
+export type TaskMirror = typeof taskMirror.$inferSelect;
+export type NewTaskMirror = typeof taskMirror.$inferInsert;
+export type TaskAttachment = typeof taskAttachments.$inferSelect;
+export type NewTaskAttachment = typeof taskAttachments.$inferInsert;
+export type TaskComment = typeof taskComments.$inferSelect;
+export type NewTaskComment = typeof taskComments.$inferInsert;
+export type TaskCommentAttachment =
+  typeof taskCommentsAttachments.$inferSelect;
+export type NewTaskCommentAttachment =
+  typeof taskCommentsAttachments.$inferInsert;
 export type ManagedTestDataRecordInsertInput = z.infer<
   typeof managedTestDataRecordsInsertSchema
 >;
@@ -372,4 +400,16 @@ export type IssueCommentAttachmentInsertInput = z.infer<
 >;
 export type IssueCommentAttachmentRecord = z.infer<
   typeof issueCommentsAttachmentsSelectSchema
+>;
+export type TaskMirrorInsertInput = z.infer<typeof taskMirrorInsertSchema>;
+export type TaskMirrorRecord = z.infer<typeof taskMirrorSelectSchema>;
+export type TaskAttachmentInsertInput = z.infer<typeof taskAttachmentsInsertSchema>;
+export type TaskAttachmentRecord = z.infer<typeof taskAttachmentsSelectSchema>;
+export type TaskCommentInsertInput = z.infer<typeof taskCommentsInsertSchema>;
+export type TaskCommentRecord = z.infer<typeof taskCommentsSelectSchema>;
+export type TaskCommentAttachmentInsertInput = z.infer<
+  typeof taskCommentsAttachmentsInsertSchema
+>;
+export type TaskCommentAttachmentRecord = z.infer<
+  typeof taskCommentsAttachmentsSelectSchema
 >;

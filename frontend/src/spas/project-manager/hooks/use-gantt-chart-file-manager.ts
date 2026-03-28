@@ -5,9 +5,11 @@ import { ganttApi } from "../api/gantt-api.js";
 import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
 import {
   clearGanttRuntimeChartCacheEntry,
+  clearGanttRuntimeChartValidationError,
   getGanttRuntimeChartCacheEntry,
-  setGanttRuntimeChartCacheEntry,
+  getGanttRuntimeChartValidationError,
   subscribeGanttRuntimeChartCache,
+  trySetValidatedGanttRuntimeChartCacheEntry,
   type GanttRuntimeChartCacheEntry,
 } from "../lib/gantt-runtime-chart-cache.js";
 import { subscribeGanttRuntimeMetadataReloadRequestedEvent } from "../lib/gantt-runtime-chart-events.js";
@@ -30,6 +32,7 @@ export interface UseGanttChartFileManagerResult {
     isInitialized: boolean;
   };
   clearPersistError: () => void;
+  clearRuntimeValidationError: () => void;
   hasServerChart: boolean;
   isDirty: boolean;
   isLoading: boolean;
@@ -38,6 +41,7 @@ export interface UseGanttChartFileManagerResult {
   persistChart: () => Promise<PersistChartResult>;
   persistErrorMessage: string | null;
   reloadChart: () => Promise<void>;
+  runtimeValidationErrorMessage: string | null;
   setDirtyFromEditor: () => void;
   setInitialBaseline: (serializedXml: string) => void;
 }
@@ -93,6 +97,8 @@ export function useGanttChartFileManager(options: {
   const [chartSource, setChartSource] = useState<GanttChartSource | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [persistErrorMessage, setPersistErrorMessage] = useState<string | null>(null);
+  const [runtimeValidationErrorMessage, setRuntimeValidationErrorMessage] =
+    useState<string | null>(null);
   const [hasServerChart, setHasServerChart] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(projectId !== null);
@@ -110,12 +116,19 @@ export function useGanttChartFileManager(options: {
   useEffect(() => {
     if (projectId === null) {
       setRuntimeCache(null);
+      setRuntimeValidationErrorMessage(null);
       return undefined;
     }
 
     setRuntimeCache(getGanttRuntimeChartCacheEntry(projectId) ?? null);
+    setRuntimeValidationErrorMessage(
+      getGanttRuntimeChartValidationError(projectId)?.message ?? null,
+    );
     return subscribeGanttRuntimeChartCache(projectId, () => {
       setRuntimeCache(getGanttRuntimeChartCacheEntry(projectId) ?? null);
+      setRuntimeValidationErrorMessage(
+        getGanttRuntimeChartValidationError(projectId)?.message ?? null,
+      );
     });
   }, [projectId]);
 
@@ -152,6 +165,7 @@ export function useGanttChartFileManager(options: {
       setChartSource(null);
       setLoadErrorMessage(null);
       setPersistErrorMessage(null);
+      setRuntimeValidationErrorMessage(null);
       setHasServerChart(false);
       lastSavedXmlRef.current = null;
       setIsDirty(false);
@@ -176,6 +190,7 @@ export function useGanttChartFileManager(options: {
       setHasServerChart(true);
       setLoadErrorMessage(null);
       setPersistErrorMessage(null);
+      setRuntimeValidationErrorMessage(null);
       setIsDirty(false);
       setIsLoading(false);
       return;
@@ -184,6 +199,7 @@ export function useGanttChartFileManager(options: {
     setChartSource(null);
     setLoadErrorMessage(null);
     setPersistErrorMessage(null);
+    setRuntimeValidationErrorMessage(null);
     setIsLoading(true);
     lastSavedXmlRef.current = null;
     setIsDirty(false);
@@ -212,7 +228,7 @@ export function useGanttChartFileManager(options: {
           content: normalizationResult.xml,
           type: loaded.type,
         });
-        setGanttRuntimeChartCacheEntry(projectId, {
+        trySetValidatedGanttRuntimeChartCacheEntry(projectId, {
           serializedXml: normalizationResult.xml,
           type: "xml",
         });
@@ -241,6 +257,7 @@ export function useGanttChartFileManager(options: {
     setChartSource(null);
     setLoadErrorMessage(null);
     setPersistErrorMessage(null);
+    setRuntimeValidationErrorMessage(null);
     setHasServerChart(false);
     setIsLoading(true);
 
@@ -255,7 +272,10 @@ export function useGanttChartFileManager(options: {
     lastSavedXmlRef.current = serializedXml;
     setIsDirty(false);
     if (projectId !== null) {
-      setGanttRuntimeChartCacheEntry(projectId, { serializedXml, type: "xml" });
+      trySetValidatedGanttRuntimeChartCacheEntry(projectId, {
+        serializedXml,
+        type: "xml",
+      });
     }
   }, [projectId]);
 
@@ -304,7 +324,10 @@ export function useGanttChartFileManager(options: {
     try {
       await ganttApi.putProjectChart(token, projectId, xml);
       lastSavedXmlRef.current = xml;
-      setGanttRuntimeChartCacheEntry(projectId, { serializedXml: xml, type: "xml" });
+      trySetValidatedGanttRuntimeChartCacheEntry(projectId, {
+        serializedXml: xml,
+        type: "xml",
+      });
       setIsDirty(false);
       setHasServerChart(true);
       setChartSource({
@@ -330,6 +353,15 @@ export function useGanttChartFileManager(options: {
     setPersistErrorMessage(null);
   }, []);
 
+  const clearRuntimeValidationError = useCallback(() => {
+    if (projectId === null) {
+      setRuntimeValidationErrorMessage(null);
+      return;
+    }
+
+    clearGanttRuntimeChartValidationError(projectId);
+  }, [projectId]);
+
   return {
     chartSource,
     cache: {
@@ -337,6 +369,7 @@ export function useGanttChartFileManager(options: {
       isInitialized: runtimeCache !== null,
     },
     clearPersistError,
+    clearRuntimeValidationError,
     hasServerChart,
     isDirty,
     isLoading,
@@ -345,6 +378,7 @@ export function useGanttChartFileManager(options: {
     persistChart,
     persistErrorMessage,
     reloadChart: invalidateAndReloadChart,
+    runtimeValidationErrorMessage,
     setDirtyFromEditor,
     setInitialBaseline,
   };

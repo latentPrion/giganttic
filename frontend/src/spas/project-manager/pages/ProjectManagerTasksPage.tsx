@@ -8,6 +8,7 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
@@ -22,6 +23,7 @@ import {
 } from "../lib/project-tasks-history-parser.js";
 import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
+import { createProjectTaskRoute } from "../routes/project-route-paths.js";
 
 interface ProjectManagerTasksPageProps {
   projectId: number | null;
@@ -61,6 +63,7 @@ function filterTasksByStatus(
 }
 
 export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
+  const navigate = useNavigate();
   const ganttRef = useRef<GanttChartHandle | null>(null);
   const fileManager = useGanttChartFileManager({
     ganttRef,
@@ -113,6 +116,12 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
       return;
     }
 
+    if (fileManager.runtimeValidationErrorMessage) {
+      setErrorMessage(fileManager.runtimeValidationErrorMessage);
+      setTasks([]);
+      return;
+    }
+
     if (fileManager.cache.serializedXml === null) {
       setErrorMessage(null);
       setTasks([]);
@@ -129,6 +138,7 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
   }, [
     fileManager.cache.serializedXml,
     fileManager.loadErrorMessage,
+    fileManager.runtimeValidationErrorMessage,
     props.projectId,
   ]);
 
@@ -159,6 +169,11 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
         {visibleTasks.map((task) => (
           <TaskListItem
             key={task.id}
+            onNavigate={() => {
+              if (props.projectId !== null) {
+                navigate(createProjectTaskRoute(props.projectId, task.id));
+              }
+            }}
             task={task}
             viewMode={VIEW_MODE}
           />

@@ -24,16 +24,33 @@ describe("gantt-runtime-chart-events", () => {
     const handler = vi.fn();
     const unsubscribe = subscribeGanttRuntimeChartUpdatedEvent(handler);
 
-    emitGanttRuntimeChartUpdatedEvent({
+    const didEmit = emitGanttRuntimeChartUpdatedEvent({
       projectId: 42,
       serializedXml: "<data><task id=\"42\"/></data>",
     });
 
+    expect(didEmit).toBe(true);
     expect(handler).toHaveBeenCalledWith({
       projectId: 42,
       serializedXml: "<data><task id=\"42\"/></data>",
     });
     expect(getGanttRuntimeChartCacheEntry(42)?.serializedXml).toContain("task id=\"42\"");
+
+    unsubscribe();
+  });
+
+  it("rejects duplicate task ids and does not dispatch update subscribers", () => {
+    const handler = vi.fn();
+    const unsubscribe = subscribeGanttRuntimeChartUpdatedEvent(handler);
+
+    const didEmit = emitGanttRuntimeChartUpdatedEvent({
+      projectId: 42,
+      serializedXml: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
+    });
+
+    expect(didEmit).toBe(false);
+    expect(handler).not.toHaveBeenCalled();
+    expect(getGanttRuntimeChartCacheEntry(42)).toBeUndefined();
 
     unsubscribe();
   });
@@ -48,4 +65,3 @@ describe("gantt-runtime-chart-events", () => {
     unsubscribe();
   });
 });
-

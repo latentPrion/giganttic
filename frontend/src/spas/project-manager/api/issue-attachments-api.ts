@@ -1,14 +1,11 @@
 import {
-  postMultipartAndParseJson,
-  requestJson,
-} from "../../../common/api/http-client.js";
-import {
   listIssueAttachmentsResponseSchema,
   deleteIssueAttachmentResponseSchema,
   uploadIssueAttachmentResponseSchema,
   type ListIssueAttachmentsResponse,
   type DeleteIssueAttachmentResponse,
 } from "../contracts/issue-comments.contracts.js";
+import { createDiscussionAttachmentsApi } from "./discussion-api-factory.js";
 import { createIssueAttachmentDownloadPath } from "./issue-attachment-paths.js";
 
 function issueAttachmentsCollectionPath(projectId: number, issueId: number): string {
@@ -23,49 +20,21 @@ function issueAttachmentItemPath(
   return `${issueAttachmentsCollectionPath(projectId, issueId)}/${attachmentId}`;
 }
 
-export const issueAttachmentsApi = {
-  async listAttachments(
-    token: string,
-    projectId: number,
-    issueId: number,
-  ): Promise<ListIssueAttachmentsResponse> {
-    return await requestJson({
-      method: "GET",
-      path: issueAttachmentsCollectionPath(projectId, issueId),
-      responseSchema: listIssueAttachmentsResponseSchema,
-      token,
-    });
+export const issueAttachmentsApi = createDiscussionAttachmentsApi<
+  number,
+  DeleteIssueAttachmentResponse,
+  ListIssueAttachmentsResponse,
+  { attachment: unknown }
+>({
+  paths: {
+    attachmentItemPath: issueAttachmentItemPath,
+    attachmentsCollectionPath: issueAttachmentsCollectionPath,
   },
-
-  async uploadAttachment(
-    token: string,
-    projectId: number,
-    issueId: number,
-    file: File,
-  ) {
-    const formData = new FormData();
-    formData.append("file", file);
-    return await postMultipartAndParseJson({
-      formData,
-      path: issueAttachmentsCollectionPath(projectId, issueId),
-      responseSchema: uploadIssueAttachmentResponseSchema,
-      token,
-    });
+  schemas: {
+    deleteAttachmentResponse: deleteIssueAttachmentResponseSchema,
+    listAttachmentsResponse: listIssueAttachmentsResponseSchema,
+    uploadAttachmentResponse: uploadIssueAttachmentResponseSchema,
   },
-
-  async deleteAttachment(
-    token: string,
-    projectId: number,
-    issueId: number,
-    attachmentId: string,
-  ): Promise<DeleteIssueAttachmentResponse> {
-    return await requestJson({
-      method: "DELETE",
-      path: issueAttachmentItemPath(projectId, issueId, attachmentId),
-      responseSchema: deleteIssueAttachmentResponseSchema,
-      token,
-    });
-  },
-};
+});
 
 export { createIssueAttachmentDownloadPath };

@@ -62,4 +62,22 @@ describe("ProjectManagerProjectNavigation", () => {
     expect(screen.getByRole("tab", { name: "Details" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Download XML" })).toBeVisible();
   });
+
+  it("renders and closes the task detail tab back to the tasks list", async () => {
+    const user = userEvent.setup();
+    const onCloseTaskTab = vi.fn();
+
+    renderWithTheme(
+      <ProjectManagerProjectNavigation
+        currentSection="task-detail"
+        projectId={42}
+        taskDetailContext={{ onCloseTaskTab, taskId: "task-7" }}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: /Task task-7/i })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Close task task-7 tab/i }));
+
+    expect(onCloseTaskTab).toHaveBeenCalledTimes(1);
+  });
 });

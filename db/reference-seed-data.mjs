@@ -342,7 +342,12 @@ const REFERENCE_SEED_DATA_BY_SCHEMA = {
 };
 
 function getReferenceSeedData(schemaName) {
-  const resolvedSchemaName = schemaName === "v5" ? "v4" : schemaName;
+  const resolvedSchemaName = (
+    schemaName === "v5"
+    || schemaName === "v6"
+  )
+    ? "v4"
+    : schemaName;
   const referenceSeedData = REFERENCE_SEED_DATA_BY_SCHEMA[resolvedSchemaName];
 
   if (!referenceSeedData) {

@@ -54,6 +54,10 @@ import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { ProjectChartsService } from "../project-charts/project-charts.service.js";
 import {
+  collectProjectChartTaskIdsBestEffort,
+  validateProjectChartTaskIdsOrThrow,
+} from "../project-charts/project-chart-task-id-validation.js";
+import {
   assertProjectAccessibleWithScopedPolicy,
   intersectProjectIds,
   isScopedAccessSession,
@@ -61,6 +65,7 @@ import {
   listScopedTokenProjectIds,
   listScopedTokenTeamIds,
 } from "../scoped-access/scoped-access.policy.js";
+import { TaskMirrorService } from "../tasks/task-mirror.service.js";
 import type {
   CreateProjectRequest,
   DeleteProjectResponse,
@@ -99,6 +104,18 @@ const PROJECT_TEAM_ALREADY_ASSOCIATED_MESSAGE =
   "That team is already associated with the project";
 const PROJECT_ORGANIZATION_ALREADY_ASSOCIATED_MESSAGE =
   "That organization is already associated with the project";
+
+function listRemovedTaskIds(
+  previousTaskIds: readonly string[],
+  nextTaskIds: readonly string[],
+): string[] {
+  if (previousTaskIds.length === 0) {
+    return [];
+  }
+
+  const nextTaskIdSet = new Set(nextTaskIds);
+  return previousTaskIds.filter((taskId) => !nextTaskIdSet.has(taskId));
+}
 
 function normalizeDescription(
   description: string | null | undefined,
@@ -200,6 +217,8 @@ export class ProjectsService {
     private readonly databaseService: DatabaseService,
     @Inject(ProjectChartsService)
     private readonly projectChartsService: ProjectChartsService,
+    @Inject(TaskMirrorService)
+    private readonly taskMirrorService: TaskMirrorService,
   ) {}
 
   async createProject(
@@ -248,15 +267,26 @@ export class ProjectsService {
     return chartXml;
   }
 
-  updateProjectChart(
+  async updateProjectChart(
     authContext: AuthContext,
     projectId: number,
     xml: string,
-  ): UpdateProjectChartResponse {
+  ): Promise<UpdateProjectChartResponse> {
     this.assertProjectExists(projectId);
     this.assertCanEditProject(authContext, projectId);
 
+    const existingXml = this.projectChartsService.readProjectChart(projectId);
+    const previousTaskIds = existingXml === null
+      ? []
+      : collectProjectChartTaskIdsBestEffort(existingXml);
+    const nextTaskIds = validateProjectChartTaskIdsOrThrow(xml);
+    const removedTaskIds = listRemovedTaskIds(previousTaskIds, nextTaskIds);
+
     this.projectChartsService.writeProjectChart(projectId, xml);
+    await this.taskMirrorService.deleteRemovedTaskMirrorData(
+      projectId,
+      removedTaskIds,
+    );
 
     return { ok: true };
   }

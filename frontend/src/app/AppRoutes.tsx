@@ -16,6 +16,7 @@ import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
 import { KanbanRoute } from "../spas/project-manager/routes/KanbanRoute.js";
 import { OrganizationRoute } from "../spas/project-manager/routes/OrganizationRoute.js";
 import { ProjectRoute } from "../spas/project-manager/routes/ProjectRoute.js";
+import { TaskRoute } from "../spas/project-manager/routes/TaskRoute.js";
 import { TasksRoute } from "../spas/project-manager/routes/TasksRoute.js";
 import { TeamRoute } from "../spas/project-manager/routes/TeamRoute.js";
 import { PublicHomeLayout } from "../spas/public-home/layouts/PublicHomeLayout.js";
@@ -51,6 +52,7 @@ export function AppRoutes() {
       <Route element={<IssuesRoute />} path="/pm/project/issues" />
       <Route element={<TasksRoute />} path="/pm/project/tasks" />
       <Route element={<IssueRoute />} path="/pm/project/issue" />
+      <Route element={<TaskRoute />} path="/pm/project/task" />
     </Routes>
   );
 }

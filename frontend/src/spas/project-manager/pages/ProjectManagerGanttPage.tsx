@@ -388,6 +388,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   const {
     chartSource,
     clearPersistError,
+    clearRuntimeValidationError,
     hasServerChart,
     isDirty,
     isLoading,
@@ -396,6 +397,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
     persistChart,
     persistErrorMessage,
     reloadChart,
+    runtimeValidationErrorMessage,
     setDirtyFromEditor,
     setInitialBaseline,
   } = fileManager;
@@ -570,6 +572,11 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
         {!isLoading && !loadErrorMessage && persistErrorMessage && (
           <Alert onClose={() => clearPersistError()} severity="error">
             {persistErrorMessage}
+          </Alert>
+        )}
+        {!isLoading && !loadErrorMessage && runtimeValidationErrorMessage && (
+          <Alert onClose={() => clearRuntimeValidationError()} severity="error">
+            {runtimeValidationErrorMessage}
           </Alert>
         )}
         {!isLoading && !loadErrorMessage && props.projectId !== null && chartSource === null && (

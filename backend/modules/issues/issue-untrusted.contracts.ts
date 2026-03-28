@@ -1,91 +1,66 @@
 import { z } from "zod";
 
-export const COMMENT_BODY_MIN_LENGTH = 16;
+import {
+  COMMENT_BODY_MIN_LENGTH,
+  createDiscussionAttachmentRouteParamsSchema,
+  createDiscussionCollectionRouteParamsSchema,
+  createDiscussionCommentAttachmentRouteParamsSchema,
+  createDiscussionCommentRequestSchema,
+  createDiscussionCommentResponseSchema,
+  createDiscussionCommentRouteParamsSchema,
+  createGetDiscussionCommentResponseSchema,
+  createListDiscussionCommentsResponseSchema,
+  deleteDiscussionAttachmentResponseSchema,
+  deleteDiscussionCommentResponseSchema,
+  discussionAttachmentSummarySchema,
+  discussionPositiveIntegerSchema,
+  listDiscussionAttachmentsResponseSchema,
+  updateDiscussionCommentRequestSchema,
+  uploadDiscussionAttachmentResponseSchema,
+} from "../../../common/discussion/discussion.contracts.js";
 
-const issueIdSchema = z.coerce.number().int().positive();
+const issueIdSchema = discussionPositiveIntegerSchema;
 
-export const issueCommentsRouteParamsSchema = z.object({
-  issueId: issueIdSchema,
-  projectId: issueIdSchema,
-});
+export { COMMENT_BODY_MIN_LENGTH };
 
-export const issueCommentRouteParamsSchema = z.object({
-  commentId: issueIdSchema,
-  issueId: issueIdSchema,
-  projectId: issueIdSchema,
-});
+export const issueCommentsRouteParamsSchema =
+  createDiscussionCollectionRouteParamsSchema("issueId", issueIdSchema);
 
-export const attachmentSummarySchema = z.object({
-  byteLength: z.number().int().nonnegative(),
-  id: z.string(),
-  originalFilename: z.string(),
-});
+export const issueCommentRouteParamsSchema =
+  createDiscussionCommentRouteParamsSchema("issueId", issueIdSchema);
 
-export const issueCommentResponseSchema = z.object({
-  attachments: z.array(attachmentSummarySchema),
-  body: z.string(),
-  createdAt: z.string(),
-  createdByUserId: z.number().int(),
-  id: z.number().int(),
-  issueId: z.number().int(),
-  parentCommentId: z.number().int().nullable(),
-  thumbsDownCount: z.number().int(),
-  thumbsUpCount: z.number().int(),
-  updatedAt: z.string(),
-});
+export const attachmentSummarySchema = discussionAttachmentSummarySchema;
 
-export const listIssueCommentsResponseSchema = z.object({
-  comments: z.array(issueCommentResponseSchema),
-});
+export const issueCommentResponseSchema = createDiscussionCommentResponseSchema(
+  "issueId",
+  issueIdSchema,
+);
 
-export const getIssueCommentResponseSchema = z.object({
-  comment: issueCommentResponseSchema,
-});
+export const listIssueCommentsResponseSchema =
+  createListDiscussionCommentsResponseSchema(issueCommentResponseSchema);
 
-const commentBodySchema = z
-  .string()
-  .min(
-    COMMENT_BODY_MIN_LENGTH,
-    `Comment body must be at least ${COMMENT_BODY_MIN_LENGTH} characters`,
-  );
+export const getIssueCommentResponseSchema =
+  createGetDiscussionCommentResponseSchema(issueCommentResponseSchema);
 
-export const createIssueCommentRequestSchema = z.object({
-  body: commentBodySchema,
-  parentCommentId: z.number().int().positive().nullable().optional(),
-});
+export const createIssueCommentRequestSchema = createDiscussionCommentRequestSchema;
 
-export const updateIssueCommentRequestSchema = z.object({
-  body: commentBodySchema,
-});
+export const updateIssueCommentRequestSchema = updateDiscussionCommentRequestSchema;
 
-export const deleteIssueCommentResponseSchema = z.object({
-  deletedCommentId: z.number().int(),
-});
+export const deleteIssueCommentResponseSchema = deleteDiscussionCommentResponseSchema;
 
-export const listIssueAttachmentsResponseSchema = z.object({
-  attachments: z.array(attachmentSummarySchema),
-});
+export const listIssueAttachmentsResponseSchema = listDiscussionAttachmentsResponseSchema;
 
-export const uploadIssueAttachmentResponseSchema = z.object({
-  attachment: attachmentSummarySchema,
-});
+export const uploadIssueAttachmentResponseSchema = uploadDiscussionAttachmentResponseSchema;
 
-export const issueAttachmentRouteParamsSchema = z.object({
-  attachmentId: z.string().min(1),
-  issueId: issueIdSchema,
-  projectId: issueIdSchema,
-});
+export const issueAttachmentRouteParamsSchema = createDiscussionAttachmentRouteParamsSchema(
+  "issueId",
+  issueIdSchema,
+);
 
-export const issueCommentAttachmentRouteParamsSchema = z.object({
-  attachmentId: z.string().min(1),
-  commentId: issueIdSchema,
-  issueId: issueIdSchema,
-  projectId: issueIdSchema,
-});
+export const issueCommentAttachmentRouteParamsSchema =
+  createDiscussionCommentAttachmentRouteParamsSchema("issueId", issueIdSchema);
 
-export const deleteIssueAttachmentResponseSchema = z.object({
-  deletedAttachmentId: z.string(),
-});
+export const deleteIssueAttachmentResponseSchema = deleteDiscussionAttachmentResponseSchema;
 
 export type IssueCommentResponse = z.infer<typeof issueCommentResponseSchema>;
 export type CreateIssueCommentRequest = z.infer<

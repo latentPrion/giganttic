@@ -15,6 +15,7 @@ import { useGanttChartFileManager } from "./use-gantt-chart-file-manager.js";
 import {
   clearGanttRuntimeChartCache,
   setGanttRuntimeChartCacheEntry,
+  trySetValidatedGanttRuntimeChartCacheEntry,
 } from "../lib/gantt-runtime-chart-cache.js";
 import { emitGanttRuntimeMetadataReloadRequestedEvent } from "../lib/gantt-runtime-chart-events.js";
 
@@ -571,5 +572,64 @@ describe("useGanttChartFileManager", () => {
       expect(result.current.chartSource?.content).toBe("<second/>");
     });
     expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces runtime validation errors when loaded xml has duplicate task ids", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
+      type: "xml",
+    });
+    const ganttRef = stubGanttRef(null);
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 12,
+        token: "tok-dup",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.runtimeValidationErrorMessage).toBe(
+        "Task id \"dup\" is duplicated in the chart.",
+      );
+    });
+  });
+
+  it("can clear runtime validation errors raised from runtime cache updates", async () => {
+    ganttApiMock.getProjectChartOrNull.mockResolvedValue({
+      content: SERVER_XML,
+      type: "xml",
+    });
+    const ganttRef = stubGanttRef(null);
+
+    const { result } = renderHook(() =>
+      useGanttChartFileManager({
+        ganttRef,
+        projectId: 13,
+        token: "tok-clear-runtime",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    act(() => {
+      trySetValidatedGanttRuntimeChartCacheEntry(13, {
+        serializedXml: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
+        type: "xml",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.runtimeValidationErrorMessage).toBeTruthy();
+    });
+
+    act(() => {
+      result.current.clearRuntimeValidationError();
+    });
+
+    expect(result.current.runtimeValidationErrorMessage).toBeNull();
   });
 });

@@ -1,5 +1,3 @@
-import { readFile, unlink, writeFile } from "node:fs/promises";
-
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,6 +14,7 @@ import {
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { AttachmentService, toAttachmentSummary } from "./attachment.service.js";
 import type {
@@ -44,6 +43,8 @@ export class IssueCommentService {
     private readonly databaseService: DatabaseService,
     @Inject(AttachmentService)
     private readonly attachmentService: AttachmentService,
+    @Inject(DiscussionCommentBodyStorageService)
+    private readonly commentBodyStorage: DiscussionCommentBodyStorageService,
   ) {}
 
   async listComments(
@@ -104,13 +105,12 @@ export class IssueCommentService {
       throw new NotFoundException(COMMENT_NOT_FOUND_MESSAGE);
     }
 
-    await this.attachmentService.ensureUntrustedDirectoriesExist();
-    const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+    await this.commentBodyStorage.writeIssueCommentBody(
       projectId,
       issueId,
       created.id,
+      payload.body,
     );
-    await writeFile(bodyPath, payload.body, "utf8");
 
     const record = this.getCommentRecordOrThrow(issueId, created.id);
     return { comment: await this.buildCommentResponse(record, projectId) };
@@ -129,12 +129,12 @@ export class IssueCommentService {
     const record = this.getCommentRecordOrThrow(issueId, commentId);
     this.assertCanEditComment(authContext, projectId, record);
 
-    const bodyPath = this.attachmentService.resolveIssueCommentMarkdownPath(
+    await this.commentBodyStorage.writeIssueCommentBody(
       projectId,
       issueId,
       commentId,
+      payload.body,
     );
-    await writeFile(bodyPath, payload.body, "utf8");
 
     this.databaseService.db.update(issueComments)
       .set({ updatedAt: new Date() })
@@ -156,8 +156,7 @@ export class IssueCommentService {
       .all();
 
     for (const row of rows) {
-      await unlinkIssueCommentBodyFiles(
-        this.attachmentService,
+      await this.commentBodyStorage.deleteIssueCommentBody(
         projectId,
         issueId,
         row.id,
@@ -190,8 +189,7 @@ export class IssueCommentService {
       .where(eq(issueComments.id, commentId))
       .run();
 
-    await unlinkIssueCommentBodyFiles(
-      this.attachmentService,
+    await this.commentBodyStorage.deleteIssueCommentBody(
       projectId,
       issueId,
       commentId,
@@ -233,8 +231,7 @@ export class IssueCommentService {
       record.id,
     );
 
-    const body = await readIssueCommentBody(
-      this.attachmentService,
+    const body = await this.commentBodyStorage.readIssueCommentBody(
       projectId,
       record.issueId,
       record.id,
@@ -348,49 +345,5 @@ export class IssueCommentService {
         }
       },
     );
-  }
-}
-
-async function readIssueCommentBody(
-  attachmentService: AttachmentService,
-  projectId: number,
-  issueId: number,
-  commentId: number,
-): Promise<string> {
-  const primary = attachmentService.resolveIssueCommentMarkdownPath(
-    projectId,
-    issueId,
-    commentId,
-  );
-  try {
-    return await readFile(primary, "utf8");
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-
-  // Only the canonical filename format is supported.
-  return "";
-}
-
-async function unlinkIssueCommentBodyFiles(
-  attachmentService: AttachmentService,
-  projectId: number,
-  issueId: number,
-  commentId: number,
-): Promise<void> {
-  await tryUnlinkQuietly(
-    attachmentService.resolveIssueCommentMarkdownPath(projectId, issueId, commentId),
-  );
-}
-
-async function tryUnlinkQuietly(filePath: string): Promise<void> {
-  try {
-    await unlink(filePath);
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
   }
 }

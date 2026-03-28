@@ -1,5 +1,6 @@
 import type { IssueStatus } from "../contracts/issue.contracts.js";
 import {
+  GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
   GGTC_TASK_STATUS_BLOCKED,
   GGTC_TASK_STATUS_CLOSED,
@@ -25,6 +26,7 @@ const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b
 const DEBUG_SESSION_ID = "117825";
 
 interface ParsedTaskNode {
+  description: string;
   id: string;
   predecessorIds: string[];
   progressPercentage: number;
@@ -42,6 +44,7 @@ function parseTaskNodeForMilestoneInference(taskElement: Element): ParsedTaskNod
   }
 
   return {
+    description: parseTaskDescription(taskElement),
     id,
     predecessorIds: [],
     progressPercentage: parseTaskProgressPercentage(taskElement),
@@ -83,6 +86,16 @@ export interface ParsedProjectTaskHistoryEntry {
   id: string;
   progressPercentage: number;
   startDate: string;
+  status: IssueStatus;
+  title: string;
+  type: "milestone" | "task";
+}
+
+export interface ParsedProjectTaskDetail {
+  description: string;
+  id: string;
+  progressPercentage: number;
+  startDate: string | null;
   status: IssueStatus;
   title: string;
   type: "milestone" | "task";
@@ -149,6 +162,10 @@ function parseTaskProgressPercentage(taskElement: Element): number {
   return Math.min(100, Math.round(normalized));
 }
 
+function parseTaskDescription(taskElement: Element): string {
+  return taskElement.getAttribute(GGTC_TASK_DESCRIPTION_ATTRIBUTE)?.trim() ?? "";
+}
+
 function extractOwnTextContent(taskElement: Element): string {
   return Array.from(taskElement.childNodes)
     .filter((node) => node.nodeType === Node.CDATA_SECTION_NODE || node.nodeType === Node.TEXT_NODE)
@@ -166,6 +183,7 @@ function parseTaskNode(taskElement: Element): ParsedTaskNode | null {
   }
 
   return {
+    description: parseTaskDescription(taskElement),
     id,
     predecessorIds: [],
     progressPercentage: parseTaskProgressPercentage(taskElement),
@@ -316,6 +334,18 @@ function toHistoryEntry(task: ParsedTaskNode, status: IssueStatus): ParsedProjec
   };
 }
 
+function toTaskDetail(task: ParsedTaskNode, status: IssueStatus): ParsedProjectTaskDetail {
+  return {
+    description: task.description,
+    id: task.id,
+    progressPercentage: task.progressPercentage,
+    startDate: task.startDate?.toISOString() ?? null,
+    status,
+    title: task.title,
+    type: task.type === "milestone" ? "milestone" : "task",
+  };
+}
+
 export function parseProjectTasksHistoryFromXml(
   xmlContent: string,
   now: Date = new Date(),
@@ -355,4 +385,23 @@ export function parseProjectTasksHistoryFromXml(
   );
 
   return historyEntries;
+}
+
+export function parseProjectTaskDetailFromXml(
+  xmlContent: string,
+  taskId: string,
+): ParsedProjectTaskDetail | null {
+  const xmlDocument = parseChartXmlDocument(xmlContent);
+  const tasksById = mapTaskNodesById(xmlDocument);
+  const dependenciesByTarget = collectIncomingDependencies(xmlDocument);
+  applyDependenciesToTasks(tasksById, dependenciesByTarget);
+
+  const task = tasksById.get(taskId);
+  if (!task || task.type === "project") {
+    return null;
+  }
+
+  const resolveTaskStatus = createStatusResolver(tasksById);
+  const status = task.type === "milestone" ? resolveTaskStatus(task.id) : task.status;
+  return toTaskDetail(task, status);
 }

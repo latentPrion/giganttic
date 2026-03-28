@@ -1,5 +1,1 @@
-/** Shape of an in-memory multer file (see multer memory storage). */
-export type MemoryUploadedFile = {
-  buffer: Buffer;
-  originalname: string;
-};
+export type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";

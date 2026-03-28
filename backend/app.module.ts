@@ -9,6 +9,7 @@ import { OrganizationsModule } from "./modules/organizations/organizations.modul
 import { ProjectsModule } from "./modules/projects/projects.module.js";
 import { ScopedAccessModule } from "./modules/scoped-access/scoped-access.module.js";
 import { TeamsModule } from "./modules/teams/teams.module.js";
+import { TasksModule } from "./modules/tasks/tasks.module.js";
 import { UsersModule } from "./modules/users/users.module.js";
 
 @Module({})
@@ -22,6 +23,7 @@ export class AppModule {
         AuthModule,
         TeamsModule,
         ProjectsModule,
+        TasksModule,
         ScopedAccessModule,
         IssuesModule,
         OrganizationsModule,

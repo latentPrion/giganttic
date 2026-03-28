@@ -10,6 +10,7 @@ import type { EntityListItemViewMode } from "../../../../common/components/entit
 import type { ParsedProjectTaskHistoryEntry } from "../../lib/project-tasks-history-parser.js";
 
 interface TaskListItemProps {
+  onNavigate?: () => void;
   task: ParsedProjectTaskHistoryEntry;
   viewMode: EntityListItemViewMode;
 }
@@ -41,6 +42,7 @@ export function TaskListItem(props: TaskListItemProps) {
   return (
     <EntityListItemCard
       description={`Task ID: ${task.id}`}
+      onNavigate={props.onNavigate}
       paperSx={{
         border: (theme) => (
           task.type === "milestone"

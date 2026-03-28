@@ -1,59 +1,44 @@
 import { z } from "zod";
 
-const attachmentSummarySchema = z.object({
-  byteLength: z.number(),
-  id: z.string(),
-  originalFilename: z.string(),
-});
+import {
+  createDiscussionCommentRequestSchema,
+  createDiscussionCommentResponseSchema,
+  createGetDiscussionCommentResponseSchema,
+  createListDiscussionCommentsResponseSchema,
+  deleteDiscussionAttachmentResponseSchema,
+  deleteDiscussionCommentResponseSchema,
+  discussionAttachmentSummarySchema,
+  discussionPositiveIntegerSchema,
+  listDiscussionAttachmentsResponseSchema,
+  updateDiscussionCommentRequestSchema,
+  uploadDiscussionAttachmentResponseSchema,
+} from "../../../../../common/discussion/discussion.contracts.js";
 
-export const issueCommentSchema = z.object({
-  attachments: z.array(attachmentSummarySchema),
-  body: z.string(),
-  createdAt: z.string(),
-  createdByUserId: z.number(),
-  id: z.number(),
-  issueId: z.number(),
-  parentCommentId: z.number().nullable(),
-  thumbsDownCount: z.number(),
-  thumbsUpCount: z.number(),
-  updatedAt: z.string(),
-});
+export const issueCommentSchema = createDiscussionCommentResponseSchema(
+  "issueId",
+  discussionPositiveIntegerSchema,
+);
 
-export const listIssueCommentsResponseSchema = z.object({
-  comments: z.array(issueCommentSchema),
-});
+export const listIssueCommentsResponseSchema =
+  createListDiscussionCommentsResponseSchema(issueCommentSchema);
 
-export const getIssueCommentResponseSchema = z.object({
-  comment: issueCommentSchema,
-});
+export const getIssueCommentResponseSchema =
+  createGetDiscussionCommentResponseSchema(issueCommentSchema);
 
-export const createIssueCommentRequestSchema = z.object({
-  body: z.string(),
-  parentCommentId: z.number().nullable().optional(),
-});
+export const createIssueCommentRequestSchema = createDiscussionCommentRequestSchema;
 
-export const updateIssueCommentRequestSchema = z.object({
-  body: z.string(),
-});
+export const updateIssueCommentRequestSchema = updateDiscussionCommentRequestSchema;
 
-export const deleteIssueCommentResponseSchema = z.object({
-  deletedCommentId: z.number(),
-});
+export const deleteIssueCommentResponseSchema = deleteDiscussionCommentResponseSchema;
 
-export const listIssueAttachmentsResponseSchema = z.object({
-  attachments: z.array(attachmentSummarySchema),
-});
+export const listIssueAttachmentsResponseSchema = listDiscussionAttachmentsResponseSchema;
 
-export const uploadIssueAttachmentResponseSchema = z.object({
-  attachment: attachmentSummarySchema,
-});
+export const uploadIssueAttachmentResponseSchema = uploadDiscussionAttachmentResponseSchema;
 
-export const deleteIssueAttachmentResponseSchema = z.object({
-  deletedAttachmentId: z.string(),
-});
+export const deleteIssueAttachmentResponseSchema = deleteDiscussionAttachmentResponseSchema;
 
 export type IssueComment = z.infer<typeof issueCommentSchema>;
-export type IssueAttachmentSummary = z.infer<typeof attachmentSummarySchema>;
+export type IssueAttachmentSummary = z.infer<typeof discussionAttachmentSummarySchema>;
 export type ListIssueCommentsResponse = z.infer<typeof listIssueCommentsResponseSchema>;
 export type GetIssueCommentResponse = z.infer<typeof getIssueCommentResponseSchema>;
 export type CreateIssueCommentRequest = z.infer<typeof createIssueCommentRequestSchema>;

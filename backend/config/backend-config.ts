@@ -45,6 +45,7 @@ export interface BackendConfig {
   }>;
   untrustedContentAttachmentsDir: string;
   untrustedContentIssueCommentsDir: string;
+  untrustedContentTaskCommentsDir: string;
 }
 
 export const BACKEND_CONFIG = Symbol("BACKEND_CONFIG");
@@ -55,6 +56,10 @@ function createDefaultUntrustedAttachmentsDir(cwd: string): string {
 
 function createDefaultUntrustedIssueCommentsDir(cwd: string): string {
   return path.join(cwd, "untrusted-content", "issue-comments");
+}
+
+function createDefaultUntrustedTaskCommentsDir(cwd: string): string {
+  return path.join(cwd, "untrusted-content", "task-comments");
 }
 
 function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessionRouteAllowlist"] {
@@ -114,6 +119,41 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
       pattern:
         "/projects/:projectId/issues/:issueId/attachments/:attachmentId/download",
     },
+    { method: "GET", pattern: "/projects/:projectId/tasks/:taskId/comments" },
+    { method: "POST", pattern: "/projects/:projectId/tasks/:taskId/comments" },
+    {
+      method: "GET",
+      pattern: "/projects/:projectId/tasks/:taskId/comments/:commentId",
+    },
+    {
+      method: "PATCH",
+      pattern: "/projects/:projectId/tasks/:taskId/comments/:commentId",
+    },
+    {
+      method: "DELETE",
+      pattern: "/projects/:projectId/tasks/:taskId/comments/:commentId",
+    },
+    {
+      method: "POST",
+      pattern:
+        "/projects/:projectId/tasks/:taskId/comments/:commentId/attachments",
+    },
+    {
+      method: "DELETE",
+      pattern:
+        "/projects/:projectId/tasks/:taskId/comments/:commentId/attachments/:attachmentId",
+    },
+    { method: "GET", pattern: "/projects/:projectId/tasks/:taskId/attachments" },
+    { method: "POST", pattern: "/projects/:projectId/tasks/:taskId/attachments" },
+    {
+      method: "DELETE",
+      pattern: "/projects/:projectId/tasks/:taskId/attachments/:attachmentId",
+    },
+    {
+      method: "GET",
+      pattern:
+        "/projects/:projectId/tasks/:taskId/attachments/:attachmentId/download",
+    },
   ];
 }
 
@@ -138,6 +178,7 @@ export function buildBackendConfig(
     scopedSessionRouteAllowlist: createDefaultScopedSessionRouteAllowlist(),
     untrustedContentAttachmentsDir: createDefaultUntrustedAttachmentsDir(cwd),
     untrustedContentIssueCommentsDir: createDefaultUntrustedIssueCommentsDir(cwd),
+    untrustedContentTaskCommentsDir: createDefaultUntrustedTaskCommentsDir(cwd),
     ...overrides,
   };
 }
@@ -167,6 +208,13 @@ export function buildBackendConfigFromEnv(
   if (env.GGTC_UNTRUSTED_ISSUE_COMMENTS_DIR?.trim()) {
     const raw = env.GGTC_UNTRUSTED_ISSUE_COMMENTS_DIR.trim();
     overrides.untrustedContentIssueCommentsDir = path.isAbsolute(raw)
+      ? raw
+      : path.resolve(cwd, raw);
+  }
+
+  if (env.GGTC_UNTRUSTED_TASK_COMMENTS_DIR?.trim()) {
+    const raw = env.GGTC_UNTRUSTED_TASK_COMMENTS_DIR.trim();
+    overrides.untrustedContentTaskCommentsDir = path.isAbsolute(raw)
       ? raw
       : path.resolve(cwd, raw);
   }

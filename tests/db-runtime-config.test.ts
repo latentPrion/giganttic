@@ -14,9 +14,9 @@ import {
 
 describe("db runtime config", () => {
   it("uses checked-in runtime defaults when no runtime env overrides are present", () => {
-    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v5");
+    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v6");
     expect(configuredRuntimeTarget).toBe("run/giganttic-dev.sqlite");
-    expect(resolveRuntimeSchemaSnapshotSubdir({})).toBe("v5");
+    expect(resolveRuntimeSchemaSnapshotSubdir({})).toBe("v6");
     expect(resolveRuntimeTarget({})).toBe("run/giganttic-dev.sqlite");
   });
 

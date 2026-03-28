@@ -28,7 +28,7 @@ import {
 } from "../lib/issue-updated-events.js";
 import {
   getGanttRuntimeChartCacheEntry,
-  setGanttRuntimeChartCacheEntry,
+  trySetValidatedGanttRuntimeChartCacheEntry,
 } from "../lib/gantt-runtime-chart-cache.js";
 import {
   emitGanttRuntimeMetadataReloadRequestedEvent,
@@ -132,6 +132,12 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       return;
     }
 
+    if (fileManager.runtimeValidationErrorMessage) {
+      setErrorMessage(fileManager.runtimeValidationErrorMessage);
+      setTasks([]);
+      return;
+    }
+
     if (fileManager.cache.serializedXml === null) {
       setTasks([]);
       return;
@@ -146,6 +152,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
   }, [
     fileManager.cache.serializedXml,
     fileManager.loadErrorMessage,
+    fileManager.runtimeValidationErrorMessage,
     props.projectId,
   ]);
 
@@ -205,10 +212,14 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
 
     try {
       const updatedXml = updateTaskStatusInChartXml(cacheEntry.serializedXml, taskId, status);
-      setGanttRuntimeChartCacheEntry(props.projectId, {
+      const result = trySetValidatedGanttRuntimeChartCacheEntry(props.projectId, {
         serializedXml: updatedXml,
         type: "xml",
       });
+      if (!result.ok) {
+        setErrorMessage(result.error?.message ?? DEFAULT_ERROR_MESSAGE);
+        return;
+      }
       emitGanttRuntimeMetadataReloadRequestedEvent({ projectId: props.projectId });
     } catch (error) {
       setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
