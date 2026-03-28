@@ -15,6 +15,7 @@ import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { TaskListItem } from "../components/tasks/TaskListItem.js";
 import type { IssueStatus } from "../contracts/issue.contracts.js";
+import { getTaskStatusTab, setTaskStatusTab } from "../lib/subtab-memory.js";
 import {
   type ParsedProjectTaskHistoryEntry,
   parseProjectTasksHistoryFromXml,
@@ -67,9 +68,32 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
     token: props.token,
   });
 
-  const [activeStatusTab, setActiveStatusTab] = useState<IssueStatus>(STATUS_TAB_IN_PROGRESS);
+  const [activeStatusTab, setActiveStatusTab] = useState<IssueStatus>(() => {
+    if (props.projectId === null) {
+      return STATUS_TAB_IN_PROGRESS;
+    }
+
+    return getTaskStatusTab(props.projectId) ?? STATUS_TAB_IN_PROGRESS;
+  });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ParsedProjectTaskHistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      setActiveStatusTab(STATUS_TAB_IN_PROGRESS);
+      return;
+    }
+
+    setActiveStatusTab(getTaskStatusTab(props.projectId) ?? STATUS_TAB_IN_PROGRESS);
+  }, [props.projectId]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      return;
+    }
+
+    setTaskStatusTab(props.projectId, activeStatusTab);
+  }, [activeStatusTab, props.projectId]);
 
   const visibleTasks = useMemo(
     () => sortTasksByMostRecentStartDate(filterTasksByStatus(tasks, activeStatusTab)),

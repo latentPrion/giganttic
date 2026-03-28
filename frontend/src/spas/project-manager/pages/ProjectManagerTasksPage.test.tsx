@@ -11,6 +11,7 @@ import {
 } from "../lib/gantt-runtime-chart-events.js";
 import { emitGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-events.js";
 import { clearGanttRuntimeChartCache } from "../lib/gantt-runtime-chart-cache.js";
+import { clearSubtabMemory } from "../lib/subtab-memory.js";
 
 const DEFAULT_TOKEN = "pm-token";
 const TASKS_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -39,6 +40,7 @@ const ganttApiMock = vi.mocked(ganttApi);
 describe("ProjectManagerTasksPage", () => {
   beforeEach(() => {
     clearGanttRuntimeChartCache();
+    clearSubtabMemory();
     ganttApiMock.getProjectChartOrNull.mockReset();
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: TASKS_XML,
@@ -75,6 +77,26 @@ describe("ProjectManagerTasksPage", () => {
     await user.click(screen.getByRole("tab", { name: "Closed" }));
     expect(await screen.findByText("Closed Task")).toBeVisible();
     expect(screen.getByText("Milestone Closed")).toBeVisible();
+  });
+
+  it("remembers the selected task status sub-tab when returning to the list", async () => {
+    const user = userEvent.setup();
+
+    const { unmount } = renderWithTheme(
+      <ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    expect(await screen.findByText("In Progress Task")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Open" }));
+    expect(await screen.findByText("Open Early")).toBeVisible();
+
+    unmount();
+
+    renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(screen.getByRole("tab", { name: "Open", selected: true })).toBeVisible();
+    expect(await screen.findByText("Open Early")).toBeVisible();
   });
 
   it("re-buckets milestones immediately when gantt runtime emits an update", async () => {

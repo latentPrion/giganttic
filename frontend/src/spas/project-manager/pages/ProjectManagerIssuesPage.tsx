@@ -34,6 +34,11 @@ import {
   emitProjectManagerIssueUpdatedEvent,
   subscribeProjectManagerIssueUpdatedEvent,
 } from "../lib/issue-updated-events.js";
+import {
+  getIssueStatusTab,
+  setIssueStatusTab,
+  type IssueFilterTab,
+} from "../lib/subtab-memory.js";
 
 interface ProjectManagerIssuesPageProps {
   projectId: number | null;
@@ -59,12 +64,6 @@ const PAGE_TITLE = "Project Issues";
 const SORT_LABEL = "Sort By";
 const SORT_OPTION_LABEL_PRIORITY = "Priority";
 const SORT_OPTION_LABEL_PROGRESS = "Progress";
-
-type IssueFilterTab =
-  | "ISSUE_STATUS_OPEN"
-  | "ISSUE_STATUS_IN_PROGRESS"
-  | "ISSUE_STATUS_BLOCKED"
-  | "ISSUE_STATUS_CLOSED";
 
 type IssueSortMode =
   | "priority"
@@ -120,13 +119,36 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
-  const [activeStatusTab, setActiveStatusTab] = useState<IssueFilterTab>(ISSUE_STATUS_TAB_IN_PROGRESS);
+  const [activeStatusTab, setActiveStatusTab] = useState<IssueFilterTab>(() => {
+    if (props.projectId === null) {
+      return ISSUE_STATUS_TAB_IN_PROGRESS;
+    }
+
+    return getIssueStatusTab(props.projectId) ?? ISSUE_STATUS_TAB_IN_PROGRESS;
+  });
   const [issueEditTargetId, setIssueEditTargetId] = useState<number | null>(null);
   const [issueSortMode, setIssueSortMode] = useState<IssueSortMode>(ISSUE_SORT_MODE_PRIORITY);
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [issueSummaryTargetId, setIssueSummaryTargetId] = useState<number | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [reloadIssuesNonce, setReloadIssuesNonce] = useState(0);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      setActiveStatusTab(ISSUE_STATUS_TAB_IN_PROGRESS);
+      return;
+    }
+
+    setActiveStatusTab(getIssueStatusTab(props.projectId) ?? ISSUE_STATUS_TAB_IN_PROGRESS);
+  }, [props.projectId]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      return;
+    }
+
+    setIssueStatusTab(props.projectId, activeStatusTab);
+  }, [activeStatusTab, props.projectId]);
 
   const visibleIssues = useMemo(
     () => sortIssues(filterIssuesByStatus(issues, activeStatusTab), issueSortMode),

@@ -7,6 +7,7 @@ import { ProjectManagerIssuesPage } from "./ProjectManagerIssuesPage.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
 import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
+import { clearSubtabMemory } from "../lib/subtab-memory.js";
 
 const navigateMock = vi.fn();
 
@@ -60,6 +61,7 @@ describe("ProjectManagerIssuesPage", () => {
     issuesApiMock.getIssue.mockReset();
     issuesApiMock.listIssues.mockReset();
     issuesApiMock.updateIssue.mockReset();
+    clearSubtabMemory();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
         createIssue(7, { name: "In Progress High", priority: 2, progressPercentage: 35 }),
@@ -108,6 +110,26 @@ describe("ProjectManagerIssuesPage", () => {
 
     await user.click(screen.getByRole("tab", { name: "Closed" }));
     expect(await screen.findByText("Closed Done")).toBeVisible();
+  });
+
+  it("remembers the selected issue status sub-tab when returning to the list", async () => {
+    const user = userEvent.setup();
+
+    const { unmount } = renderWithTheme(
+      <ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />,
+    );
+
+    expect(await screen.findByText("In Progress High")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Open" }));
+    expect(await screen.findByText("Open Low")).toBeVisible();
+
+    unmount();
+
+    renderWithTheme(<ProjectManagerIssuesPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    expect(screen.getByRole("tab", { name: "Open", selected: true })).toBeVisible();
+    expect(await screen.findByText("Open Low")).toBeVisible();
   });
 
   it("shows the filtered empty state by default when only non-in-progress issues exist", async () => {
