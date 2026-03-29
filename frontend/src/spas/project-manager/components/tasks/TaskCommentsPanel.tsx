@@ -5,7 +5,7 @@ import { taskCommentsApi } from "../../api/task-comments-api.js";
 import type { TaskComment } from "../../contracts/task-comments.contracts.js";
 import { emitProjectManagerTaskDiscussionStateEvent } from "../../lib/task-discussion-state-events.js";
 import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.js";
-import { TaskMarkdownRender } from "./TaskMarkdownRender.js";
+import { TASK_COMMENT_MARKDOWN_HELP_TEXT, TaskMarkdownRender } from "./TaskMarkdownRender.js";
 
 interface TaskCommentsPanelProps {
   currentUserId: number;
@@ -74,11 +74,13 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
       }}
       commentDomIdPrefix="task-comment"
       currentUserId={currentUserId}
+      editorHelpText={TASK_COMMENT_MARKDOWN_HELP_TEXT}
       highlightCommentId={highlightCommentId}
       isActive={taskTab === "comments"}
       onNavigateToComment={onNavigateToComment}
-      renderMarkdown={(markdown) => (
+      renderMarkdown={(markdown, context) => (
         <TaskMarkdownRender
+          commentId={context?.commentId ?? null}
           markdown={markdown}
           projectId={projectId}
           taskId={taskId}

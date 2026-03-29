@@ -22,6 +22,9 @@ describe("ProjectAttachmentsPanel", () => {
     projectAttachmentsApiMock.deleteAttachment.mockReset();
     projectAttachmentsApiMock.listAttachments.mockReset();
     projectAttachmentsApiMock.uploadAttachment.mockReset();
+    projectAttachmentsApiMock.listAttachments.mockResolvedValue({
+      attachments: [{ byteLength: 24, id: "proj-att-1", originalFilename: "brief.pdf" }],
+    });
   });
 
   it("shows a friendly missing-attachments message instead of a raw API error", async () => {
@@ -42,5 +45,17 @@ describe("ProjectAttachmentsPanel", () => {
 
     expect(await screen.findByText("No attachments exist for this project as yet.")).toBeVisible();
     expect(screen.queryByText("Cannot GET attachments")).not.toBeInTheDocument();
+  });
+
+  it("shows the attachment id in the project attachment list", async () => {
+    renderWithTheme(
+      <ProjectAttachmentsPanel
+        isActive
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText("ID: proj-att-1 • 24 B")).toBeVisible();
   });
 });

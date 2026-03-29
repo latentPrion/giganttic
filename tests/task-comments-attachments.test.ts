@@ -139,6 +139,110 @@ describe("task comments and attachments api", () => {
     expect(uploadResponse.statusCode).toBe(404);
     expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID)).toEqual([]);
   });
+
+  it("downloads task comment attachments through the comment-scoped route", async () => {
+    const user = await harness.registerUser("task-comment-attachment-download");
+    const { projectId } = await createProjectWithDefaultTask(
+      user.accessToken,
+      "Task comment attachment download",
+    );
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: VALID_COMMENT_BODY },
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment.id;
+
+    const uploadResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(user.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("task-comment-download.png"),
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const unauthDownload = await harness.app.inject({
+      method: "GET",
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(unauthDownload.statusCode).toBe(401);
+
+    const downloadResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(downloadResponse.statusCode).toBe(200);
+    expect(downloadResponse.rawPayload.equals(MINIMAL_PNG_BUFFER)).toBe(true);
+  });
+
+  it("does not download task comment attachments through a different comment or task", async () => {
+    const user = await harness.registerUser("task-comment-attachment-download-guard");
+    const { projectId } = await createProjectWithDefaultTask(
+      user.accessToken,
+      "Task comment attachment download guard",
+    );
+    const otherTaskId = "2";
+    await putProjectChartWithTaskIds(user.accessToken, projectId, [
+      DEFAULT_TASK_ID,
+      otherTaskId,
+    ]);
+
+    const firstCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: VALID_COMMENT_BODY },
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    expect(firstCommentResponse.statusCode).toBe(201);
+    const firstCommentId = harness.parseJson<{ comment: { id: number } }>(
+      firstCommentResponse.payload,
+    ).comment.id;
+
+    const secondCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: `${VALID_COMMENT_BODY} second` },
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    expect(secondCommentResponse.statusCode).toBe(201);
+    const secondCommentId = harness.parseJson<{ comment: { id: number } }>(
+      secondCommentResponse.payload,
+    ).comment.id;
+
+    const uploadResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(user.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("task-comment-guard.png"),
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${firstCommentId}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const wrongCommentDownload = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${secondCommentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(wrongCommentDownload.statusCode).toBe(404);
+
+    const wrongTaskDownload = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `${buildTaskCommentsPath(projectId, otherTaskId)}/${firstCommentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(wrongTaskDownload.statusCode).toBe(404);
+  });
 });
 
 async function createProjectWithDefaultTask(accessToken: string, name: string) {
@@ -158,6 +262,28 @@ async function createProjectWithDefaultTask(accessToken: string, name: string) {
     projectId: project.id,
     taskId: DEFAULT_TASK_ID,
   };
+}
+
+async function putProjectChartWithTaskIds(
+  accessToken: string,
+  projectId: number,
+  taskIds: string[],
+): Promise<void> {
+  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<data>\n${taskIds
+    .map(
+      (taskId, index) =>
+        `  <task id="${taskId}" type="task" start_date="2026-03-0${index + 1} 09:00"><![CDATA[Task ${taskId}]]></task>`,
+    )
+    .join("\n")}\n</data>`;
+
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: { xml: content },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/chart`,
+  });
+
+  expect(response.statusCode).toBe(200);
 }
 
 function buildTaskCommentsPath(projectId: number, taskId: string): string {

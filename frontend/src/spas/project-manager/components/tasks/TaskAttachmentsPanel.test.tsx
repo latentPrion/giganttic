@@ -109,4 +109,17 @@ describe("TaskAttachmentsPanel", () => {
 
     expect(await screen.findByText(/Max file size: 5\.0 MiB per file\./i)).toBeVisible();
   });
+
+  it("shows the attachment id in the task attachment list", async () => {
+    renderWithTheme(
+      <TaskAttachmentsPanel
+        projectId={42}
+        taskId="task-7"
+        taskTab="attachments"
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText("ID: att-1 • 12 B")).toBeVisible();
+  });
 });

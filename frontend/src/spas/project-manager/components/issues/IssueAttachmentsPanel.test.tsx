@@ -69,4 +69,17 @@ describe("IssueAttachmentsPanel", () => {
 
     expect(await screen.findByText(/Max file size: 5\.0 MiB per file\./i)).toBeVisible();
   });
+
+  it("shows the attachment id in the issue attachment list", async () => {
+    renderWithTheme(
+      <IssueAttachmentsPanel
+        issueId={7}
+        issueTab="attachments"
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText("ID: att-1 • 12 B")).toBeVisible();
+  });
 });

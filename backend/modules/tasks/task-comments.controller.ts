@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Req,
+  StreamableFile,
   UseInterceptors,
 } from "@nestjs/common";
 
@@ -16,10 +17,12 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { DiscussionAttachmentService } from "../discussion/discussion-attachment.service.js";
+import { buildAttachmentContentDisposition } from "../discussion/discussion-upload-controller.utils.js";
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
 import { TaskCommentService } from "./task-comment.service.js";
+import { TasksService } from "./tasks.service.js";
 import {
   createTaskCommentRequestSchema,
   deleteTaskAttachmentResponseSchema,
@@ -49,6 +52,8 @@ export class TaskCommentsController {
   constructor(
     @Inject(TaskCommentService)
     private readonly taskCommentService: TaskCommentService,
+    @Inject(TasksService)
+    private readonly tasksService: TasksService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
   ) {}
@@ -186,5 +191,35 @@ export class TaskCommentsController {
     });
 
     return uploadTaskAttachmentResponseSchema.parse({ attachment });
+  }
+
+  @Get(":commentId/attachments/:attachmentId/download")
+  downloadCommentAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(taskCommentAttachmentRouteParamsSchema)) params: unknown,
+  ) {
+    const { attachmentId, commentId, projectId, taskId } =
+      taskCommentAttachmentRouteParamsSchema.parse(params);
+
+    this.tasksService.validateTaskReadableForCurrentUser(
+      request.authContext!,
+      projectId,
+      taskId,
+    );
+
+    const row = this.attachmentService.requireAttachmentLinkedToTaskComment(
+      projectId,
+      taskId,
+      commentId,
+      attachmentId,
+    );
+
+    return new StreamableFile(
+      this.attachmentService.getAttachmentFileStream(attachmentId),
+      {
+        disposition: buildAttachmentContentDisposition(row.originalFilename),
+        type: "application/octet-stream",
+      },
+    );
   }
 }

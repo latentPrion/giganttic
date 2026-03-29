@@ -5,7 +5,7 @@ import { issueCommentsApi } from "../../api/issue-comments-api.js";
 import type { IssueComment } from "../../contracts/issue-comments.contracts.js";
 import { emitProjectManagerIssueDiscussionStateEvent } from "../../lib/issue-discussion-state-events.js";
 import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.js";
-import { IssueMarkdownRender } from "./IssueMarkdownRender.js";
+import { ISSUE_COMMENT_MARKDOWN_HELP_TEXT, IssueMarkdownRender } from "./IssueMarkdownRender.js";
 
 interface IssueCommentsPanelProps {
   currentUserId: number;
@@ -74,11 +74,13 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
       }}
       commentDomIdPrefix="issue-comment"
       currentUserId={currentUserId}
+      editorHelpText={ISSUE_COMMENT_MARKDOWN_HELP_TEXT}
       highlightCommentId={highlightCommentId}
       isActive={issueTab === "comments"}
       onNavigateToComment={onNavigateToComment}
-      renderMarkdown={(markdown) => (
+      renderMarkdown={(markdown, context) => (
         <IssueMarkdownRender
+          commentId={context?.commentId ?? null}
           issueId={issueId}
           markdown={markdown}
           projectId={projectId}

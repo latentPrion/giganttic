@@ -104,6 +104,12 @@ function requireProjectRow(): HTMLElement {
   return projectRow as HTMLElement;
 }
 
+function requireJournalSection(title: string): HTMLElement {
+  const journalSection = screen.getByText(title).closest(".MuiPaper-root");
+  expect(journalSection).not.toBeNull();
+  return journalSection as HTMLElement;
+}
+
 describe("ProjectManagerProjectPage", () => {
   beforeEach(async () => {
     navigateMock.mockReset();
@@ -223,6 +229,27 @@ describe("ProjectManagerProjectPage", () => {
 
     expect(await screen.findByText("No journal exists for this project as yet.")).toBeVisible();
     expect(screen.queryByText("Cannot GET journal")).not.toBeInTheDocument();
+  });
+
+  it("shows project-only attachment embedding instructions in the project journal editor", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await screen.findByText("Project Journal");
+    const journalSection = requireJournalSection("Project Journal");
+    await user.click(await within(journalSection).findByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByText(/this project's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/project-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.queryByText(/gigantt:\/\/issue-attachment\/<attachmentId>/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/gigantt:\/\/task-attachment\/<attachmentId>/i)).not.toBeInTheDocument();
   });
 
   it("shows a zero-valued project attachments count chip when attachments return 404", async () => {

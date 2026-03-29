@@ -149,6 +149,29 @@ describe("TaskCommentsPanel", () => {
     expect(await screen.findAllByText("Max file size: 5.0 MiB per file.")).not.toHaveLength(0);
   });
 
+  it("shows exact multi-scope attachment embedding instructions in the task comment editor", async () => {
+    renderWithTheme(
+      <TaskCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={() => {}}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    expect(
+      await screen.findByText(/this project's Attachments tab/i),
+    ).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/project-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this task's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/task-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this comment's attachment list/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/task-comment-attachment\/<commentId>\/<attachmentId>/i)).toBeVisible();
+  });
+
   it("navigates to the parent comment when the reply chip is clicked", async () => {
     const user = userEvent.setup();
     const navigateToComment = vi.fn();
@@ -219,7 +242,8 @@ describe("TaskCommentsPanel", () => {
       />,
     );
 
-    expect(await screen.findByText("child.png (222 bytes)")).toBeVisible();
+    expect(await screen.findByText("child.png")).toBeVisible();
+    expect(screen.getByText("ID: att-t-1 • 222 B")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {

@@ -533,46 +533,7 @@ export class DiscussionAttachmentService {
     attachmentId: string,
   ): AttachmentRow {
     this.assertIssueExists(projectId, issueId);
-
-    const fromIssue = this.databaseService.db
-      .select({ attachment: attachments })
-      .from(issuesAttachments)
-      .innerJoin(
-        attachments,
-        eq(issuesAttachments.attachmentId, attachments.id),
-      )
-      .where(
-        and(
-          eq(issuesAttachments.issueId, issueId),
-          eq(issuesAttachments.attachmentId, attachmentId),
-        ),
-      )
-      .get();
-
-    if (fromIssue) {
-      return fromIssue.attachment;
-    }
-
-    const fromComment = this.databaseService.db
-      .select({ attachment: attachments })
-      .from(issueCommentsAttachments)
-      .innerJoin(
-        attachments,
-        eq(issueCommentsAttachments.attachmentId, attachments.id),
-      )
-      .where(
-        and(
-          eq(issueCommentsAttachments.issueId, issueId),
-          eq(issueCommentsAttachments.attachmentId, attachmentId),
-        ),
-      )
-      .get();
-
-    if (fromComment) {
-      return fromComment.attachment;
-    }
-
-    throw new NotFoundException("Attachment not found");
+    return this.requireIssueAttachmentRow(issueId, attachmentId);
   }
 
   requireAttachmentLinkedToProject(
@@ -608,47 +569,32 @@ export class DiscussionAttachmentService {
     taskId: string,
     attachmentId: string,
   ): AttachmentRow {
-    const fromTask = this.databaseService.db
-      .select({ attachment: attachments })
-      .from(taskAttachments)
-      .innerJoin(
-        attachments,
-        eq(taskAttachments.attachmentId, attachments.id),
-      )
-      .where(
-        and(
-          eq(taskAttachments.projectId, projectId),
-          eq(taskAttachments.taskId, taskId),
-          eq(taskAttachments.attachmentId, attachmentId),
-        ),
-      )
-      .get();
+    return this.requireTaskAttachmentRow(projectId, taskId, attachmentId);
+  }
 
-    if (fromTask) {
-      return fromTask.attachment;
-    }
+  requireAttachmentLinkedToIssueComment(
+    projectId: number,
+    issueId: number,
+    commentId: number,
+    attachmentId: string,
+  ): AttachmentRow {
+    this.assertIssueCommentExists(projectId, issueId, commentId);
+    return this.requireIssueCommentAttachmentRow(issueId, commentId, attachmentId);
+  }
 
-    const fromComment = this.databaseService.db
-      .select({ attachment: attachments })
-      .from(taskCommentsAttachments)
-      .innerJoin(
-        attachments,
-        eq(taskCommentsAttachments.attachmentId, attachments.id),
-      )
-      .where(
-        and(
-          eq(taskCommentsAttachments.projectId, projectId),
-          eq(taskCommentsAttachments.taskId, taskId),
-          eq(taskCommentsAttachments.attachmentId, attachmentId),
-        ),
-      )
-      .get();
-
-    if (fromComment) {
-      return fromComment.attachment;
-    }
-
-    throw new NotFoundException("Attachment not found");
+  requireAttachmentLinkedToTaskComment(
+    projectId: number,
+    taskId: string,
+    commentId: number,
+    attachmentId: string,
+  ): AttachmentRow {
+    this.assertTaskCommentExists(projectId, taskId, commentId);
+    return this.requireTaskCommentAttachmentRow(
+      projectId,
+      taskId,
+      commentId,
+      attachmentId,
+    );
   }
 
   async removeOrphanAttachmentsAndFiles(): Promise<void> {
@@ -788,26 +734,13 @@ export class DiscussionAttachmentService {
     issueId: number,
     attachmentId: string,
   ): { id: string } {
-    const linked = this.databaseService.db
-      .select({ id: attachments.id })
-      .from(issuesAttachments)
-      .innerJoin(
-        attachments,
-        eq(issuesAttachments.attachmentId, attachments.id),
-      )
-      .where(
-        and(
-          eq(issuesAttachments.issueId, issueId),
-          eq(issuesAttachments.attachmentId, attachmentId),
-        ),
-      )
-      .get();
+    const linked = this.requireIssueAttachmentRow(issueId, attachmentId);
 
     if (!linked) {
       throw new NotFoundException("Attachment not found");
     }
 
-    return linked;
+    return { id: linked.id };
   }
 
   private requireProjectAttachmentLink(
@@ -841,8 +774,86 @@ export class DiscussionAttachmentService {
     commentId: number,
     attachmentId: string,
   ): { id: string } {
+    const linked = this.requireIssueCommentAttachmentRow(
+      issueId,
+      commentId,
+      attachmentId,
+    );
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return { id: linked.id };
+  }
+
+  private requireTaskAttachmentLink(
+    projectId: number,
+    taskId: string,
+    attachmentId: string,
+  ): { id: string } {
+    const linked = this.requireTaskAttachmentRow(projectId, taskId, attachmentId);
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return { id: linked.id };
+  }
+
+  private requireTaskCommentAttachmentLink(
+    projectId: number,
+    taskId: string,
+    commentId: number,
+    attachmentId: string,
+  ): { id: string } {
+    const linked = this.requireTaskCommentAttachmentRow(
+      projectId,
+      taskId,
+      commentId,
+      attachmentId,
+    );
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return { id: linked.id };
+  }
+
+  private requireIssueAttachmentRow(
+    issueId: number,
+    attachmentId: string,
+  ): AttachmentRow {
     const linked = this.databaseService.db
-      .select({ id: attachments.id })
+      .select({ attachment: attachments })
+      .from(issuesAttachments)
+      .innerJoin(
+        attachments,
+        eq(issuesAttachments.attachmentId, attachments.id),
+      )
+      .where(
+        and(
+          eq(issuesAttachments.issueId, issueId),
+          eq(issuesAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .get();
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return linked.attachment;
+  }
+
+  private requireIssueCommentAttachmentRow(
+    issueId: number,
+    commentId: number,
+    attachmentId: string,
+  ): AttachmentRow {
+    const linked = this.databaseService.db
+      .select({ attachment: attachments })
       .from(issueCommentsAttachments)
       .innerJoin(
         attachments,
@@ -861,16 +872,16 @@ export class DiscussionAttachmentService {
       throw new NotFoundException("Attachment not found");
     }
 
-    return linked;
+    return linked.attachment;
   }
 
-  private requireTaskAttachmentLink(
+  private requireTaskAttachmentRow(
     projectId: number,
     taskId: string,
     attachmentId: string,
-  ): { id: string } {
+  ): AttachmentRow {
     const linked = this.databaseService.db
-      .select({ id: attachments.id })
+      .select({ attachment: attachments })
       .from(taskAttachments)
       .innerJoin(
         attachments,
@@ -889,17 +900,17 @@ export class DiscussionAttachmentService {
       throw new NotFoundException("Attachment not found");
     }
 
-    return linked;
+    return linked.attachment;
   }
 
-  private requireTaskCommentAttachmentLink(
+  private requireTaskCommentAttachmentRow(
     projectId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
-  ): { id: string } {
+  ): AttachmentRow {
     const linked = this.databaseService.db
-      .select({ id: attachments.id })
+      .select({ attachment: attachments })
       .from(taskCommentsAttachments)
       .innerJoin(
         attachments,
@@ -919,7 +930,7 @@ export class DiscussionAttachmentService {
       throw new NotFoundException("Attachment not found");
     }
 
-    return linked;
+    return linked.attachment;
   }
 
   private async persistAttachmentAndInsert(input: {

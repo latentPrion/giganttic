@@ -1,41 +1,108 @@
 import { Box, CircularProgress, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 
 import { requestBlob } from "../../../../common/api/http-client.js";
 
+const DEFAULT_ATTACHMENT_DOWNLOAD_NAME = "attachment";
+const GIGANTT_URL_SCHEME = "gigantt:";
+
+export interface DiscussionMarkdownAttachmentResolver {
+  buildDownloadPath: (uriSuffix: string) => string | null;
+  isAllowedInContext?: (uriSuffix: string) => boolean;
+  prefix: string;
+}
+
+interface ResolvedMarkdownAttachment {
+  downloadPath: string;
+  uriSuffix: string;
+}
+
 interface DiscussionMarkdownImageProps {
   alt?: string;
-  resolveAttachmentDownloadPath: (attachmentId: string) => string;
+  attachmentResolvers: DiscussionMarkdownAttachmentResolver[];
   src?: string;
   token: string;
-  urlPrefix: string;
+}
+
+interface DiscussionMarkdownRenderProps {
+  attachmentResolvers: DiscussionMarkdownAttachmentResolver[];
+  helpText?: string;
+  markdown: string;
+  showHelpText?: boolean;
+  token: string;
+}
+
+function isAllowedMarkdownAttachment(
+  resolver: DiscussionMarkdownAttachmentResolver,
+  uriSuffix: string,
+): boolean {
+  return resolver.isAllowedInContext?.(uriSuffix) ?? true;
+}
+
+function resolveMarkdownAttachment(
+  attachmentResolvers: DiscussionMarkdownAttachmentResolver[],
+  href: string | undefined,
+): ResolvedMarkdownAttachment | null {
+  if (!href) {
+    return null;
+  }
+
+  for (const resolver of attachmentResolvers) {
+    if (!href.startsWith(resolver.prefix)) {
+      continue;
+    }
+
+    const uriSuffix = href.slice(resolver.prefix.length);
+    if (!uriSuffix || !isAllowedMarkdownAttachment(resolver, uriSuffix)) {
+      return null;
+    }
+
+    const downloadPath = resolver.buildDownloadPath(uriSuffix);
+    if (!downloadPath) {
+      return null;
+    }
+
+    return { downloadPath, uriSuffix };
+  }
+
+  return null;
+}
+
+function transformMarkdownUrl(value: string): string {
+  if (value.startsWith(GIGANTT_URL_SCHEME)) {
+    return value;
+  }
+
+  return defaultUrlTransform(value);
 }
 
 function DiscussionMarkdownImage(props: DiscussionMarkdownImageProps) {
-  const { alt, resolveAttachmentDownloadPath, src, token, urlPrefix } = props;
+  const { alt, attachmentResolvers, src, token } = props;
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const resolvedAttachment = resolveMarkdownAttachment(attachmentResolvers, src);
+  const resolvedDownloadPath = resolvedAttachment?.downloadPath ?? null;
 
   useEffect(() => {
-    if (!src?.startsWith(urlPrefix)) {
+    if (!resolvedDownloadPath) {
       return undefined;
     }
 
-    const attachmentId = src.slice(urlPrefix.length);
     let active = true;
-    let revokedUrl: string | null = null;
+    let nextObjectUrl: string | null = null;
+    setFailed(false);
+    setObjectUrl(null);
 
     void (async () => {
       try {
         const blob = await requestBlob({
-          path: resolveAttachmentDownloadPath(attachmentId),
+          path: resolvedDownloadPath,
           token,
         });
-        const nextUrl = URL.createObjectURL(blob);
-        revokedUrl = nextUrl;
+        nextObjectUrl = URL.createObjectURL(blob);
         if (active) {
-          setObjectUrl(nextUrl);
+          setObjectUrl(nextObjectUrl);
         }
       } catch {
         if (active) {
@@ -46,13 +113,13 @@ function DiscussionMarkdownImage(props: DiscussionMarkdownImageProps) {
 
     return () => {
       active = false;
-      if (revokedUrl) {
-        URL.revokeObjectURL(revokedUrl);
+      if (nextObjectUrl) {
+        URL.revokeObjectURL(nextObjectUrl);
       }
     };
-  }, [resolveAttachmentDownloadPath, src, token, urlPrefix]);
+  }, [resolvedDownloadPath, token]);
 
-  if (!src?.startsWith(urlPrefix)) {
+  if (!resolvedDownloadPath) {
     return <img alt={alt ?? ""} src={src} />;
   }
 
@@ -69,37 +136,52 @@ function DiscussionMarkdownImage(props: DiscussionMarkdownImageProps) {
 
 async function downloadDiscussionAttachment(
   token: string,
-  resolveAttachmentDownloadPath: (attachmentId: string) => string,
-  attachmentId: string,
+  resolvedAttachment: ResolvedMarkdownAttachment,
   filename: string,
 ): Promise<void> {
   const blob = await requestBlob({
-    path: resolveAttachmentDownloadPath(attachmentId),
+    path: resolvedAttachment.downloadPath,
     token,
   });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = filename || "attachment";
+  anchor.download = filename || DEFAULT_ATTACHMENT_DOWNLOAD_NAME;
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
-interface DiscussionMarkdownRenderProps {
-  attachmentUrlPrefix: string;
-  helpText?: string;
-  markdown: string;
-  resolveAttachmentDownloadPath: (attachmentId: string) => string;
-  showHelpText?: boolean;
-  token: string;
+function renderAttachmentLink(
+  attachmentResolvers: DiscussionMarkdownAttachmentResolver[],
+  token: string,
+  children: React.ReactNode,
+  href: string | undefined,
+): React.ReactNode {
+  const resolvedAttachment = resolveMarkdownAttachment(attachmentResolvers, href);
+  if (!resolvedAttachment) {
+    return <a href={href}>{children}</a>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        void downloadDiscussionAttachment(
+          token,
+          resolvedAttachment,
+          DEFAULT_ATTACHMENT_DOWNLOAD_NAME,
+        )}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function DiscussionMarkdownRender(props: DiscussionMarkdownRenderProps) {
   const {
-    attachmentUrlPrefix,
+    attachmentResolvers,
     helpText,
     markdown,
-    resolveAttachmentDownloadPath,
     showHelpText = false,
     token,
   } = props;
@@ -148,36 +230,18 @@ export function DiscussionMarkdownRender(props: DiscussionMarkdownRenderProps) {
               {children}
             </Typography>
           ),
-          a: ({ children, href }) => {
-            if (href?.startsWith(attachmentUrlPrefix)) {
-              const attachmentId = href.slice(attachmentUrlPrefix.length);
-              return (
-                <button
-                  type="button"
-                  onClick={() =>
-                    void downloadDiscussionAttachment(
-                      token,
-                      resolveAttachmentDownloadPath,
-                      attachmentId,
-                      "attachment",
-                    )}
-                >
-                  {children}
-                </button>
-              );
-            }
-            return <a href={href}>{children}</a>;
-          },
+          a: ({ children, href }) =>
+            renderAttachmentLink(attachmentResolvers, token, children, href),
           img: (imgProps) => (
             <DiscussionMarkdownImage
               alt={imgProps.alt}
-              resolveAttachmentDownloadPath={resolveAttachmentDownloadPath}
+              attachmentResolvers={attachmentResolvers}
               src={imgProps.src}
               token={token}
-              urlPrefix={attachmentUrlPrefix}
             />
           ),
         }}
+        urlTransform={transformMarkdownUrl}
       >
         {markdown}
       </ReactMarkdown>

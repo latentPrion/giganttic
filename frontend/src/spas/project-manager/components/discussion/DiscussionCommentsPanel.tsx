@@ -15,7 +15,10 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { getApiErrorMessage } from "../../../../common/api/api-error.js";
 import { requestBlob } from "../../../../common/api/http-client.js";
-import { createDiscussionMaxFileSizeMessage } from "../../../../../../common/discussion/discussion-upload.constants.js";
+import {
+  createDiscussionMaxFileSizeMessage,
+  formatDiscussionByteLength,
+} from "../../../../../../common/discussion/discussion-upload.constants.js";
 import {
   COMMENT_BODY_MIN_LENGTH,
   type CreateDiscussionCommentRequest,
@@ -24,6 +27,14 @@ import {
 } from "../../../../../../common/discussion/discussion.contracts.js";
 
 const COMMENT_ATTACHMENT_MAX_FILE_SIZE_MESSAGE = createDiscussionMaxFileSizeMessage();
+const COMMENT_ATTACHMENT_ID_LABEL_PREFIX = "ID: ";
+const COMMENT_ATTACHMENT_METADATA_SEPARATOR = " • ";
+
+function createCommentAttachmentMetadataLabel(
+  attachment: DiscussionAttachmentSummary,
+): string {
+  return `${COMMENT_ATTACHMENT_ID_LABEL_PREFIX}${attachment.id}${COMMENT_ATTACHMENT_METADATA_SEPARATOR}${formatDiscussionByteLength(attachment.byteLength)}`;
+}
 
 export interface DiscussionCommentLike {
   attachments: DiscussionAttachmentSummary[];
@@ -53,11 +64,15 @@ interface DiscussionCommentsPanelProps<Comment extends DiscussionCommentLike> {
   };
   commentDomIdPrefix: string;
   currentUserId: number;
+  editorHelpText: string;
   highlightCommentId: number | null;
   isActive: boolean;
   onNavigateToComment: (commentId: number) => void;
   panelTitle?: string;
-  renderMarkdown: (markdown: string) => React.ReactNode;
+  renderMarkdown: (
+    markdown: string,
+    context?: { commentId: number },
+  ) => React.ReactNode;
   resolveAttachmentDownloadPath: (attachmentId: string) => string;
   token: string;
 }
@@ -130,8 +145,15 @@ function CommentAttachmentsList(props: {
               underline="hover"
               sx={{ textAlign: "right" }}
             >
-              {attachment.originalFilename} ({attachment.byteLength} bytes)
+              {attachment.originalFilename}
             </MuiLink>
+            <Typography
+              color="text.secondary"
+              sx={{ display: "block", mt: 0.25 }}
+              variant="caption"
+            >
+              {createCommentAttachmentMetadataLabel(attachment)}
+            </Typography>
           </Box>
         </Stack>
       ))}
@@ -146,6 +168,7 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
     api,
     commentDomIdPrefix,
     currentUserId,
+    editorHelpText,
     highlightCommentId,
     isActive,
     onNavigateToComment,
@@ -318,6 +341,9 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
             onChange={(event) => setComposerBody(event.target.value)}
             value={composerBody}
           />
+          <Typography color="text.secondary" variant="body2">
+            {editorHelpText}
+          </Typography>
           {parentCommentId !== null ? (
             <Chip
               clickable
@@ -441,6 +467,9 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
                     onChange={(event) => setEditDraft(event.target.value)}
                     value={editDraft}
                   />
+                  <Typography color="text.secondary" variant="body2">
+                    {editorHelpText}
+                  </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button
                       disabled={busy}
@@ -461,7 +490,7 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
                   </Stack>
                 </Stack>
               ) : (
-                renderMarkdown(comment.body)
+                renderMarkdown(comment.body, { commentId: comment.id })
               )}
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 {canEdit ? (

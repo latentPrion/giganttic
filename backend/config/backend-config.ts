@@ -131,6 +131,11 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
     },
     {
       method: "GET",
+      pattern:
+        "/projects/:projectId/issues/:issueId/comments/:commentId/attachments/:attachmentId/download",
+    },
+    {
+      method: "GET",
       pattern: "/projects/:projectId/issues/:issueId/attachments",
     },
     {
@@ -169,6 +174,11 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
       method: "DELETE",
       pattern:
         "/projects/:projectId/tasks/:taskId/comments/:commentId/attachments/:attachmentId",
+    },
+    {
+      method: "GET",
+      pattern:
+        "/projects/:projectId/tasks/:taskId/comments/:commentId/attachments/:attachmentId/download",
     },
     { method: "GET", pattern: "/projects/:projectId/tasks/:taskId/attachments" },
     { method: "POST", pattern: "/projects/:projectId/tasks/:taskId/attachments" },

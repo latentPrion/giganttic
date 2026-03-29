@@ -24,6 +24,12 @@ import type { DiscussionAttachmentSummary } from "../../../../../../common/discu
 
 const FILE_INPUT_ACCEPT = "*/*";
 const ATTACHMENT_MAX_FILE_SIZE_MESSAGE = createDiscussionMaxFileSizeMessage();
+const ATTACHMENT_ID_LABEL_PREFIX = "ID: ";
+const ATTACHMENT_METADATA_SEPARATOR = " • ";
+
+function createAttachmentMetadataLabel(row: DiscussionAttachmentSummary): string {
+  return `${ATTACHMENT_ID_LABEL_PREFIX}${row.id}${ATTACHMENT_METADATA_SEPARATOR}${formatDiscussionByteLength(row.byteLength)}`;
+}
 
 async function downloadAttachment(
   token: string,
@@ -186,7 +192,7 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
                 </MuiLink>
               )}
               primaryTypographyProps={{ align: "right" }}
-              secondary={formatDiscussionByteLength(row.byteLength)}
+              secondary={createAttachmentMetadataLabel(row)}
               secondaryTypographyProps={{ align: "right" }}
               sx={{ flex: "0 1 auto", textAlign: "right" }}
             />

@@ -9,12 +9,14 @@ import {
   Patch,
   Post,
   Req,
+  StreamableFile,
   UseInterceptors,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import { buildAttachmentContentDisposition } from "../discussion/discussion-upload-controller.utils.js";
 import { AttachmentService } from "./attachment.service.js";
 import {
   createIssueCommentRequestSchema,
@@ -30,6 +32,7 @@ import {
 } from "./issue-untrusted.contracts.js";
 import { IssueCommentService } from "./issue-comment.service.js";
 import { IssueUploadMultipartInterceptor } from "./issue-upload-multipart.interceptor.js";
+import { IssuesService } from "./issues.service.js";
 import type { MemoryUploadedFile } from "./memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "./uploaded-memory-file.decorator.js";
 
@@ -41,6 +44,8 @@ export class IssueCommentsController {
   constructor(
     @Inject(IssueCommentService)
     private readonly issueCommentService: IssueCommentService,
+    @Inject(IssuesService)
+    private readonly issuesService: IssuesService,
     @Inject(AttachmentService)
     private readonly attachmentService: AttachmentService,
   ) {}
@@ -179,6 +184,36 @@ export class IssueCommentsController {
     });
 
     return uploadIssueAttachmentResponseSchema.parse({ attachment: summary });
+  }
+
+  @Get(":commentId/attachments/:attachmentId/download")
+  downloadCommentAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(issueCommentAttachmentRouteParamsSchema)) params: unknown,
+  ) {
+    const { attachmentId, commentId, issueId, projectId } =
+      issueCommentAttachmentRouteParamsSchema.parse(params);
+
+    this.issuesService.validateIssueReadableForCurrentUser(
+      request.authContext!,
+      projectId,
+      issueId,
+    );
+
+    const row = this.attachmentService.requireAttachmentLinkedToIssueComment(
+      projectId,
+      issueId,
+      commentId,
+      attachmentId,
+    );
+
+    return new StreamableFile(
+      this.attachmentService.getAttachmentFileStream(attachmentId),
+      {
+        disposition: buildAttachmentContentDisposition(row.originalFilename),
+        type: "application/octet-stream",
+      },
+    );
   }
 }
 

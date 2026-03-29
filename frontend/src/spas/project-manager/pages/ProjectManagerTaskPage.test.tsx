@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../../common/api/api-error.js";
+import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { taskAttachmentsApi } from "../api/task-attachments-api.js";
@@ -55,7 +56,14 @@ vi.mock("../api/task-journal-api.js", () => ({
   },
 }));
 
+vi.mock("../../../lobby/api/lobby-api.js", () => ({
+  lobbyApi: {
+    getProject: vi.fn(),
+  },
+}));
+
 const ganttApiMock = vi.mocked(ganttApi);
+const lobbyApiMock = vi.mocked(lobbyApi);
 const taskCommentsApiMock = vi.mocked(taskCommentsApi);
 const taskAttachmentsApiMock = vi.mocked(taskAttachmentsApi);
 const taskJournalApiMock = vi.mocked(taskJournalApi);
@@ -75,10 +83,17 @@ const DEFAULT_TASK_PAGE_PROPS = {
   token: DEFAULT_TOKEN,
 };
 
+function requireJournalSection(title: string): HTMLElement {
+  const journalSection = screen.getByText(title).closest(".MuiPaper-root");
+  expect(journalSection).not.toBeNull();
+  return journalSection as HTMLElement;
+}
+
 describe("ProjectManagerTaskPage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
+    lobbyApiMock.getProject.mockReset();
     taskJournalApiMock.getJournal.mockReset();
     taskCommentsApiMock.listComments.mockReset();
     taskAttachmentsApiMock.listAttachments.mockReset();
@@ -90,6 +105,27 @@ describe("ProjectManagerTaskPage", () => {
       journalExists: true,
       markdown: "Task journal",
       taskMirrorExists: true,
+    });
+    lobbyApiMock.getProject.mockResolvedValue({
+      members: [{
+        roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER"],
+        userId: 1,
+        username: "demo-user",
+      }],
+      organizations: [],
+      project: {
+        createdAt: "2026-03-08T00:00:00.000Z",
+        description: "Project description",
+        id: 42,
+        name: "Project 42",
+        updatedAt: "2026-03-08T00:00:00.000Z",
+      },
+      projectManagers: [{
+        sourceKinds: ["direct"],
+        userId: 1,
+        username: "demo-user",
+      }],
+      teams: [],
     });
     taskCommentsApiMock.listComments.mockResolvedValue({ comments: [] });
     taskAttachmentsApiMock.listAttachments.mockResolvedValue({ attachments: [] });
@@ -115,6 +151,22 @@ describe("ProjectManagerTaskPage", () => {
     await user.click(await screen.findByRole("button", { name: "Back to Tasks" }));
 
     expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
+  });
+
+  it("shows project and task attachment embedding instructions in the task journal editor", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<ProjectManagerTaskPage {...DEFAULT_TASK_PAGE_PROPS} />);
+
+    await screen.findByText("Task Journal");
+    const journalSection = requireJournalSection("Task Journal");
+    await user.click(await within(journalSection).findByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByText(/this project's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/project-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this task's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/task-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.queryByText(/gigantt:\/\/issue-attachment\/<attachmentId>/i)).not.toBeInTheDocument();
   });
 
   it("uses the shared project-scoped navigation tabs including the task detail tab", async () => {

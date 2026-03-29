@@ -97,6 +97,12 @@ function createIssue(overrides: Partial<Issue> = {}): Issue {
   };
 }
 
+function requireJournalSection(title: string): HTMLElement {
+  const journalSection = screen.getByText(title).closest(".MuiPaper-root");
+  expect(journalSection).not.toBeNull();
+  return journalSection as HTMLElement;
+}
+
 describe("ProjectManagerIssuePage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
@@ -174,6 +180,29 @@ describe("ProjectManagerIssuePage", () => {
     expect(summaryDialog).toBeVisible();
     expect(within(summaryDialog).getByText("Priority: High")).toBeVisible();
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("shows project and issue attachment embedding instructions in the issue journal editor", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    await screen.findByText("Issue Journal");
+    const journalSection = requireJournalSection("Issue Journal");
+    await user.click(await within(journalSection).findByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByText(/this project's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/project-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this issue's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/issue-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.queryByText(/gigantt:\/\/task-attachment\/<attachmentId>/i)).not.toBeInTheDocument();
   });
 
   it("updates the issue and refreshes the detail preview row", async () => {

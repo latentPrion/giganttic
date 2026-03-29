@@ -424,6 +424,139 @@ describe("issue comments and attachments api", () => {
     }
   });
 
+  it("downloads issue comment attachments through the comment-scoped route", async () => {
+    const user = await harness.registerUser("issue-comment-attachment-download");
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      user.accessToken,
+      "issue-comment-attachment-download-project",
+    );
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: "Comment body for issue attachment download" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment.id;
+
+    const uploadResponse = await harness.app.inject({
+      headers: {
+        ...harness.createAuthHeaders(user.accessToken),
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload: createMultipartFileBuffer({
+        boundary: MULTIPART_BOUNDARY,
+        content: MINIMAL_PNG_BUFFER,
+        contentType: "image/png",
+        fieldName: "file",
+        filename: "comment-download.png",
+      }),
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const unauthDownload = await harness.app.inject({
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(unauthDownload.statusCode).toBe(401);
+
+    const downloadResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(downloadResponse.statusCode).toBe(200);
+    expect(downloadResponse.rawPayload.equals(MINIMAL_PNG_BUFFER)).toBe(true);
+  });
+
+  it("does not download issue comment attachments through a different comment or issue", async () => {
+    const user = await harness.registerUser("issue-comment-attachment-download-guard");
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      user.accessToken,
+      "issue-comment-attachment-download-guard-project",
+    );
+    const otherIssueId = harness.parseJson<{ issue: { id: number } }>(
+      (
+        await harness.app.inject({
+          headers: harness.createAuthHeaders(user.accessToken),
+          method: "POST",
+          payload: {
+            name: "Other issue",
+            priority: IssuePriorityCode.ISSUE_PRIORITY_LOW,
+            progressPercentage: 0,
+          },
+          url: `/stc-proj-mgmt/api/projects/${projectId}/issues`,
+        })
+      ).payload,
+    ).issue.id;
+
+    const firstCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: "First comment body for guarded download" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(firstCommentResponse.statusCode).toBe(201);
+    const firstCommentId = harness.parseJson<{ comment: { id: number } }>(
+      firstCommentResponse.payload,
+    ).comment.id;
+
+    const secondCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: "Second comment body for guarded download" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(secondCommentResponse.statusCode).toBe(201);
+    const secondCommentId = harness.parseJson<{ comment: { id: number } }>(
+      secondCommentResponse.payload,
+    ).comment.id;
+
+    const uploadResponse = await harness.app.inject({
+      headers: {
+        ...harness.createAuthHeaders(user.accessToken),
+        "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+      },
+      method: "POST",
+      payload: createMultipartFileBuffer({
+        boundary: MULTIPART_BOUNDARY,
+        content: MINIMAL_PNG_BUFFER,
+        contentType: "image/png",
+        fieldName: "file",
+        filename: "guarded-comment-download.png",
+      }),
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${firstCommentId}/attachments`,
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      uploadResponse.payload,
+    );
+
+    const wrongCommentDownload = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${secondCommentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(wrongCommentDownload.statusCode).toBe(404);
+
+    const wrongIssueDownload = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${otherIssueId}/comments/${firstCommentId}/attachments/${uploaded.attachment.id}/download`,
+    });
+    expect(wrongIssueDownload.statusCode).toBe(404);
+  });
+
   it("blocks deleting comments that already have replies", async () => {
     const user = await harness.registerUser("reply-delete");
     const projectId = harness.parseJson<{ project: { id: number } }>(
@@ -482,7 +615,7 @@ describe("issue comments and attachments api", () => {
     expect(deleteParent.statusCode).toBe(400);
   });
 
-  it("deletes issue attachments for effective project managers only", async () => {
+  it("deletes issue attachments for project participants who can modify issues", async () => {
     const pmUser = await harness.registerUser("issue-attachment-delete-pm");
     const viewOnlyUser = await harness.registerUser("issue-attachment-delete-viewer");
 
@@ -531,24 +664,24 @@ describe("issue comments and attachments api", () => {
       attachment: { id: string };
     }>(uploadResponse.payload);
 
-    const deleteForbidden = await harness.app.inject({
+    const deleteByParticipant = await harness.app.inject({
       headers: harness.createAuthHeaders(viewOnlyUser.accessToken),
       method: "DELETE",
       url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments/${uploaded.attachment.id}`,
     });
-    expect(deleteForbidden.statusCode).toBe(403);
+    expect(deleteByParticipant.statusCode).toBe(200);
+
+    const deletedByParticipant = harness.parseJson<{ deletedAttachmentId: string }>(
+      deleteByParticipant.payload,
+    );
+    expect(deletedByParticipant.deletedAttachmentId).toBe(uploaded.attachment.id);
 
     const deleteResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(pmUser.accessToken),
       method: "DELETE",
       url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments/${uploaded.attachment.id}`,
     });
-    expect(deleteResponse.statusCode).toBe(200);
-
-    const deleted = harness.parseJson<{ deletedAttachmentId: string }>(
-      deleteResponse.payload,
-    );
-    expect(deleted.deletedAttachmentId).toBe(uploaded.attachment.id);
+    expect(deleteResponse.statusCode).toBe(404);
 
     const listResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(pmUser.accessToken),

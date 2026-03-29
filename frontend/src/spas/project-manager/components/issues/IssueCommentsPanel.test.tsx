@@ -139,6 +139,29 @@ describe("IssueCommentsPanel", () => {
     expect(await screen.findAllByText("Max file size: 5.0 MiB per file.")).not.toHaveLength(0);
   });
 
+  it("shows exact multi-scope attachment embedding instructions in the issue comment editor", async () => {
+    renderWithTheme(
+      <IssueCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        issueId={7}
+        issueTab="comments"
+        onNavigateToComment={() => {}}
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    expect(
+      await screen.findByText(/this project's Attachments tab/i),
+    ).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/project-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this issue's Attachments tab/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/issue-attachment\/<attachmentId>/i)).toBeVisible();
+    expect(screen.getByText(/this comment's attachment list/i)).toBeVisible();
+    expect(screen.getByText(/gigantt:\/\/issue-comment-attachment\/<commentId>\/<attachmentId>/i)).toBeVisible();
+  });
+
   it("deletes a comment attachment and reloads comments", async () => {
     const user = userEvent.setup();
     renderWithTheme(
@@ -153,7 +176,8 @@ describe("IssueCommentsPanel", () => {
       />,
     );
 
-    expect(await screen.findByText("child.png (111 bytes)")).toBeVisible();
+    expect(await screen.findByText("child.png")).toBeVisible();
+    expect(screen.getByText("ID: att-c-1 • 111 B")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {

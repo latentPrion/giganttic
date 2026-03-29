@@ -123,11 +123,13 @@ describe("responsive layout contracts", () => {
     expect(source).toContain('sx={{ width: { sm: "auto", xs: "100%" } }}');
   });
 
-  it("keeps the hero link row and auth cta responsive", () => {
-    const source = readHomeComponentFile("HomeHero.tsx");
+  it("keeps the profile link row responsive on the about page and preserves the hero auth cta", () => {
+    const heroSource = readHomeComponentFile("HomeHero.tsx");
+    const profileLinksSource = readHomeComponentFile("HomeProfileLinks.tsx");
 
-    expect(source).toContain('direction={{ sm: "row", xs: "column" }}');
-    expect(source).toContain('buttonSize="large"');
+    expect(profileLinksSource).toContain('direction={{ sm: "row", xs: "column" }}');
+    expect(profileLinksSource).toContain('width: "100%"');
+    expect(heroSource).toContain('buttonSize="large"');
   });
 
   it("wires the landing shell through the shared app entry point", () => {
