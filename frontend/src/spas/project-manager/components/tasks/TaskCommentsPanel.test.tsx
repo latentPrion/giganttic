@@ -133,6 +133,22 @@ describe("TaskCommentsPanel", () => {
     expect(input).toHaveFocus();
   });
 
+  it("shows the max file size message for task comment attachments", async () => {
+    renderWithTheme(
+      <TaskCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={() => {}}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findAllByText("Max file size: 5.0 MiB per file.")).not.toHaveLength(0);
+  });
+
   it("navigates to the parent comment when the reply chip is clicked", async () => {
     const user = userEvent.setup();
     const navigateToComment = vi.fn();

@@ -15,26 +15,14 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { getApiErrorMessage } from "../../../../common/api/api-error.js";
 import { requestBlob } from "../../../../common/api/http-client.js";
+import {
+  createDiscussionMaxFileSizeMessage,
+  formatDiscussionByteLength,
+} from "../../../../../../common/discussion/discussion-upload.constants.js";
 import type { DiscussionAttachmentSummary } from "../../../../../../common/discussion/discussion.contracts.js";
 
 const FILE_INPUT_ACCEPT = "*/*";
-const MIN_BYTES_LABEL = "0 B";
-
-function formatByteLength(byteLength: number): string {
-  if (byteLength <= 0) {
-    return MIN_BYTES_LABEL;
-  }
-
-  if (byteLength < 1024) {
-    return `${byteLength} B`;
-  }
-
-  if (byteLength < 1024 * 1024) {
-    return `${(byteLength / 1024).toFixed(1)} KiB`;
-  }
-
-  return `${(byteLength / (1024 * 1024)).toFixed(1)} MiB`;
-}
+const ATTACHMENT_MAX_FILE_SIZE_MESSAGE = createDiscussionMaxFileSizeMessage();
 
 async function downloadAttachment(
   token: string,
@@ -157,7 +145,8 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
           {busy ? <CircularProgress size={22} /> : null}
         </Stack>
         <Typography color="text.secondary" sx={{ mt: 1.5 }} variant="body2">
-          Choose one or more files. Maximum size and allowed types are enforced on the server.
+          Choose one or more files. {ATTACHMENT_MAX_FILE_SIZE_MESSAGE} Allowed types are enforced on
+          the server.
         </Typography>
       </Paper>
       <List dense>
@@ -189,7 +178,7 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
                 </MuiLink>
               )}
               primaryTypographyProps={{ align: "right" }}
-              secondary={formatByteLength(row.byteLength)}
+              secondary={formatDiscussionByteLength(row.byteLength)}
               secondaryTypographyProps={{ align: "right" }}
               sx={{ flex: "0 1 auto", textAlign: "right" }}
             />

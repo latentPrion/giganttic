@@ -96,4 +96,17 @@ describe("TaskAttachmentsPanel", () => {
       );
     });
   });
+
+  it("shows the max file size message in the task attachment upload area", async () => {
+    renderWithTheme(
+      <TaskAttachmentsPanel
+        projectId={42}
+        taskId="task-7"
+        taskTab="attachments"
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText(/Max file size: 5\.0 MiB per file\./i)).toBeVisible();
+  });
 });

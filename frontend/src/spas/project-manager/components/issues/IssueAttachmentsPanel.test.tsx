@@ -56,5 +56,17 @@ describe("IssueAttachmentsPanel", () => {
     });
     expect(issueAttachmentsApiMock.listAttachments).toHaveBeenCalledTimes(2);
   });
-});
 
+  it("shows the max file size message in the issue attachment upload area", async () => {
+    renderWithTheme(
+      <IssueAttachmentsPanel
+        issueId={7}
+        issueTab="attachments"
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText(/Max file size: 5\.0 MiB per file\./i)).toBeVisible();
+  });
+});

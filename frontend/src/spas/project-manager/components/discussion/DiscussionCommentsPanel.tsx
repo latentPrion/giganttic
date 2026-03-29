@@ -15,12 +15,15 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { getApiErrorMessage } from "../../../../common/api/api-error.js";
 import { requestBlob } from "../../../../common/api/http-client.js";
+import { createDiscussionMaxFileSizeMessage } from "../../../../../../common/discussion/discussion-upload.constants.js";
 import {
   COMMENT_BODY_MIN_LENGTH,
   type CreateDiscussionCommentRequest,
   type DiscussionAttachmentSummary,
   type UpdateDiscussionCommentRequest,
 } from "../../../../../../common/discussion/discussion.contracts.js";
+
+const COMMENT_ATTACHMENT_MAX_FILE_SIZE_MESSAGE = createDiscussionMaxFileSizeMessage();
 
 export interface DiscussionCommentLike {
   attachments: DiscussionAttachmentSummary[];
@@ -498,6 +501,9 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
                   />
                 </Button>
               </Stack>
+              <Typography color="text.secondary" sx={{ mt: 0.5 }} variant="caption">
+                {COMMENT_ATTACHMENT_MAX_FILE_SIZE_MESSAGE}
+              </Typography>
               {hasAttachments ? <Divider sx={{ mt: 1.5 }} /> : null}
               <CommentAttachmentsList
                 onDelete={(attachmentId) =>

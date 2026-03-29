@@ -123,6 +123,22 @@ describe("IssueCommentsPanel", () => {
     expect(input).toHaveFocus();
   });
 
+  it("shows the max file size message for issue comment attachments", async () => {
+    renderWithTheme(
+      <IssueCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        issueId={7}
+        issueTab="comments"
+        onNavigateToComment={() => {}}
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findAllByText("Max file size: 5.0 MiB per file.")).not.toHaveLength(0);
+  });
+
   it("deletes a comment attachment and reloads comments", async () => {
     const user = userEvent.setup();
     renderWithTheme(

@@ -1,14 +1,12 @@
 import path from "node:path";
 
+import { DEFAULT_DISCUSSION_ATTACHMENT_MAX_UPLOAD_BYTES } from "../../common/discussion/discussion-upload.constants.js";
 import {
   resolveRuntimeSchemaSnapshotSubdir,
   resolveRuntimeTarget,
 } from "../../db/config.js";
 
-const BYTE = 1;
-const KIBIBYTE = 1024 * BYTE;
-const MEBIBYTE = 1024 * KIBIBYTE;
-const DEFAULT_MAX_ATTACHMENT_UPLOAD_BYTES = 5 * MEBIBYTE;
+const DEFAULT_MAX_ATTACHMENT_UPLOAD_BYTES = DEFAULT_DISCUSSION_ATTACHMENT_MAX_UPLOAD_BYTES;
 const DEFAULT_MAX_ATTACHMENTS_PER_ISSUE_OR_COMMENT = 32;
 
 const DEFAULT_ALLOWED_ATTACHMENT_EXTENSIONS = [
