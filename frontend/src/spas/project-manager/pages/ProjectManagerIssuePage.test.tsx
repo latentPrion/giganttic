@@ -2,6 +2,7 @@ import React from "react";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
@@ -28,7 +29,14 @@ vi.mock("../api/issues-api.js", () => ({
   },
 }));
 
+vi.mock("../../../lobby/api/lobby-api.js", () => ({
+  lobbyApi: {
+    getProject: vi.fn(),
+  },
+}));
+
 const issuesApiMock = vi.mocked(issuesApi);
+const lobbyApiMock = vi.mocked(lobbyApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 const DEFAULT_ISSUE_PAGE_PROPS = {
@@ -59,10 +67,28 @@ function createIssue(overrides: Partial<Issue> = {}): Issue {
 describe("ProjectManagerIssuePage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    lobbyApiMock.getProject.mockReset();
     issuesApiMock.deleteIssue.mockReset();
     issuesApiMock.getIssue.mockReset();
     issuesApiMock.updateIssue.mockReset();
     issuesApiMock.getIssue.mockResolvedValue({ issue: createIssue() });
+    lobbyApiMock.getProject.mockResolvedValue({
+      members: [{
+        roleCodes: [],
+        userId: 1,
+        username: "demo-user",
+      }],
+      organizations: [],
+      project: {
+        createdAt: DEFAULT_TIMESTAMP,
+        description: "Project description",
+        id: 42,
+        name: "Project 42",
+        updatedAt: DEFAULT_TIMESTAMP,
+      },
+      projectManagers: [],
+      teams: [],
+    });
   });
 
   it("renders the selected issue and detailed card", async () => {

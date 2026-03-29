@@ -45,6 +45,7 @@ describe("kanban cards", () => {
   it("renders gantt task cards separately from issue cards", () => {
     renderWithTheme(
       <KanbanTaskCard
+        allowStatusChange
         card={{
           column: "ISSUE_STATUS_IN_PROGRESS",
           id: "ganttTask:101",
@@ -74,6 +75,7 @@ describe("kanban cards", () => {
 
     renderWithTheme(
       <KanbanTaskCard
+        allowStatusChange
         card={{
           column: "ISSUE_STATUS_IN_PROGRESS",
           id: "ganttTask:101",
@@ -106,6 +108,7 @@ describe("kanban cards", () => {
 
     renderWithTheme(
       <KanbanTaskCard
+        allowStatusChange
         card={{
           column: "ISSUE_STATUS_IN_PROGRESS",
           id: "ganttTask:101",
@@ -133,9 +136,35 @@ describe("kanban cards", () => {
     vi.useRealTimers();
   });
 
+  it("does not open the task status menu when status changes are disabled", () => {
+    renderWithTheme(
+      <KanbanTaskCard
+        card={{
+          column: "ISSUE_STATUS_IN_PROGRESS",
+          id: "ganttTask:101",
+          kind: "ganttTask",
+          task: {
+            id: "101",
+            isMilestone: false,
+            progressPercentage: 65,
+            startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_IN_PROGRESS",
+            title: "Started task",
+          },
+          title: "Started task",
+        }}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-101"));
+    expect(screen.queryByRole("menuitem", { name: "blocked" })).not.toBeInTheDocument();
+  });
+
   it("does not open status menu for milestone cards on double click", async () => {
     renderWithTheme(
       <KanbanTaskCard
+        allowStatusChange
         card={{
           column: "ISSUE_STATUS_CLOSED",
           id: "ganttTask:mile-1",

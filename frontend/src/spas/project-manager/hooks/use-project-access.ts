@@ -1,18 +1,13 @@
 import { useCallback } from "react";
 
-import { canEditProject } from "../lib/project-edit-permissions.js";
 import { useProjectPermission } from "./use-project-permission.js";
 
-export function useProjectEditAccess(options: {
+export function useProjectAccess(options: {
   currentUserId: number | undefined;
   projectId: number | null;
   token: string;
 }) {
-  const transform = useCallback(
-    (response: Parameters<typeof canEditProject>[2]) =>
-      canEditProject(options.currentUserId, undefined, response),
-    [options.currentUserId],
-  );
+  const transform = useCallback(() => true, []);
   const permission = useProjectPermission({
     currentUserId: options.currentUserId,
     errorFallbackMessage: "Unable to load project access.",
@@ -22,7 +17,7 @@ export function useProjectEditAccess(options: {
   });
 
   return {
-    canEdit: permission.canAccess,
+    canAccess: permission.canAccess,
     projectAccessErrorMessage: permission.projectAccessErrorMessage,
   };
 }

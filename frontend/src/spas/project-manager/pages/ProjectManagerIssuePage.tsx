@@ -42,7 +42,7 @@ import {
   emitProjectManagerIssueJournalUpdatedEvent,
   subscribeProjectManagerIssueJournalUpdatedEvent,
 } from "../lib/issue-journal-updated-events.js";
-import { useProjectEditAccess } from "../hooks/use-project-edit-access.js";
+import { useProjectAccess } from "../hooks/use-project-access.js";
 
 interface ProjectManagerIssuePageProps {
   commentId: number | null;
@@ -82,7 +82,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [reloadIssueNonce, setReloadIssueNonce] = useState(0);
-  const { canEdit: canEditProjectContent } = useProjectEditAccess({
+  const { canAccess: canManageIssueContent } = useProjectAccess({
     currentUserId: props.currentUserId,
     projectId: props.projectId,
     token: props.token,
@@ -342,7 +342,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
         />
         <IssueDetailsCard issue={issue} />
         <DiscussionJournalSection
-          canEdit={canEditProjectContent}
+          canEdit={canManageIssueContent}
           editorHelpText={ISSUE_MARKDOWN_HELP_TEXT}
           errorMessage={issueJournalErrorMessage}
           isLoading={isIssueJournalLoading}

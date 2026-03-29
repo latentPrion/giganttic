@@ -22,6 +22,7 @@ const CARD_BORDER_WIDTH = 1;
 const CARD_BORDER_RADIUS = 3;
 
 export function KanbanTaskCard(props: {
+  allowStatusChange?: boolean;
   card: KanbanTaskCardModel;
   disabled?: boolean;
   onNavigateToTask?: (taskId: string) => void;
@@ -40,7 +41,7 @@ export function KanbanTaskCard(props: {
     onNavigate: props.onNavigateToTask
       ? () => props.onNavigateToTask?.(task.id)
       : undefined,
-    shouldOpenMenuOnDoubleClick: () => !isReadOnlyMilestone,
+    shouldOpenMenuOnDoubleClick: () => (props.allowStatusChange ?? false) && !isReadOnlyMilestone,
   });
 
   function handleSelectStatus(status: IssueStatus): void {

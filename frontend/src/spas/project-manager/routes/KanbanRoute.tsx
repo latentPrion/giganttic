@@ -10,8 +10,9 @@ export function KanbanRoute() {
 
   return (
     <ProjectManagerAuthenticatedRoute>
-      {(token) => (
+      {(token, currentUserId) => (
         <ProjectManagerKanbanPage
+          currentUserId={currentUserId}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
           token={token}
         />

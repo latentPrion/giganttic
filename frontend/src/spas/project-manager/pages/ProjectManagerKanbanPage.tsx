@@ -35,8 +35,10 @@ import {
   emitGanttRuntimeMetadataReloadRequestedEvent,
 } from "../lib/gantt-runtime-chart-events.js";
 import { updateTaskStatusInChartXml } from "../lib/kanban-task-status-cache-update.js";
+import { useProjectEditAccess } from "../hooks/use-project-edit-access.js";
 
 interface ProjectManagerKanbanPageProps {
+  currentUserId: number;
   projectId: number | null;
   token: string;
 }
@@ -69,6 +71,11 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
   const [isUpdatingCardStatus, setIsUpdatingCardStatus] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [tasks, setTasks] = useState<ParsedGanttKanbanTask[]>([]);
+  const { canEdit: canEditProjectContent } = useProjectEditAccess({
+    currentUserId: props.currentUserId,
+    projectId: props.projectId,
+    token: props.token,
+  });
 
   const columns = useMemo(
     () => createKanbanColumns(issues, tasks),
@@ -209,7 +216,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
   }
 
   function handleTaskStatusChange(taskId: string, status: IssueStatus): void {
-    if (props.projectId === null) {
+    if (props.projectId === null || !canEditProjectContent) {
       return;
     }
 
@@ -261,6 +268,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
           void handleIssueStatusChange(issueId, status);
         }}
         onTaskNavigateToDetail={openTaskDetail}
+        taskStatusChangeEnabled={canEditProjectContent}
         onTaskStatusChange={handleTaskStatusChange}
       />
     );

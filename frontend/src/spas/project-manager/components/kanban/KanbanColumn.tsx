@@ -15,6 +15,7 @@ function renderKanbanCard(
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void,
   onIssueNavigateToDetail: ((issueId: number) => void) | undefined,
   onTaskNavigateToDetail: ((taskId: string) => void) | undefined,
+  taskStatusChangeEnabled: boolean,
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void,
   isBusy: boolean,
 ) {
@@ -22,6 +23,7 @@ function renderKanbanCard(
     case "ganttTask":
       return (
         <KanbanTaskCard
+          allowStatusChange={taskStatusChangeEnabled}
           card={card}
           disabled={isBusy}
           onNavigateToTask={onTaskNavigateToDetail}
@@ -47,6 +49,7 @@ export function KanbanColumn(props: {
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
   onIssueNavigateToDetail?: (issueId: number) => void;
   onTaskNavigateToDetail?: (taskId: string) => void;
+  taskStatusChangeEnabled?: boolean;
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
 }) {
   const { column } = props;
@@ -73,6 +76,7 @@ export function KanbanColumn(props: {
                   props.onIssueStatusChange,
                   props.onIssueNavigateToDetail,
                   props.onTaskNavigateToDetail,
+                  props.taskStatusChangeEnabled ?? false,
                   props.onTaskStatusChange,
                   props.isBusy,
                 )}

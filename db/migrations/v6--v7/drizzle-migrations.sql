@@ -1,7 +1,5 @@
-ALTER TABLE `Projects` RENAME COLUMN `journal` TO `reusable-v7-projects-journal`;
---> statement-breakpoint
-ALTER TABLE `Issues` RENAME COLUMN `journal` TO `reusable-v7-issues-journal`;
---> statement-breakpoint
+ALTER TABLE `Issues` RENAME COLUMN "journal" TO "reusable-v7-issues-journal";--> statement-breakpoint
+ALTER TABLE `Projects` RENAME COLUMN "journal" TO "reusable-v7-projects-journal";--> statement-breakpoint
 CREATE TABLE `Projects_Attachments` (
 	`projectId` integer NOT NULL,
 	`attachmentId` text NOT NULL,

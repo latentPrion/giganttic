@@ -13,7 +13,6 @@ import {
   projects,
 } from "../../../db/index.js";
 import {
-  hasEffectiveProjectManagerRole,
   hasProjectAccess,
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
@@ -37,7 +36,7 @@ const CLOSED_ISSUE_REASON_REQUIRED_MESSAGE =
 const CLOSED_REASON_ONLY_FOR_CLOSED_ISSUE_MESSAGE =
   "Closed reason fields are only valid for closed issues";
 const ISSUE_DELETE_FORBIDDEN_MESSAGE = "Not permitted to delete that issue";
-const ISSUE_MANAGE_FORBIDDEN_MESSAGE = "Not permitted to manage that issue";
+const ISSUE_MODIFY_FORBIDDEN_MESSAGE = "Not permitted to modify that issue";
 const ISSUE_NOT_FOUND_MESSAGE = "Issue not found";
 const ISSUE_VIEW_FORBIDDEN_MESSAGE = "Not permitted to view that issue";
 const PROJECT_NOT_FOUND_MESSAGE = "Project not found";
@@ -181,7 +180,7 @@ export class IssuesService {
     payload: CreateIssueRequest,
   ): Promise<{ issue: IssueResponse }> {
     this.assertProjectExists(projectId);
-    this.assertCanManageIssues(authContext, projectId);
+    this.assertCanModifyIssues(authContext, projectId);
 
     const now = new Date();
     const [createdIssue] = this.databaseService.db.insert(issues)
@@ -258,7 +257,7 @@ export class IssuesService {
     payload: UpdateIssueRequest,
   ): Promise<{ issue: IssueResponse }> {
     this.assertProjectExists(projectId);
-    this.assertCanManageIssues(authContext, projectId);
+    this.assertCanModifyIssues(authContext, projectId);
     const currentIssue = this.getIssueEntityByIdOrThrow(projectId, issueId);
 
     this.databaseService.db.update(issues)
@@ -275,7 +274,7 @@ export class IssuesService {
     markdown: string,
   ): Promise<{ journalExists: boolean; markdown: string | null }> {
     this.assertProjectExists(projectId);
-    this.assertCanManageIssues(authContext, projectId);
+    this.assertCanModifyIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
     await this.journalStorage.writeIssueJournal(projectId, issueId, markdown);
     return {
@@ -290,7 +289,7 @@ export class IssuesService {
     issueId: number,
   ): Promise<DeleteIssueResponse> {
     this.assertProjectExists(projectId);
-    this.assertCanManageIssues(authContext, projectId);
+    this.assertCanModifyIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
 
     await this.issueCommentService.deleteAllCommentBodiesForIssue(projectId, issueId);
@@ -309,7 +308,7 @@ export class IssuesService {
     attachmentId: string,
   ): Promise<{ deletedAttachmentId: string }> {
     this.assertProjectExists(projectId);
-    this.assertCanManageIssues(authContext, projectId);
+    this.assertCanModifyIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
 
     const deletedAttachmentId = await this.attachmentService.deleteIssueAttachmentLink(
@@ -329,12 +328,12 @@ export class IssuesService {
     }
   }
 
-  private assertCanManageIssues(authContext: AuthContext, projectId: number): void {
+  private assertCanModifyIssues(authContext: AuthContext, projectId: number): void {
     assertProjectAccessibleWithScopedPolicy(
       this.databaseService.db,
       authContext,
       projectId,
-      () => this.assertCanManageIssuesNormally(authContext, projectId),
+      () => this.assertCanModifyIssuesNormally(authContext, projectId),
     );
   }
 
@@ -347,9 +346,9 @@ export class IssuesService {
     );
   }
 
-  private assertCanManageIssuesNormally(authContext: AuthContext, projectId: number): void {
-    if (!hasEffectiveProjectManagerRole(this.databaseService.db, projectId, authContext.userId)) {
-      throw new ForbiddenException(ISSUE_MANAGE_FORBIDDEN_MESSAGE);
+  private assertCanModifyIssuesNormally(authContext: AuthContext, projectId: number): void {
+    if (!hasProjectAccess(this.databaseService.db, projectId, authContext.userId)) {
+      throw new ForbiddenException(ISSUE_MODIFY_FORBIDDEN_MESSAGE);
     }
   }
 

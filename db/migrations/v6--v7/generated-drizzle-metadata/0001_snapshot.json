@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "113f489d-8db6-463f-8b34-d862ffc10dec",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "418e17fc-c840-41af-9346-0574a9762963",
+  "prevId": "1e58783e-45de-4b3e-af72-1bd43045093b",
   "tables": {
     "Attachments": {
       "name": "Attachments",
@@ -2901,7 +2901,10 @@
   "_meta": {
     "schemas": {},
     "tables": {},
-    "columns": {}
+    "columns": {
+      "\"Issues\".\"journal\"": "\"Issues\".\"reusable-v7-issues-journal\"",
+      "\"Projects\".\"journal\"": "\"Projects\".\"reusable-v7-projects-journal\""
+    }
   },
   "internal": {
     "indexes": {}

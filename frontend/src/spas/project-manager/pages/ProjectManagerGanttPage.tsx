@@ -69,6 +69,7 @@ const EDIT_SELECTED_MILESTONE_LABEL = "Edit Selected Milestone";
 const EDIT_SELECTED_TASK_LABEL = "Edit Selected Task";
 const MILESTONE_ACTIONS_LABEL = "Milestone actions";
 const TASK_ACTIONS_LABEL = "Task actions";
+const VIEWER_REFRESH_BUTTON_LABEL = "Refresh";
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? "None" : `${projectId}`;
@@ -198,6 +199,24 @@ function renderPersistenceActions(
   );
 }
 
+function renderViewerRefreshAction(
+  isLoading: boolean,
+  isPersisting: boolean,
+  onRefresh: () => void,
+) {
+  return (
+    <Button
+      disabled={isLoading || isPersisting}
+      onClick={onRefresh}
+      size="small"
+      type="button"
+      variant="outlined"
+    >
+      {VIEWER_REFRESH_BUTTON_LABEL}
+    </Button>
+  );
+}
+
 function renderBottomControlActions(
   canEdit: boolean,
   chartSource: GanttChartSource | null,
@@ -270,7 +289,7 @@ function renderBottomControlActions(
             isDirty,
           )}
         </>
-      ) : null}
+      ) : renderViewerRefreshAction(isLoading, isPersisting, onRefresh)}
     </>
   );
 }

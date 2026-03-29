@@ -200,6 +200,31 @@ function createMockProjectResponse(
   };
 }
 
+function createNonPmProjectResponse(
+  projectId: number,
+  viewerUserId: number,
+): GetProjectResponse {
+  return {
+    members: [
+      {
+        roleCodes: [],
+        userId: viewerUserId,
+        username: "viewer-user",
+      },
+    ],
+    organizations: [],
+    project: {
+      createdAt: "2026-01-01T00:00:00.000Z",
+      description: null,
+      id: projectId,
+      name: "Test Project",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    projectManagers: [],
+    teams: [],
+  };
+}
+
 const VIEWER_USER_ID = 9001;
 
 const defaultPageProps = {
@@ -1662,6 +1687,25 @@ describe("ProjectManagerGanttPage", () => {
     expect(screen.getByRole("button", { name: "Choose download format" })).toBeVisible();
     expect(getControlPanel().getByRole("button", { name: "Task actions" })).toBeVisible();
     expect(getControlPanel().getByRole("button", { name: "Milestone actions" })).toBeVisible();
+  });
+
+  it("shows a plain refresh button instead of save actions for non-PM viewers", async () => {
+    getProjectMock.mockImplementationOnce(async (_token: string, projectId: number) =>
+      createNonPmProjectResponse(projectId, VIEWER_USER_ID),
+    );
+
+    renderWithTheme(
+      <ProjectManagerGanttPage {...defaultPageProps} projectId={42} token={TEST_TOKEN} />,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    expect(getControlPanel().getByRole("button", { name: "Refresh" })).toBeVisible();
+    expect(getControlPanel().queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(getControlPanel().queryByRole("button", { name: "Task actions" })).not.toBeInTheDocument();
+    expect(getControlPanel().queryByRole("button", { name: "Milestone actions" })).not.toBeInTheDocument();
   });
 
   it("downloads DHTMLX XML locally after changing the selected format", async () => {

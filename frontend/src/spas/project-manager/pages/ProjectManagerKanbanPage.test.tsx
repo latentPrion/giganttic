@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../../common/api/api-error.js";
+import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { issuesApi } from "../api/issues-api.js";
@@ -16,6 +17,7 @@ import {
 import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
 
 const DEFAULT_TOKEN = "pm-token";
+const DEFAULT_CURRENT_USER_ID = 101;
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
 const ACTIVE_GANTT_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
@@ -39,8 +41,15 @@ vi.mock("../api/gantt-api.js", () => ({
   },
 }));
 
+vi.mock("../../../lobby/api/lobby-api.js", () => ({
+  lobbyApi: {
+    getProject: vi.fn(),
+  },
+}));
+
 const issuesApiMock = vi.mocked(issuesApi);
 const ganttApiMock = vi.mocked(ganttApi);
+const lobbyApiMock = vi.mocked(lobbyApi);
 const navigateMock = vi.fn();
 
 vi.mock("react-router-dom", async () => {
@@ -75,12 +84,49 @@ function getColumn(columnName: "Open" | "In Progress" | "Blocked" | "Closed") {
   return heading.closest(".MuiPaper-root") as HTMLElement;
 }
 
+function renderKanbanPage(projectId: number | null = 42) {
+  return renderWithTheme(
+    <ProjectManagerKanbanPage
+      currentUserId={DEFAULT_CURRENT_USER_ID}
+      projectId={projectId}
+      token={DEFAULT_TOKEN}
+    />,
+  );
+}
+
+function createProjectAccessResponse(options: {
+  projectManagers?: Array<{ sourceKinds: Array<"direct" | "org" | "team">; userId: number; username: string }>;
+} = {}) {
+  return {
+    members: [{
+      roleCodes: [],
+      userId: DEFAULT_CURRENT_USER_ID,
+      username: "demo-user",
+    }],
+    organizations: [],
+    project: {
+      createdAt: DEFAULT_TIMESTAMP,
+      description: "Project description",
+      id: 42,
+      name: "Project 42",
+      updatedAt: DEFAULT_TIMESTAMP,
+    },
+    projectManagers: options.projectManagers ?? [{
+      sourceKinds: ["direct"],
+      userId: DEFAULT_CURRENT_USER_ID,
+      username: "demo-user",
+    }],
+    teams: [],
+  };
+}
+
 describe("ProjectManagerKanbanPage", () => {
   beforeEach(() => {
     clearGanttRuntimeChartCache();
     issuesApiMock.listIssues.mockReset();
     issuesApiMock.updateIssue.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
+    lobbyApiMock.getProject.mockReset();
     navigateMock.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
       issues: [
@@ -107,10 +153,11 @@ describe("ProjectManagerKanbanPage", () => {
       content: ACTIVE_GANTT_XML,
       type: "xml",
     });
+    lobbyApiMock.getProject.mockResolvedValue(createProjectAccessResponse());
   });
 
   it("renders the mixed kanban board with issue columns and visible gantt tasks", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
     expect(await screen.findByText("Selected project: 42")).toBeVisible();
@@ -125,7 +172,7 @@ describe("ProjectManagerKanbanPage", () => {
   });
 
   it("filters out future open gantt tasks", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     await screen.findByText("Started task");
 
@@ -135,7 +182,7 @@ describe("ProjectManagerKanbanPage", () => {
   it("continues rendering the issue board when the chart route returns 404", async () => {
     ganttApiMock.getProjectChartOrNull.mockResolvedValue(null);
 
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(await screen.findByText("Open issue")).toBeVisible();
     expect(screen.queryByText("Started task")).not.toBeInTheDocument();
@@ -147,14 +194,14 @@ describe("ProjectManagerKanbanPage", () => {
       serializedXml: ACTIVE_GANTT_XML,
     });
 
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(await screen.findByText("Started task")).toBeVisible();
     expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
   });
 
   it("re-renders kanban gantt tasks when gantt runtime cache updates while mounted", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(await screen.findByText("Started task")).toBeVisible();
 
@@ -174,7 +221,7 @@ describe("ProjectManagerKanbanPage", () => {
   it("shows an error when issue loading fails", async () => {
     issuesApiMock.listIssues.mockRejectedValue(new Error("Issue load failed"));
 
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(
       await screen.findByText("Unable to load that project kanban board right now."),
@@ -189,13 +236,13 @@ describe("ProjectManagerKanbanPage", () => {
       }),
     );
 
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     expect(await screen.findByText("Chart load failed")).toBeVisible();
   });
 
   it("shows the missing-project fallback without loading data", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={null} token={DEFAULT_TOKEN} />);
+    renderKanbanPage(null);
 
     expect(await screen.findByText("Select a valid project to view its kanban board.")).toBeVisible();
     expect(issuesApiMock.listIssues).not.toHaveBeenCalled();
@@ -203,7 +250,7 @@ describe("ProjectManagerKanbanPage", () => {
   });
 
   it("loads both issues and chart XML for the selected project", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     await waitFor(() => {
       expect(issuesApiMock.listIssues).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
@@ -213,7 +260,7 @@ describe("ProjectManagerKanbanPage", () => {
 
   it("updates issue status on double click and persists to backend", async () => {
     const user = userEvent.setup();
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const issueCard = await screen.findByTestId("kanban-issue-card-1");
     fireEvent.doubleClick(issueCard);
@@ -231,9 +278,31 @@ describe("ProjectManagerKanbanPage", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it("still allows non-PM project participants to change issue status", async () => {
+    const user = userEvent.setup();
+    lobbyApiMock.getProject.mockResolvedValueOnce(createProjectAccessResponse({
+      projectManagers: [],
+    }));
+
+    renderKanbanPage();
+
+    const issueCard = await screen.findByTestId("kanban-issue-card-1");
+    fireEvent.doubleClick(issueCard);
+    await user.click(await screen.findByRole("menuitem", { name: "blocked" }));
+
+    await waitFor(() => {
+      expect(issuesApiMock.updateIssue).toHaveBeenCalledWith(
+        DEFAULT_TOKEN,
+        42,
+        1,
+        expect.objectContaining({ status: "ISSUE_STATUS_BLOCKED" }),
+      );
+    });
+  });
+
   it("does not navigate when dismissing the status menu (double click then click off)", async () => {
     const user = userEvent.setup();
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const issueCard = await screen.findByTestId("kanban-issue-card-1");
     fireEvent.doubleClick(issueCard);
@@ -249,7 +318,7 @@ describe("ProjectManagerKanbanPage", () => {
 
   it("opens the per-issue view on single click", async () => {
     const user = userEvent.setup();
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const issueCard = await screen.findByTestId("kanban-issue-card-1");
     await user.click(issueCard);
@@ -261,7 +330,7 @@ describe("ProjectManagerKanbanPage", () => {
 
   it("opens the task detail view on single click", async () => {
     const user = userEvent.setup();
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const taskCard = await screen.findByTestId("kanban-task-card-101");
     await user.click(taskCard);
@@ -276,7 +345,7 @@ describe("ProjectManagerKanbanPage", () => {
     const metadataReloadListener = vi.fn();
     window.addEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, metadataReloadListener);
 
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const taskCard = await screen.findByTestId("kanban-task-card-101");
     fireEvent.doubleClick(taskCard);
@@ -293,7 +362,7 @@ describe("ProjectManagerKanbanPage", () => {
 
   it("does not navigate when dismissing the task status menu after double click", async () => {
     const user = userEvent.setup();
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
 
     const taskCard = await screen.findByTestId("kanban-task-card-101");
     fireEvent.doubleClick(taskCard);
@@ -304,8 +373,21 @@ describe("ProjectManagerKanbanPage", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it("does not open the task status menu for non-PM project participants", async () => {
+    lobbyApiMock.getProject.mockResolvedValueOnce(createProjectAccessResponse({
+      projectManagers: [],
+    }));
+
+    renderKanbanPage();
+
+    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    fireEvent.doubleClick(taskCard);
+
+    expect(screen.queryByRole("menuitem", { name: "blocked" })).not.toBeInTheDocument();
+  });
+
   it("reloads issues when issue-updated event is emitted", async () => {
-    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+    renderKanbanPage();
     await screen.findByText("Open issue");
     expect(issuesApiMock.listIssues).toHaveBeenCalledTimes(1);
 

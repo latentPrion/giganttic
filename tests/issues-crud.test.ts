@@ -209,7 +209,7 @@ describe("issues crud api", () => {
     expect(listBody.issues.map((issue) => issue.id)).toContain(createBody.issue.id);
   });
 
-  it("allows a direct project member to list and get but not create, update, or delete issues", async () => {
+  it("allows a direct project member to create, list, get, update, and delete issues", async () => {
     const creator = await harness.registerUser("issue-member-creator");
     const member = await harness.registerUser("issue-member");
     const projectResponse = await createProject(creator.accessToken, { name: "Mercury" });
@@ -239,19 +239,24 @@ describe("issues crud api", () => {
     });
     const issueId = harness.parseJson<{ issue: { id: number } }>(createResponse.payload).issue.id;
 
+    const memberCreateResponse = await createIssue(member.accessToken, projectId, {
+      name: "Member created issue",
+    });
     const listResponse = await listIssues(member.accessToken, projectId);
     const getResponse = await getIssue(member.accessToken, projectId, issueId);
-    const forbiddenResponses = await Promise.all([
-      createIssue(member.accessToken, projectId, { name: "Nope" }),
-      updateIssue(member.accessToken, projectId, issueId, { progressPercentage: 25 }),
-      deleteIssue(member.accessToken, projectId, issueId),
-    ]);
+    const updateResponse = await updateIssue(
+      member.accessToken,
+      projectId,
+      issueId,
+      { progressPercentage: 25 },
+    );
+    const deleteResponse = await deleteIssue(member.accessToken, projectId, issueId);
 
+    expect(memberCreateResponse.statusCode).toBe(201);
     expect(listResponse.statusCode).toBe(200);
     expect(getResponse.statusCode).toBe(200);
-    for (const response of forbiddenResponses) {
-      expect(response.statusCode).toBe(403);
-    }
+    expect(updateResponse.statusCode).toBe(200);
+    expect(deleteResponse.statusCode).toBe(200);
   });
 
   it("rejects list and get for an authenticated outsider without project access", async () => {
@@ -271,7 +276,7 @@ describe("issues crud api", () => {
     expect(getResponse.statusCode).toBe(403);
   });
 
-  it("allows a team-derived project-access user to list and get issues but not mutate them", async () => {
+  it("allows a team-derived project-access user to list, get, and create issues", async () => {
     const projectOwner = await harness.registerUser("issue-team-access-owner");
     const teamCreator = await harness.registerUser("issue-team-access-creator");
     const teamMember = await harness.registerUser("issue-team-access-member");
@@ -307,12 +312,12 @@ describe("issues crud api", () => {
     const listResponse = await listIssues(teamMember.accessToken, projectId);
     const getResponse = await getIssue(teamMember.accessToken, projectId, issueId);
     const createResponse = await createIssue(teamMember.accessToken, projectId, {
-      name: "Should fail",
+      name: "Team member created issue",
     });
 
     expect(listResponse.statusCode).toBe(200);
     expect(getResponse.statusCode).toBe(200);
-    expect(createResponse.statusCode).toBe(403);
+    expect(createResponse.statusCode).toBe(201);
   });
 
   it("allows a team-derived project manager to create update and delete issues", async () => {
@@ -817,24 +822,12 @@ describe("issues crud api", () => {
     expect(body.issues.map((issue) => issue.id)).toEqual([secondIssueId, firstIssueId, thirdIssueId]);
   });
 
-  it("keeps the issue row unchanged after blocked validation or unauthorized updates", async () => {
+  it("keeps the issue row unchanged after blocked validation or outsider updates", async () => {
     const creator = await harness.registerUser("issue-atomicity-creator");
-    const member = await harness.registerUser("issue-atomicity-member");
+    const outsider = await harness.registerUser("issue-atomicity-outsider");
     const projectId = harness.parseJson<{ project: { id: number } }>(
       (await createProject(creator.accessToken, { name: "Atomicity Project" })).payload,
     ).project.id;
-    const membershipResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(creator.accessToken),
-      method: "PUT",
-      payload: {
-        members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: creator.user.id },
-          { roleCodes: [], userId: member.user.id },
-        ],
-      },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
-    });
-    expect(membershipResponse.statusCode).toBe(200);
 
     const issueId = harness.parseJson<{ issue: { id: number } }>(
       (await createIssue(creator.accessToken, projectId, {
@@ -848,40 +841,28 @@ describe("issues crud api", () => {
     const invalidUpdate = await updateIssue(creator.accessToken, projectId, issueId, {
       closedReasonDescription: "Should fail",
     });
-    const unauthorizedUpdate = await updateIssue(member.accessToken, projectId, issueId, {
+    const outsiderUpdate = await updateIssue(outsider.accessToken, projectId, issueId, {
       progressPercentage: 90,
     });
     const after = harness.databaseService.db.select().from(issues).where(eq(issues.id, issueId)).get();
 
     expect(invalidUpdate.statusCode).toBe(400);
-    expect(unauthorizedUpdate.statusCode).toBe(403);
+    expect(outsiderUpdate.statusCode).toBe(403);
     expect(after).toEqual(before);
   });
 
-  it("keeps the issue row unchanged after an unauthorized delete", async () => {
+  it("keeps the issue row unchanged after an outsider delete", async () => {
     const creator = await harness.registerUser("issue-delete-atomicity-creator");
-    const member = await harness.registerUser("issue-delete-atomicity-member");
+    const outsider = await harness.registerUser("issue-delete-atomicity-outsider");
     const projectId = harness.parseJson<{ project: { id: number } }>(
       (await createProject(creator.accessToken, { name: "Delete Atomicity Project" })).payload,
     ).project.id;
-    const membershipResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(creator.accessToken),
-      method: "PUT",
-      payload: {
-        members: [
-          { roleCodes: ["GGTC_PROJECTROLE_PROJECT_MANAGER", PROJECT_OWNER_ROLE], userId: creator.user.id },
-          { roleCodes: [], userId: member.user.id },
-        ],
-      },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
-    });
-    expect(membershipResponse.statusCode).toBe(200);
 
     const issueId = harness.parseJson<{ issue: { id: number } }>(
       (await createIssue(creator.accessToken, projectId, { name: "Keep me" })).payload,
     ).issue.id;
 
-    const deleteResponse = await deleteIssue(member.accessToken, projectId, issueId);
+    const deleteResponse = await deleteIssue(outsider.accessToken, projectId, issueId);
 
     expect(deleteResponse.statusCode).toBe(403);
     expect(

@@ -16,6 +16,7 @@ export function KanbanBoard(props: {
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
   onIssueNavigateToDetail?: (issueId: number) => void;
   onTaskNavigateToDetail?: (taskId: string) => void;
+  taskStatusChangeEnabled?: boolean;
   onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
 }) {
   return (
@@ -33,6 +34,7 @@ export function KanbanBoard(props: {
               onIssueStatusChange={props.onIssueStatusChange}
               onIssueNavigateToDetail={props.onIssueNavigateToDetail}
               onTaskNavigateToDetail={props.onTaskNavigateToDetail}
+              taskStatusChangeEnabled={props.taskStatusChangeEnabled}
               onTaskStatusChange={props.onTaskStatusChange}
             />
           </Stack>
