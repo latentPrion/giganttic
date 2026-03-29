@@ -173,7 +173,6 @@ describe("app routing", () => {
         createdAt: "2026-03-08T00:00:00.000Z",
         description: "Issue description",
         id: 7,
-        journal: "Issue journal",
         name: "Issue 7",
         openedAt: "2026-03-08T00:00:00.000Z",
         priority: 2,
@@ -191,7 +190,6 @@ describe("app routing", () => {
         createdAt: "2026-03-08T00:00:00.000Z",
         description: "Issue description",
         id: 7,
-        journal: "Issue journal",
         name: "Issue 7",
         openedAt: "2026-03-08T00:00:00.000Z",
         priority: 2,
@@ -294,6 +292,31 @@ describe("app routing", () => {
     expect(
       screen.getByRole("heading", { name: "About" }),
     ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Github" }),
+    ).toHaveAttribute("href", "https://github.com/latentprion");
+    expect(
+      screen.getByRole("link", { name: "LinkedIn" }),
+    ).toHaveAttribute("href", "https://www.linkedin.com/in/kofi-doku-atuah-0142054a/");
+    expect(
+      screen.getByText(/Giganttic is built by LatentPrion/i),
+    ).toBeVisible();
+  });
+
+  it("does not render the profile links on the public home route", () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/"],
+    });
+
+    expect(
+      screen.queryByRole("link", { name: "Github" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "LinkedIn" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("What Giganttic Can Do"),
+    ).toBeVisible();
   });
 
   it("renders the authenticated username as a lobby link", async () => {
@@ -326,7 +349,7 @@ describe("app routing", () => {
     });
 
     expect(
-      await screen.findByText("Giganttic, built by LatentPrion"),
+      await screen.findByText("Run projects with clarity."),
     ).toBeVisible();
   });
 
@@ -350,7 +373,7 @@ describe("app routing", () => {
     });
 
     expect(
-      await screen.findByText("Giganttic, built by LatentPrion"),
+      await screen.findByText("Run projects with clarity."),
     ).toBeVisible();
   });
 
@@ -439,7 +462,7 @@ describe("app routing", () => {
       initialEntries: ["/auth/scoped-token-login?token=scoped-token-abc"],
     });
 
-    expect(await screen.findByText("Giganttic, built by LatentPrion")).toBeVisible();
+    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
     expect(authTokenStorageMock.write).toHaveBeenCalledWith("scoped-login-token");
   });
@@ -527,7 +550,7 @@ describe("app routing", () => {
     });
 
     expect(
-      await screen.findByText("Giganttic, built by LatentPrion"),
+      await screen.findByText("Run projects with clarity."),
     ).toBeVisible();
   });
 
@@ -550,7 +573,7 @@ describe("app routing", () => {
     });
 
     expect(
-      await screen.findByText("Giganttic, built by LatentPrion"),
+      await screen.findByText("Run projects with clarity."),
     ).toBeVisible();
   });
 

@@ -14,11 +14,14 @@ import { IssueViewButton } from "../../../common/components/entity-actions/Issue
 import { IssueListItem } from "../../../common/components/entity-list/IssueListItem.js";
 import type { EntityListItemViewMode } from "../../../common/components/entity-list/entity-list-item.types.js";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { issueJournalApi } from "../api/issue-journal-api.js";
 import { issuesApi } from "../api/issues-api.js";
 import { IssueAttachmentsPanel } from "../components/issues/IssueAttachmentsPanel.js";
 import { IssueCommentsPanel } from "../components/issues/IssueCommentsPanel.js";
 import { IssueDetailsCard } from "../components/issues/IssueDetailsCard.js";
 import { IssueEditModal } from "../components/issues/IssueEditModal.js";
+import { DiscussionJournalSection } from "../components/discussion/DiscussionJournalSection.js";
+import { IssueMarkdownRender, ISSUE_MARKDOWN_HELP_TEXT } from "../components/issues/IssueMarkdownRender.js";
 import { IssueSummaryModal } from "../components/issues/IssueSummaryModal.js";
 import { DiscussionWorkspaceTabs } from "../components/discussion/DiscussionWorkspaceTabs.js";
 import type { IssueDetailTab } from "../contracts/route-query.contracts.js";
@@ -35,6 +38,11 @@ import {
   emitProjectManagerIssueUpdatedEvent,
   subscribeProjectManagerIssueUpdatedEvent,
 } from "../lib/issue-updated-events.js";
+import {
+  emitProjectManagerIssueJournalUpdatedEvent,
+  subscribeProjectManagerIssueJournalUpdatedEvent,
+} from "../lib/issue-journal-updated-events.js";
+import { useProjectEditAccess } from "../hooks/use-project-edit-access.js";
 
 interface ProjectManagerIssuePageProps {
   commentId: number | null;
@@ -62,11 +70,23 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isIssueJournalLoading, setIsIssueJournalLoading] = useState(
+    props.issueId !== null && props.projectId !== null,
+  );
+  const [isIssueJournalSaving, setIsIssueJournalSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(props.issueId !== null && props.projectId !== null);
   const [issue, setIssue] = useState<Issue | null>(null);
+  const [issueJournalErrorMessage, setIssueJournalErrorMessage] = useState<string | null>(null);
+  const [issueJournalExists, setIssueJournalExists] = useState(false);
+  const [issueJournalMarkdown, setIssueJournalMarkdown] = useState<string | null>(null);
   const [issueSummaryRefreshKey, setIssueSummaryRefreshKey] = useState(0);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [reloadIssueNonce, setReloadIssueNonce] = useState(0);
+  const { canEdit: canEditProjectContent } = useProjectEditAccess({
+    currentUserId: props.currentUserId,
+    projectId: props.projectId,
+    token: props.token,
+  });
 
   useEffect(() => {
     if (props.issueId === null || props.projectId === null) {
@@ -104,6 +124,54 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
       isMounted = false;
     };
   }, [props.issueId, props.projectId, props.token, reloadIssueNonce]);
+
+  useEffect(() => {
+    if (props.issueId === null || props.projectId === null) {
+      setIssueJournalErrorMessage(null);
+      setIssueJournalExists(false);
+      setIssueJournalMarkdown(null);
+      setIsIssueJournalLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadIssueJournal(): Promise<void> {
+      setIssueJournalErrorMessage(null);
+      setIsIssueJournalLoading(true);
+
+      try {
+        const response = await issueJournalApi.getJournal(
+          props.token,
+          props.projectId!,
+          props.issueId!,
+        );
+        if (mounted) {
+          setIssueJournalExists(response.journalExists);
+          setIssueJournalMarkdown(response.markdown);
+        }
+      } catch (error) {
+        if (mounted) {
+          setIssueJournalErrorMessage(
+            buildErrorMessage(error, "Unable to load the issue journal."),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setIsIssueJournalLoading(false);
+        }
+      }
+    }
+
+    void loadIssueJournal();
+
+    return subscribeProjectManagerIssueJournalUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId || detail.issueId !== props.issueId) {
+        return;
+      }
+      void loadIssueJournal();
+    });
+  }, [props.issueId, props.projectId, props.token]);
 
   useEffect(() => {
     if (props.projectId === null || props.issueId === null) {
@@ -185,6 +253,34 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     }
   }
 
+  async function handleSaveIssueJournal(markdown: string): Promise<void> {
+    if (props.issueId === null || props.projectId === null) {
+      return;
+    }
+
+    setIsIssueJournalSaving(true);
+    setIssueJournalErrorMessage(null);
+    try {
+      const response = await issueJournalApi.updateJournal(
+        props.token,
+        props.projectId,
+        props.issueId,
+        markdown,
+      );
+      setIssueJournalExists(response.journalExists);
+      setIssueJournalMarkdown(response.markdown);
+      emitProjectManagerIssueJournalUpdatedEvent({
+        issueId: props.issueId,
+        projectId: props.projectId,
+      });
+    } catch (error) {
+      setIssueJournalErrorMessage(buildErrorMessage(error, "Unable to save the issue journal."));
+      throw error;
+    } finally {
+      setIsIssueJournalSaving(false);
+    }
+  }
+
   async function handleDeleteIssue(issueRowId: number): Promise<void> {
     if (props.projectId === null) {
       return;
@@ -245,6 +341,25 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
           viewMode={VIEW_MODE}
         />
         <IssueDetailsCard issue={issue} />
+        <DiscussionJournalSection
+          canEdit={canEditProjectContent}
+          editorHelpText={ISSUE_MARKDOWN_HELP_TEXT}
+          errorMessage={issueJournalErrorMessage}
+          isLoading={isIssueJournalLoading}
+          isSaving={isIssueJournalSaving}
+          journalExists={issueJournalExists}
+          markdown={issueJournalMarkdown}
+          onSave={handleSaveIssueJournal}
+          renderMarkdown={(markdown) => (
+            <IssueMarkdownRender
+              issueId={issue.id}
+              markdown={markdown}
+              projectId={issue.projectId}
+              token={props.token}
+            />
+          )}
+          title="Issue Journal"
+        />
       </Stack>
     );
   }

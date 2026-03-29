@@ -26,6 +26,7 @@ import { ProjectListItem } from "../../../common/components/entity-list/ProjectL
 import { TeamListItem } from "../../../common/components/entity-list/TeamListItem.js";
 import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import { projectJournalApi } from "../api/project-journal-api.js";
 import { OrganizationCreateModal } from "../../../lobby/components/organization/OrganizationCreateModal.js";
 import { OrganizationSummaryModal } from "../../../lobby/components/organization/OrganizationSummaryModal.js";
 import { ProjectEditModal } from "../../../lobby/components/project/ProjectEditModal.js";
@@ -45,8 +46,15 @@ import type {
 } from "../../../lobby/contracts/lobby.contracts.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { EntityAssociationModal } from "../components/projects/EntityAssociationModal.js";
+import { DiscussionJournalSection } from "../components/discussion/DiscussionJournalSection.js";
 import { ProjectDetailsCard } from "../components/projects/ProjectDetailsCard.js";
+import { ProjectAttachmentsPanel } from "../components/projects/ProjectAttachmentsPanel.js";
+import { ProjectMarkdownRender, PROJECT_MARKDOWN_HELP_TEXT } from "../components/projects/ProjectMarkdownRender.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
+import {
+  emitProjectManagerProjectJournalUpdatedEvent,
+  subscribeProjectManagerProjectJournalUpdatedEvent,
+} from "../lib/project-journal-updated-events.js";
 import {
   createProjectIssuesRoute,
   createProjectManagerOrganizationRoute,
@@ -63,6 +71,7 @@ interface ProjectManagerProjectPageProps {
 
 const ASSOCIATE_EXISTING_ORGANIZATION_LABEL = "Associate Existing Organization";
 const ASSOCIATE_EXISTING_TEAM_LABEL = "Associate Existing Team";
+const ATTACHMENTS_TAB_LABEL = "Attachments";
 const DEFAULT_ERROR_MESSAGE = "Unable to load that project right now.";
 const DETAIL_SOURCE_LABEL = "Direct";
 const DETAILS_TAB_LABEL = "Details";
@@ -80,7 +89,7 @@ const SYSTEM_ADMIN_ROLE_CODE = "GGTC_SYSTEMROLE_ADMIN";
 const TEAMS_TAB_LABEL = "Teams";
 const TEAM_SOURCE_LABEL = "Team";
 
-type ProjectDetailsTabValue = "details" | "organizations" | "teams";
+type ProjectDetailsTabValue = "attachments" | "details" | "organizations" | "teams";
 
 function buildErrorMessage(error: unknown, fallback: string): string {
   return getApiErrorMessage(error, fallback);
@@ -215,8 +224,15 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
   const [isCreateAndAssociateTeamModalOpen, setIsCreateAndAssociateTeamModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
+  const [isProjectJournalLoading, setIsProjectJournalLoading] = useState(
+    props.projectId !== null,
+  );
+  const [isProjectJournalSaving, setIsProjectJournalSaving] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [organizationSummaryTargetId, setOrganizationSummaryTargetId] = useState<number | null>(null);
+  const [projectJournalErrorMessage, setProjectJournalErrorMessage] = useState<string | null>(null);
+  const [projectJournalExists, setProjectJournalExists] = useState(false);
+  const [projectJournalMarkdown, setProjectJournalMarkdown] = useState<string | null>(null);
   const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
   const [projectSummaryRefreshKey, setProjectSummaryRefreshKey] = useState(0);
   const [teamSummaryTargetId, setTeamSummaryTargetId] = useState<number | null>(null);
@@ -281,6 +297,53 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
     };
   }, [props.projectId, props.token, projectSummaryRefreshKey]);
 
+  useEffect(() => {
+    if (props.projectId === null) {
+      setProjectJournalErrorMessage(null);
+      setProjectJournalExists(false);
+      setProjectJournalMarkdown(null);
+      setIsProjectJournalLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadProjectJournal(): Promise<void> {
+      setIsProjectJournalLoading(true);
+      setProjectJournalErrorMessage(null);
+
+      try {
+        const response = await projectJournalApi.getJournal(
+          props.token,
+          props.projectId!,
+          null,
+        );
+        if (mounted) {
+          setProjectJournalExists(response.journalExists);
+          setProjectJournalMarkdown(response.markdown);
+        }
+      } catch (error) {
+        if (mounted) {
+          setProjectJournalErrorMessage(buildErrorMessage(error, "Unable to load the project journal."));
+        }
+      } finally {
+        if (mounted) {
+          setIsProjectJournalLoading(false);
+        }
+      }
+    }
+
+    void loadProjectJournal();
+
+    return subscribeProjectManagerProjectJournalUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+
+      void loadProjectJournal();
+    });
+  }, [props.projectId, props.token]);
+
   function navigateToIssues(): void {
     if (props.projectId === null) {
       navigate("/pm/project/issues");
@@ -335,6 +398,32 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
       return response.project;
     } finally {
       setBusyKey(null);
+    }
+  }
+
+  async function handleSaveProjectJournal(markdown: string): Promise<void> {
+    if (props.projectId === null) {
+      return;
+    }
+
+    setIsProjectJournalSaving(true);
+    setProjectJournalErrorMessage(null);
+
+    try {
+      const response = await projectJournalApi.updateJournal(
+        props.token,
+        props.projectId,
+        null,
+        markdown,
+      );
+      setProjectJournalExists(response.journalExists);
+      setProjectJournalMarkdown(response.markdown);
+      emitProjectManagerProjectJournalUpdatedEvent({ projectId: props.projectId });
+    } catch (error) {
+      setProjectJournalErrorMessage(buildErrorMessage(error, "Unable to save the project journal."));
+      throw error;
+    } finally {
+      setIsProjectJournalSaving(false);
     }
   }
 
@@ -527,6 +616,24 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
     return (
       <Stack spacing={2}>
         <ProjectDetailsCard projectResponse={projectResponse} />
+        <DiscussionJournalSection
+          canEdit={allowProjectEdit}
+          editorHelpText={PROJECT_MARKDOWN_HELP_TEXT}
+          errorMessage={projectJournalErrorMessage}
+          isLoading={isProjectJournalLoading}
+          isSaving={isProjectJournalSaving}
+          journalExists={projectJournalExists}
+          markdown={projectJournalMarkdown}
+          onSave={handleSaveProjectJournal}
+          renderMarkdown={(markdown) => (
+            <ProjectMarkdownRender
+              markdown={markdown}
+              projectId={projectResponse.project.id}
+              token={props.token}
+            />
+          )}
+          title="Project Journal"
+        />
         <Stack spacing={1.25}>
           <Typography component="h2" variant="h6">
             {PROJECT_OWNERS_HEADING}
@@ -576,6 +683,14 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
     }
 
     switch (activeTab) {
+      case "attachments":
+        return (
+          <ProjectAttachmentsPanel
+            isActive={activeTab === "attachments"}
+            projectId={project.id}
+            token={props.token}
+          />
+        );
       case "teams":
         return renderTeamTabContent();
       case "organizations":
@@ -641,6 +756,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           value={activeTab}
         >
           <Tab label={DETAILS_TAB_LABEL} value="details" />
+          <Tab label={ATTACHMENTS_TAB_LABEL} value="attachments" />
           <Tab label={TEAMS_TAB_LABEL} value="teams" />
           <Tab label={ORGANIZATIONS_TAB_LABEL} value="organizations" />
         </Tabs>

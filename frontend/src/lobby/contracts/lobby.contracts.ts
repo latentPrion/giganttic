@@ -7,7 +7,6 @@ const projectSchema = z.object({
   createdAt: timestampSchema,
   description: z.string().nullable(),
   id: z.number().int().positive(),
-  journal: z.string().nullable().optional(),
   name: z.string(),
   updatedAt: timestampSchema,
 });
@@ -69,7 +68,6 @@ export const listProjectsResponseSchema = z.object({
 });
 export const createProjectRequestSchema = z.object({
   description: z.string().trim().min(1).nullable().optional(),
-  journal: z.string().trim().min(1).nullable().optional(),
   name: z.string().trim().min(1),
 });
 export const createProjectResponseSchema = z.object({
@@ -84,10 +82,9 @@ export const getProjectResponseSchema = z.object({
 });
 export const updateProjectRequestSchema = z.object({
   description: z.string().trim().min(1).nullable().optional(),
-  journal: z.string().trim().min(1).nullable().optional(),
   name: z.string().trim().min(1).optional(),
 }).refine(
-  (value) => value.description !== undefined || value.journal !== undefined || value.name !== undefined,
+  (value) => value.description !== undefined || value.name !== undefined,
   "At least one field must be provided",
 );
 export const updateProjectResponseSchema = z.object({

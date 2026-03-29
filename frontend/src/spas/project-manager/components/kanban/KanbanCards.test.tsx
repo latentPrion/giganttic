@@ -22,7 +22,6 @@ describe("kanban cards", () => {
             createdAt: DEFAULT_TIMESTAMP,
             description: "Investigate the blocker",
             id: 9,
-            journal: "Blocked on dependency",
             name: "Blocked issue",
             openedAt: DEFAULT_TIMESTAMP,
             priority: 3,

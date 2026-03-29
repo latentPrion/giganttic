@@ -1,8 +1,6 @@
 import React from "react";
 import {
   Box,
-  Divider,
-  Link,
   Paper,
   Stack,
   Typography,
@@ -11,11 +9,71 @@ import {
 import { useSessionManager } from "../../common/session/hooks/useSessionManager.js";
 import { LoggedOutSessionManager } from "../../common/session/components/LoggedOutSessionManager.js";
 
-const GITHUB_HREF = "https://github.com/latentprion";
-const GITHUB_LABEL = "Github";
-const HERO_MESSAGE = "Giganttic, built by LatentPrion";
-const LINKEDIN_HREF = "https://www.linkedin.com/in/kofi-doku-atuah-0142054a/";
-const LINKEDIN_LABEL = "LinkedIn";
+const FEATURE_SECTION_LABEL = "What Giganttic Can Do";
+const HERO_HEADLINE = "Run projects with clarity.";
+const HERO_SUPPORTING_COPY =
+  "Giganttic brings scheduling, issue tracking, task discussion, and access-controlled collaboration into one structured workspace, including client-facing read-only project access for viewing gantt charts and participating through issues, comments, and attachments.";
+
+const HOME_FEATURES = [
+  {
+    description: "Plan timelines with gantt charts, milestones, and live task updates.",
+    title: "Schedule work",
+  },
+  {
+    description: "Track blockers, progress, comments, and attachments without losing context.",
+    title: "Manage delivery",
+  },
+  {
+    description: "Coordinate projects, teams, and organizations with explicit scoped permissions.",
+    title: "Control access",
+  },
+  {
+    description: "Give clients read-only access so they can follow the gantt chart, raise issues, and collaborate through comments and attachments.",
+    title: "Share with clients",
+  },
+  {
+    description: "Keep journals and discussions close to the project, issue, or task they belong to.",
+    title: "Capture decisions",
+  },
+] as const;
+
+function HomeFeatureHighlights() {
+  return (
+    <Paper
+      sx={(theme) => ({
+        backgroundColor: theme.palette.background.default,
+        border: 1,
+        borderColor: theme.palette.divider,
+        borderRadius: 3,
+        padding: { xs: 1.25, sm: 1.5 },
+        width: "100%",
+      })}
+      variant="outlined"
+    >
+      <Stack spacing={1.25}>
+        <Typography color="text.secondary" variant="overline">
+          {FEATURE_SECTION_LABEL}
+        </Typography>
+        <Stack spacing={1}>
+          {HOME_FEATURES.map((feature) => (
+            <Paper
+              key={feature.title}
+              sx={{ borderRadius: 2, padding: 1.25 }}
+              variant="outlined"
+            >
+              <Stack spacing={0.35}>
+                <Typography variant="subtitle1">{feature.title}</Typography>
+                <Typography color="text.secondary" variant="body2">
+                  {feature.description}
+                </Typography>
+              </Stack>
+            </Paper>
+          ))}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
 
 export function HomeHero() {
   const { actions, authState, isBusy } = useSessionManager();
@@ -60,38 +118,16 @@ export function HomeHero() {
               overflowWrap: "anywhere",
             }}
           >
-            {HERO_MESSAGE}
+            {HERO_HEADLINE}
           </Typography>
-          <Stack
-            direction={{ sm: "row", xs: "column" }}
-            justifyContent="center"
-            spacing={2}
-            sx={(theme) => ({
-              alignItems: "center",
-              backgroundColor: theme.palette.action.hover,
-              border: 1,
-              borderColor: theme.palette.divider,
-              borderRadius: 999,
-              padding: "0.5rem 1.25rem",
-              width: "100%",
-            })}
+          <Typography
+            color="text.secondary"
+            sx={{ maxWidth: 680 }}
+            variant="h6"
           >
-            <Link href={GITHUB_HREF} rel="noreferrer" target="_blank" underline="hover">
-              {GITHUB_LABEL}
-            </Link>
-            <Divider
-              flexItem
-              orientation="vertical"
-              sx={{ display: { xs: "none", sm: "block" } }}
-            />
-            <Divider
-              flexItem
-              sx={{ display: { xs: "block", sm: "none" } }}
-            />
-            <Link href={LINKEDIN_HREF} rel="noreferrer" target="_blank" underline="hover">
-              {LINKEDIN_LABEL}
-            </Link>
-          </Stack>
+            {HERO_SUPPORTING_COPY}
+          </Typography>
+          <HomeFeatureHighlights />
         {shouldShowAuthCta ? (
           <LoggedOutSessionManager
             buttonSize="large"

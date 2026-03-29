@@ -42,11 +42,16 @@ describe("TaskMirrorService", () => {
     removeOrphanAttachmentsAndFiles: removeOrphanAttachmentsAndFilesMock,
   };
 
+  const journalStorage = {
+    deleteTaskJournal: vi.fn(),
+  };
+
   const service = new TaskMirrorService(
     databaseService as never,
     projectChartsService as never,
     commentBodyStorage as never,
     attachmentService as never,
+    journalStorage as never,
   );
 
   beforeEach(() => {

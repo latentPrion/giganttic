@@ -43,7 +43,10 @@ export interface BackendConfig {
   }>;
   untrustedContentAttachmentsDir: string;
   untrustedContentIssueCommentsDir: string;
+  untrustedContentIssueJournalsDir: string;
+  untrustedContentProjectJournalsDir: string;
   untrustedContentTaskCommentsDir: string;
+  untrustedContentTaskJournalsDir: string;
 }
 
 export const BACKEND_CONFIG = Symbol("BACKEND_CONFIG");
@@ -56,8 +59,20 @@ function createDefaultUntrustedIssueCommentsDir(cwd: string): string {
   return path.join(cwd, "untrusted-content", "issue-comments");
 }
 
+function createDefaultUntrustedIssueJournalsDir(cwd: string): string {
+  return path.join(cwd, "untrusted-content", "issue-journals");
+}
+
+function createDefaultUntrustedProjectJournalsDir(cwd: string): string {
+  return path.join(cwd, "untrusted-content", "project-journals");
+}
+
 function createDefaultUntrustedTaskCommentsDir(cwd: string): string {
   return path.join(cwd, "untrusted-content", "task-comments");
+}
+
+function createDefaultUntrustedTaskJournalsDir(cwd: string): string {
+  return path.join(cwd, "untrusted-content", "task-journals");
 }
 
 function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessionRouteAllowlist"] {
@@ -69,13 +84,27 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
     { method: "GET", pattern: "/projects" },
     { method: "GET", pattern: "/projects/chart-export-capabilities" },
     { method: "GET", pattern: "/projects/:projectId" },
+    { method: "GET", pattern: "/projects/:projectId/journal" },
+    { method: "PUT", pattern: "/projects/:projectId/journal" },
     { method: "GET", pattern: "/projects/:projectId/chart" },
     { method: "PUT", pattern: "/projects/:projectId/chart" },
+    { method: "GET", pattern: "/projects/:projectId/attachments" },
+    { method: "POST", pattern: "/projects/:projectId/attachments" },
+    {
+      method: "DELETE",
+      pattern: "/projects/:projectId/attachments/:attachmentId",
+    },
+    {
+      method: "GET",
+      pattern: "/projects/:projectId/attachments/:attachmentId/download",
+    },
     { method: "GET", pattern: "/projects/:projectId/issues" },
     { method: "POST", pattern: "/projects/:projectId/issues" },
     { method: "GET", pattern: "/projects/:projectId/issues/:issueId" },
     { method: "PATCH", pattern: "/projects/:projectId/issues/:issueId" },
     { method: "DELETE", pattern: "/projects/:projectId/issues/:issueId" },
+    { method: "GET", pattern: "/projects/:projectId/issues/:issueId/journal" },
+    { method: "PUT", pattern: "/projects/:projectId/issues/:issueId/journal" },
     { method: "GET", pattern: "/projects/:projectId/issues/:issueId/comments" },
     { method: "POST", pattern: "/projects/:projectId/issues/:issueId/comments" },
     {
@@ -152,6 +181,8 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
       pattern:
         "/projects/:projectId/tasks/:taskId/attachments/:attachmentId/download",
     },
+    { method: "GET", pattern: "/projects/:projectId/tasks/:taskId/journal" },
+    { method: "PUT", pattern: "/projects/:projectId/tasks/:taskId/journal" },
   ];
 }
 
@@ -176,7 +207,10 @@ export function buildBackendConfig(
     scopedSessionRouteAllowlist: createDefaultScopedSessionRouteAllowlist(),
     untrustedContentAttachmentsDir: createDefaultUntrustedAttachmentsDir(cwd),
     untrustedContentIssueCommentsDir: createDefaultUntrustedIssueCommentsDir(cwd),
+    untrustedContentIssueJournalsDir: createDefaultUntrustedIssueJournalsDir(cwd),
+    untrustedContentProjectJournalsDir: createDefaultUntrustedProjectJournalsDir(cwd),
     untrustedContentTaskCommentsDir: createDefaultUntrustedTaskCommentsDir(cwd),
+    untrustedContentTaskJournalsDir: createDefaultUntrustedTaskJournalsDir(cwd),
     ...overrides,
   };
 }
@@ -210,9 +244,30 @@ export function buildBackendConfigFromEnv(
       : path.resolve(cwd, raw);
   }
 
+  if (env.GGTC_UNTRUSTED_ISSUE_JOURNALS_DIR?.trim()) {
+    const raw = env.GGTC_UNTRUSTED_ISSUE_JOURNALS_DIR.trim();
+    overrides.untrustedContentIssueJournalsDir = path.isAbsolute(raw)
+      ? raw
+      : path.resolve(cwd, raw);
+  }
+
+  if (env.GGTC_UNTRUSTED_PROJECT_JOURNALS_DIR?.trim()) {
+    const raw = env.GGTC_UNTRUSTED_PROJECT_JOURNALS_DIR.trim();
+    overrides.untrustedContentProjectJournalsDir = path.isAbsolute(raw)
+      ? raw
+      : path.resolve(cwd, raw);
+  }
+
   if (env.GGTC_UNTRUSTED_TASK_COMMENTS_DIR?.trim()) {
     const raw = env.GGTC_UNTRUSTED_TASK_COMMENTS_DIR.trim();
     overrides.untrustedContentTaskCommentsDir = path.isAbsolute(raw)
+      ? raw
+      : path.resolve(cwd, raw);
+  }
+
+  if (env.GGTC_UNTRUSTED_TASK_JOURNALS_DIR?.trim()) {
+    const raw = env.GGTC_UNTRUSTED_TASK_JOURNALS_DIR.trim();
+    overrides.untrustedContentTaskJournalsDir = path.isAbsolute(raw)
       ? raw
       : path.resolve(cwd, raw);
   }

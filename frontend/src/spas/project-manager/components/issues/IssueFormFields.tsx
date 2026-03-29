@@ -14,7 +14,6 @@ interface IssueFormState {
   closedReason: ClosedReason | "";
   closedReasonDescription: string;
   description: string;
-  journal: string;
   name: string;
   priority: string;
   progressPercentage: string;
@@ -47,7 +46,6 @@ const ISSUE_PROGRESS_PERCENTAGE_MINIMUM = 0;
 const ISSUE_PRIORITY_OPTIONS = createIssuePriorityOptions();
 const ISSUE_FIELD_NAME = "name";
 const ISSUE_FIELD_DESCRIPTION = "description";
-const ISSUE_FIELD_JOURNAL = "journal";
 const ISSUE_FIELD_STATUS = "status";
 const ISSUE_FIELD_PRIORITY = "priority";
 const ISSUE_FIELD_PROGRESS_PERCENTAGE = "progressPercentage";
@@ -87,15 +85,6 @@ export function IssueFormFields(props: IssueFormFieldsProps) {
         name={ISSUE_FIELD_DESCRIPTION}
         onChange={(event) => props.onFieldChange("description", event.target.value)}
         value={props.formState.description}
-      />
-      <TextField
-        id="issue-journal"
-        label="Journal"
-        minRows={4}
-        multiline
-        name={ISSUE_FIELD_JOURNAL}
-        onChange={(event) => props.onFieldChange("journal", event.target.value)}
-        value={props.formState.journal}
       />
       <TextField
         id="issue-status"

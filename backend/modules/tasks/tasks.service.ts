@@ -14,6 +14,7 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionAttachmentService } from "../discussion/discussion-attachment.service.js";
+import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { TaskMirrorService } from "./task-mirror.service.js";
 
@@ -31,6 +32,8 @@ export class TasksService {
     private readonly taskMirrorService: TaskMirrorService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
+    @Inject(DiscussionJournalStorageService)
+    private readonly journalStorage: DiscussionJournalStorageService,
   ) {}
 
   validateTaskReadableForCurrentUser(
@@ -90,6 +93,62 @@ export class TasksService {
     );
 
     return { deletedAttachmentId };
+  }
+
+  async getTaskJournal(
+    authContext: AuthContext,
+    projectId: number,
+    taskId: string,
+  ): Promise<{
+    journalExists: boolean;
+    markdown: string | null;
+    taskMirrorExists: boolean;
+  }> {
+    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    const taskMirrorExists = this.taskMirrorService.taskMirrorExists(projectId, taskId);
+    const markdown = taskMirrorExists
+      ? await this.journalStorage.readTaskJournal(projectId, taskId)
+      : null;
+
+    return {
+      journalExists: markdown !== null,
+      markdown,
+      taskMirrorExists,
+    };
+  }
+
+  async updateTaskJournal(
+    authContext: AuthContext,
+    projectId: number,
+    taskId: string,
+    markdown: string,
+  ): Promise<{
+    journalExists: boolean;
+    markdown: string | null;
+    taskMirrorExists: boolean;
+  }> {
+    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
+
+    const taskMirrorExisted = this.taskMirrorService.taskMirrorExists(projectId, taskId);
+    if (!taskMirrorExisted) {
+      this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+    }
+
+    try {
+      await this.journalStorage.writeTaskJournal(projectId, taskId, markdown);
+    } catch (error) {
+      if (!taskMirrorExisted) {
+        this.taskMirrorService.deleteTaskMirror(projectId, taskId);
+      }
+      throw error;
+    }
+
+    return {
+      journalExists: true,
+      markdown,
+      taskMirrorExists: true,
+    };
   }
 
   private assertProjectExists(projectId: number): void {

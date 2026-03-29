@@ -42,7 +42,6 @@ export const issueSchema = z.object({
   createdAt: z.string(),
   description: z.string().nullable(),
   id: z.number().int().positive(),
-  journal: z.string().nullable(),
   name: z.string(),
   openedAt: z.string(),
   priority: createIssuePrioritySchema(),
@@ -64,7 +63,6 @@ export const createIssueRequestSchema = z.object({
   closedReason: closedReasonSchema.nullable().optional(),
   closedReasonDescription: createOptionalNullableTextSchema(),
   description: createOptionalNullableTextSchema(),
-  journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema(),
   priority: createIssuePrioritySchema().optional(),
   progressPercentage: createProgressPercentageSchema().optional(),
@@ -79,7 +77,6 @@ export const updateIssueRequestSchema = z.object({
   closedReason: closedReasonSchema.nullable().optional(),
   closedReasonDescription: createOptionalNullableTextSchema(),
   description: createOptionalNullableTextSchema(),
-  journal: createOptionalNullableTextSchema(),
   name: createIssueNameSchema().optional(),
   priority: createIssuePrioritySchema().optional(),
   progressPercentage: createProgressPercentageSchema().optional(),
@@ -89,7 +86,6 @@ export const updateIssueRequestSchema = z.object({
     value.closedReason !== undefined
     || value.closedReasonDescription !== undefined
     || value.description !== undefined
-    || value.journal !== undefined
     || value.name !== undefined
     || value.priority !== undefined
     || value.progressPercentage !== undefined

@@ -5,6 +5,7 @@ import { taskComments, taskMirror } from "../../../db/index.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionAttachmentService } from "../discussion/discussion-attachment.service.js";
 import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
+import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import { ProjectChartsService } from "../project-charts/project-charts.service.js";
 import { collectProjectChartTaskIdsBestEffort } from "../project-charts/project-chart-task-id-validation.js";
 
@@ -21,6 +22,8 @@ export class TaskMirrorService {
     private readonly commentBodyStorage: DiscussionCommentBodyStorageService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
+    @Inject(DiscussionJournalStorageService)
+    private readonly journalStorage: DiscussionJournalStorageService,
   ) {}
 
   ensureTaskMirrorExists(projectId: number, taskId: string): void {
@@ -35,6 +38,32 @@ export class TaskMirrorService {
     if (!taskIds.includes(taskId)) {
       throw new NotFoundException(TASK_NOT_FOUND_MESSAGE);
     }
+  }
+
+  taskMirrorExists(projectId: number, taskId: string): boolean {
+    const row = this.databaseService.db
+      .select({ projectId: taskMirror.projectId })
+      .from(taskMirror)
+      .where(
+        and(
+          eq(taskMirror.projectId, projectId),
+          eq(taskMirror.taskId, taskId),
+        ),
+      )
+      .get();
+
+    return Boolean(row);
+  }
+
+  deleteTaskMirror(projectId: number, taskId: string): void {
+    this.databaseService.db.delete(taskMirror)
+      .where(
+        and(
+          eq(taskMirror.projectId, projectId),
+          eq(taskMirror.taskId, taskId),
+        ),
+      )
+      .run();
   }
 
   listTaskIdsFromCurrentChart(projectId: number): string[] {
@@ -74,6 +103,10 @@ export class TaskMirrorService {
         row.taskId,
         row.id,
       );
+    }
+
+    for (const taskId of removedTaskIds) {
+      await this.journalStorage.deleteTaskJournal(projectId, taskId);
     }
 
     this.databaseService.db.delete(taskMirror)

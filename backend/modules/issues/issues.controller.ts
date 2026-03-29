@@ -7,12 +7,17 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import {
+  getDiscussionJournalResponseSchema,
+  upsertDiscussionJournalRequestSchema,
+} from "../../../common/discussion/discussion-journal.contracts.js";
 import {
   createIssueRequestSchema,
   createIssueResponseSchema,
@@ -89,6 +94,41 @@ export class IssuesController {
         projectId,
         issueId,
         body as never,
+      ),
+    );
+  }
+
+  @Get(":issueId/journal")
+  async getIssueJournal(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(issueRouteParamsSchema)) params: unknown,
+  ) {
+    const { issueId, projectId } = issueRouteParamsSchema.parse(params);
+
+    return getDiscussionJournalResponseSchema.parse(
+      await this.issuesService.getIssueJournal(
+        request.authContext!,
+        projectId,
+        issueId,
+      ),
+    );
+  }
+
+  @Put(":issueId/journal")
+  async updateIssueJournal(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(issueRouteParamsSchema)) params: unknown,
+    @Body(new ZodValidationPipe(upsertDiscussionJournalRequestSchema)) body: unknown,
+  ) {
+    const { issueId, projectId } = issueRouteParamsSchema.parse(params);
+    const { markdown } = upsertDiscussionJournalRequestSchema.parse(body);
+
+    return getDiscussionJournalResponseSchema.parse(
+      await this.issuesService.updateIssueJournal(
+        request.authContext!,
+        projectId,
+        issueId,
+        markdown,
       ),
     );
   }

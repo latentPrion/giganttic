@@ -41,7 +41,6 @@ const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
       createdAt: DEFAULT_TIMESTAMP,
       description: "Project description",
       id: 42,
-      journal: "Project journal",
       name: "Project 42",
       updatedAt: DEFAULT_TIMESTAMP,
     }],

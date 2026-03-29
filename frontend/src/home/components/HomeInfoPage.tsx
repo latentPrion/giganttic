@@ -8,10 +8,11 @@ import {
 
 interface HomeInfoPageProps {
   body: string;
+  footerContent?: React.ReactNode;
   title: string;
 }
 
-export function HomeInfoPage({ body, title }: HomeInfoPageProps) {
+export function HomeInfoPage({ body, footerContent, title }: HomeInfoPageProps) {
   return (
     <Box
       sx={{
@@ -37,6 +38,7 @@ export function HomeInfoPage({ body, title }: HomeInfoPageProps) {
           <Typography color="text.secondary" variant="body1" sx={{ lineHeight: 1.75 }}>
             {body}
           </Typography>
+          {footerContent}
         </Stack>
       </Paper>
     </Box>

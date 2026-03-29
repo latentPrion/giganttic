@@ -3,6 +3,7 @@ import React from "react";
 import { createTaskAttachmentDownloadPath } from "../../api/task-attachment-paths.js";
 import { taskCommentsApi } from "../../api/task-comments-api.js";
 import type { TaskComment } from "../../contracts/task-comments.contracts.js";
+import { emitProjectManagerTaskDiscussionStateEvent } from "../../lib/task-discussion-state-events.js";
 import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.js";
 import { TaskMarkdownRender } from "./TaskMarkdownRender.js";
 
@@ -30,8 +31,16 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
   return (
     <DiscussionCommentsPanel<TaskComment>
       api={{
-        createComment: async (payload) =>
-          taskCommentsApi.createComment(token, projectId, taskId, payload),
+        createComment: async (payload) => {
+          const response = await taskCommentsApi.createComment(
+            token,
+            projectId,
+            taskId,
+            payload,
+          );
+          emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
+          return response;
+        },
         deleteComment: async (commentId) =>
           taskCommentsApi.deleteComment(token, projectId, taskId, commentId),
         deleteCommentAttachment: async (commentId, attachmentId) =>

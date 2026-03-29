@@ -18,6 +18,8 @@ import {
   issueCommentsAttachments,
   issues,
   issuesAttachments,
+  projects,
+  projectsAttachments,
   taskAttachments,
   taskComments,
   taskCommentsAttachments,
@@ -43,6 +45,7 @@ export type AttachmentRow = typeof attachments.$inferSelect;
 export type AttachmentSummary = DiscussionAttachmentSummary;
 
 type AttachmentLinkInput =
+  | { kind: "project"; projectId: number }
   | { issueId: number; kind: "issue" }
   | { commentId: number; issueId: number; kind: "issue-comment" }
   | { kind: "task"; projectId: number; taskId: string }
@@ -115,6 +118,16 @@ export class DiscussionAttachmentService {
     );
   }
 
+  countProjectLevelAttachments(projectId: number): number {
+    return this.countByQuery(
+      this.databaseService.db
+        .select({ value: count() })
+        .from(projectsAttachments)
+        .where(eq(projectsAttachments.projectId, projectId))
+        .get(),
+    );
+  }
+
   countCommentAttachments(issueId: number, commentId: number): number {
     return this.countByQuery(
       this.databaseService.db
@@ -169,6 +182,10 @@ export class DiscussionAttachmentService {
     this.assertWithinAttachmentLimit(this.countIssueLevelAttachments(issueId));
   }
 
+  assertCanAddProjectAttachment(projectId: number): void {
+    this.assertWithinAttachmentLimit(this.countProjectLevelAttachments(projectId));
+  }
+
   assertCanAddCommentAttachment(issueId: number, commentId: number): void {
     this.assertWithinAttachmentLimit(
       this.countCommentAttachments(issueId, commentId),
@@ -204,6 +221,23 @@ export class DiscussionAttachmentService {
     return this.persistAttachmentAndInsert({
       buffer: input.buffer,
       link: { issueId: input.issueId, kind: "issue" },
+      originalFilename: input.originalFilename,
+      uploadedByUserId: input.uploadedByUserId,
+    });
+  }
+
+  async createAttachmentAndLinkToProject(input: {
+    buffer: Buffer;
+    originalFilename: string;
+    projectId: number;
+    uploadedByUserId: number;
+  }): Promise<AttachmentSummary> {
+    this.assertProjectExists(input.projectId);
+    this.assertCanAddProjectAttachment(input.projectId);
+
+    return this.persistAttachmentAndInsert({
+      buffer: input.buffer,
+      link: { kind: "project", projectId: input.projectId },
       originalFilename: input.originalFilename,
       uploadedByUserId: input.uploadedByUserId,
     });
@@ -295,6 +329,20 @@ export class DiscussionAttachmentService {
       .map((row) => row.attachment);
   }
 
+  listProjectLevelAttachmentRows(projectId: number): AttachmentRow[] {
+    return this.databaseService.db
+      .select({ attachment: attachments })
+      .from(projectsAttachments)
+      .innerJoin(
+        attachments,
+        eq(projectsAttachments.attachmentId, attachments.id),
+      )
+      .where(eq(projectsAttachments.projectId, projectId))
+      .orderBy(attachments.id)
+      .all()
+      .map((row) => row.attachment);
+  }
+
   listAttachmentsForComment(
     issueId: number,
     commentId: number,
@@ -374,6 +422,26 @@ export class DiscussionAttachmentService {
         and(
           eq(issuesAttachments.issueId, issueId),
           eq(issuesAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .run();
+
+    await this.removeOrphanAttachmentsAndFiles();
+    return linked.id;
+  }
+
+  async deleteProjectAttachmentLink(
+    projectId: number,
+    attachmentId: string,
+  ): Promise<string> {
+    const linked = this.requireProjectAttachmentLink(projectId, attachmentId);
+
+    this.databaseService.db
+      .delete(projectsAttachments)
+      .where(
+        and(
+          eq(projectsAttachments.projectId, projectId),
+          eq(projectsAttachments.attachmentId, attachmentId),
         ),
       )
       .run();
@@ -507,6 +575,34 @@ export class DiscussionAttachmentService {
     throw new NotFoundException("Attachment not found");
   }
 
+  requireAttachmentLinkedToProject(
+    projectId: number,
+    attachmentId: string,
+  ): AttachmentRow {
+    this.assertProjectExists(projectId);
+
+    const linked = this.databaseService.db
+      .select({ attachment: attachments })
+      .from(projectsAttachments)
+      .innerJoin(
+        attachments,
+        eq(projectsAttachments.attachmentId, attachments.id),
+      )
+      .where(
+        and(
+          eq(projectsAttachments.projectId, projectId),
+          eq(projectsAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .get();
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return linked.attachment;
+  }
+
   requireAttachmentLinkedToTask(
     projectId: number,
     taskId: string,
@@ -561,6 +657,12 @@ export class DiscussionAttachmentService {
       .from(attachments)
       .where(
         and(
+          notExists(
+            this.databaseService.db
+              .select()
+              .from(projectsAttachments)
+              .where(eq(projectsAttachments.attachmentId, attachments.id)),
+          ),
           notExists(
             this.databaseService.db
               .select()
@@ -625,6 +727,18 @@ export class DiscussionAttachmentService {
     }
   }
 
+  private assertProjectExists(projectId: number): void {
+    const projectRow = this.databaseService.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .get();
+
+    if (!projectRow) {
+      throw new NotFoundException("Project not found");
+    }
+  }
+
   private assertIssueCommentExists(
     projectId: number,
     issueId: number,
@@ -685,6 +799,32 @@ export class DiscussionAttachmentService {
         and(
           eq(issuesAttachments.issueId, issueId),
           eq(issuesAttachments.attachmentId, attachmentId),
+        ),
+      )
+      .get();
+
+    if (!linked) {
+      throw new NotFoundException("Attachment not found");
+    }
+
+    return linked;
+  }
+
+  private requireProjectAttachmentLink(
+    projectId: number,
+    attachmentId: string,
+  ): { id: string } {
+    const linked = this.databaseService.db
+      .select({ id: attachments.id })
+      .from(projectsAttachments)
+      .innerJoin(
+        attachments,
+        eq(projectsAttachments.attachmentId, attachments.id),
+      )
+      .where(
+        and(
+          eq(projectsAttachments.projectId, projectId),
+          eq(projectsAttachments.attachmentId, attachmentId),
         ),
       )
       .get();
@@ -833,6 +973,14 @@ export class DiscussionAttachmentService {
     attachmentId: string,
     link: AttachmentLinkInput,
   ): void {
+    if (link.kind === "project") {
+      this.databaseService.db.insert(projectsAttachments).values({
+        attachmentId,
+        projectId: link.projectId,
+      }).run();
+      return;
+    }
+
     if (link.kind === "issue") {
       this.databaseService.db.insert(issuesAttachments).values({
         attachmentId,

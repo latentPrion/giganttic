@@ -28,6 +28,7 @@ import {
   usersTeamsTeamRoles,
 } from "../../../db/index.js";
 import { DatabaseService } from "../database/database.service.js";
+import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import {
   seededScopedFixtures,
   seededTestAccounts,
@@ -45,6 +46,15 @@ type NamedSeedEntity = {
 
 type SeededIssueEntity =
   (typeof seededScopedFixtures.issues.orgProjectManager)[number];
+type SeededProjectIds = {
+  orgProjectManager: number;
+  projectProjectManager: number;
+  teamProjectManager: number;
+};
+type IssueJournalTarget = {
+  issueId: number;
+  projectId: number;
+};
 
 const TEST_DATA_ENTITY_TABLES = {
   organization: "Organizations",
@@ -58,13 +68,17 @@ export class TestDataService {
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(DiscussionJournalStorageService)
+    private readonly discussionJournalStorageService: DiscussionJournalStorageService,
   ) {}
 
   async ensureTestData(): Promise<void> {
-    this.databaseService.db.transaction((tx) => {
+    const seededProjectIds = this.databaseService.db.transaction((tx) => {
       const seededUserIds = this.ensureSeedUsers(tx);
-      this.ensureScopedSeedFixtures(tx, seededUserIds);
+      return this.ensureScopedSeedFixtures(tx, seededUserIds);
     });
+    await this.syncSeededProjectJournalFiles(seededProjectIds);
+    await this.syncSeededIssueJournalFiles(seededProjectIds);
   }
 
   async hasTestData(): Promise<boolean> {
@@ -77,6 +91,9 @@ export class TestDataService {
   }
 
   async purgeTestData(): Promise<void> {
+    const trackedIds = this.readTrackedEntityIds(this.databaseService.db);
+    const issueJournalTargets = this.readIssueJournalTargets(trackedIds.projectIds);
+
     this.databaseService.db.transaction((tx) => {
       const trackedIds = this.readTrackedEntityIds(tx);
       this.deleteTrackedProjectChildren(tx, trackedIds.projectIds);
@@ -86,6 +103,8 @@ export class TestDataService {
       this.deleteTrackedTopLevelEntities(tx, trackedIds);
       tx.delete(managedTestDataRecords).run();
     });
+    await this.deleteProjectJournalFiles(trackedIds.projectIds);
+    await this.deleteIssueJournalFiles(issueJournalTargets);
   }
 
   private ensureSeedUsers(tx: SeedDatabase): SeededUserIds {
@@ -309,7 +328,7 @@ export class TestDataService {
   private ensureScopedSeedFixtures(
     tx: SeedDatabase,
     seededUserIds: SeededUserIds,
-  ): void {
+  ): SeededProjectIds {
     const organizationManagerOrganizationId = this.ensureOrganization(
       tx,
       seededScopedFixtures.organizations.orgOrganizationManager,
@@ -459,6 +478,12 @@ export class TestDataService {
       teamProjectManagerProjectId,
       seededScopedFixtures.issues.teamProjectManager,
     );
+
+    return {
+      orgProjectManager: organizationProjectManagerProjectId,
+      projectProjectManager: directProjectManagerProjectId,
+      teamProjectManager: teamProjectManagerProjectId,
+    };
   }
 
   private ensureOrganization(tx: SeedDatabase, seed: NamedSeedEntity): number {
@@ -745,7 +770,6 @@ export class TestDataService {
       closedReason: seed.closedReason,
       closedReasonDescription: seed.closedReasonDescription,
       description: seed.description,
-      journal: seed.journal,
       name: seed.name,
       openedAt: new Date(seed.openedAt),
       priority: seed.priority,
@@ -753,6 +777,97 @@ export class TestDataService {
       projectId,
       status: seed.status,
     };
+  }
+
+  private readIssueJournalTargets(projectIds: readonly number[]): IssueJournalTarget[] {
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    return this.databaseService.db
+      .select({
+        issueId: issues.id,
+        projectId: issues.projectId,
+      })
+      .from(issues)
+      .where(inArray(issues.projectId, [...projectIds]))
+      .all();
+  }
+
+  private async syncSeededProjectJournalFiles(projectIds: SeededProjectIds): Promise<void> {
+    await Promise.all([
+      this.discussionJournalStorageService.writeProjectJournal(
+        projectIds.projectProjectManager,
+        "",
+      ),
+      this.discussionJournalStorageService.writeProjectJournal(
+        projectIds.orgProjectManager,
+        "",
+      ),
+      this.discussionJournalStorageService.writeProjectJournal(
+        projectIds.teamProjectManager,
+        "",
+      ),
+    ]);
+  }
+
+  private async syncSeededIssueJournalFiles(projectIds: SeededProjectIds): Promise<void> {
+    await Promise.all([
+      this.writeSeededIssueJournalFilesForProject(
+        projectIds.orgProjectManager,
+        seededScopedFixtures.issues.orgProjectManager,
+      ),
+      this.writeSeededIssueJournalFilesForProject(
+        projectIds.projectProjectManager,
+        seededScopedFixtures.issues.projectProjectManager,
+      ),
+      this.writeSeededIssueJournalFilesForProject(
+        projectIds.teamProjectManager,
+        seededScopedFixtures.issues.teamProjectManager,
+      ),
+    ]);
+  }
+
+  private async writeSeededIssueJournalFilesForProject(
+    projectId: number,
+    seededIssues: readonly SeededIssueEntity[],
+  ): Promise<void> {
+    for (const seededIssue of seededIssues) {
+      const issueRow = this.databaseService.db
+        .select({ id: issues.id })
+        .from(issues)
+        .where(and(eq(issues.projectId, projectId), eq(issues.name, seededIssue.name)))
+        .get();
+
+      if (!issueRow) {
+        continue;
+      }
+
+      await this.discussionJournalStorageService.writeIssueJournal(
+        projectId,
+        issueRow.id,
+        seededIssue.journal ?? "",
+      );
+    }
+  }
+
+  private async deleteProjectJournalFiles(projectIds: readonly number[]): Promise<void> {
+    await Promise.all(
+      projectIds.map((projectId) =>
+        this.discussionJournalStorageService.deleteProjectJournal(projectId)),
+    );
+  }
+
+  private async deleteIssueJournalFiles(
+    issueJournalTargets: readonly IssueJournalTarget[],
+  ): Promise<void> {
+    await Promise.all(
+      issueJournalTargets.map((target) =>
+        this.discussionJournalStorageService.deleteIssueJournal(
+          target.projectId,
+          target.issueId,
+        )),
+    );
   }
 
   private upsertTrackedEntity(

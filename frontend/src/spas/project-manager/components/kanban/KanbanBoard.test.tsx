@@ -23,7 +23,6 @@ describe("KanbanBoard", () => {
                 createdAt: DEFAULT_TIMESTAMP,
                 description: "Open issue description",
                 id: 1,
-                journal: "Open issue journal",
                 name: "Open issue",
                 openedAt: DEFAULT_TIMESTAMP,
                 priority: 1,

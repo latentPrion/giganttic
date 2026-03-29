@@ -17,7 +17,6 @@ import {
   ISSUE_DIALOG_MAX_WIDTH,
   ISSUE_LOAD_ERROR_MESSAGE,
   ISSUE_SUMMARY_DIALOG_TITLE,
-  ISSUE_SUMMARY_JOURNAL_PREVIEW_LENGTH,
 } from "./issue-modal.constants.js";
 
 interface IssueSummaryModalProps {
@@ -39,16 +38,6 @@ function buildIssueLoadErrorMessage(error: unknown): string {
 
 function formatTimestamp(value: string | null): string {
   return value === null ? "Not closed" : new Date(value).toLocaleString();
-}
-
-function createJournalPreview(journal: string | null): string {
-  if (!journal) {
-    return "No journal notes yet.";
-  }
-
-  return journal.length <= ISSUE_SUMMARY_JOURNAL_PREVIEW_LENGTH
-    ? journal
-    : `${journal.slice(0, ISSUE_SUMMARY_JOURNAL_PREVIEW_LENGTH)}...`;
 }
 
 export function IssueSummaryModal(props: IssueSummaryModalProps) {
@@ -132,12 +121,6 @@ export function IssueSummaryModal(props: IssueSummaryModalProps) {
             <Typography variant="body2">
               Closed Reason: {issueResponse.issue.closedReason ?? "N/A"}
             </Typography>
-            <Stack spacing={0.5}>
-              <Typography variant="subtitle2">Journal Preview</Typography>
-              <Typography variant="body2">
-                {createJournalPreview(issueResponse.issue.journal)}
-              </Typography>
-            </Stack>
           </Stack>
         ) : null}
       </DialogContent>

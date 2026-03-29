@@ -17,6 +17,10 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import {
+  getDiscussionJournalResponseSchema,
+  upsertDiscussionJournalRequestSchema,
+} from "../../../common/discussion/discussion-journal.contracts.js";
+import {
   createProjectRequestSchema,
   createProjectResponseSchema,
   deleteProjectResponseSchema,
@@ -134,6 +138,36 @@ export class ProjectsController {
         request.authContext!,
         projectId,
         body as never,
+      ),
+    );
+  }
+
+  @Get(":projectId/journal")
+  async getProjectJournal(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+
+    return getDiscussionJournalResponseSchema.parse(
+      await this.projectsService.getProjectJournal(request.authContext!, projectId),
+    );
+  }
+
+  @Put(":projectId/journal")
+  async updateProjectJournal(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(upsertDiscussionJournalRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+    const { markdown } = upsertDiscussionJournalRequestSchema.parse(body);
+
+    return getDiscussionJournalResponseSchema.parse(
+      await this.projectsService.updateProjectJournal(
+        request.authContext!,
+        projectId,
+        markdown,
       ),
     );
   }

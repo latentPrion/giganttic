@@ -28,10 +28,6 @@ function createOptionalDescriptionSchema() {
   return z.string().trim().min(1).nullable().optional();
 }
 
-function createOptionalJournalSchema() {
-  return z.string().trim().min(1).nullable().optional();
-}
-
 function createRequiredNameSchema() {
   return z.string().trim().min(1);
 }
@@ -65,16 +61,14 @@ export const projectIdParamSchema = z.object({
 
 export const createProjectRequestSchema = z.object({
   description: createOptionalDescriptionSchema(),
-  journal: createOptionalJournalSchema(),
   name: createRequiredNameSchema(),
 });
 
 export const updateProjectRequestSchema = z.object({
   description: createOptionalDescriptionSchema(),
-  journal: createOptionalJournalSchema(),
   name: createRequiredNameSchema().optional(),
 }).refine(
-  (value) => value.description !== undefined || value.journal !== undefined || value.name !== undefined,
+  (value) => value.description !== undefined || value.name !== undefined,
   PROJECT_UPDATE_REQUIRED_MESSAGE,
 );
 
@@ -121,7 +115,6 @@ export const projectSchema = z.object({
   createdAt: z.string(),
   description: z.string().nullable(),
   id: z.number().int().positive(),
-  journal: z.string().nullable(),
   name: z.string(),
   updatedAt: z.string(),
 });

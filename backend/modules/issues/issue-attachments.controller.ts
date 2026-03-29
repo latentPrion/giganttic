@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -15,6 +14,10 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import {
+  buildAttachmentContentDisposition,
+  requireUploadedBuffer,
+} from "../discussion/discussion-upload-controller.utils.js";
+import {
   AttachmentService,
   toAttachmentSummary,
 } from "./attachment.service.js";
@@ -29,8 +32,6 @@ import { IssueUploadMultipartInterceptor } from "./issue-upload-multipart.interc
 import { IssuesService } from "./issues.service.js";
 import type { MemoryUploadedFile } from "./memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "./uploaded-memory-file.decorator.js";
-
-const MISSING_UPLOAD_FILE_MESSAGE = "Multipart field 'file' is required";
 
 @Authenticated()
 @Controller("projects/:projectId/issues/:issueId/attachments")
@@ -135,18 +136,4 @@ export class IssueAttachmentsController {
       type: "application/octet-stream",
     });
   }
-}
-
-function requireUploadedBuffer(file: MemoryUploadedFile | undefined): Buffer {
-  if (!file?.buffer) {
-    throw new BadRequestException(MISSING_UPLOAD_FILE_MESSAGE);
-  }
-
-  return file.buffer;
-}
-
-function buildAttachmentContentDisposition(originalFilename: string): string {
-  const safeName = originalFilename.replace(/["\r\n]/g, "_").trim() || "attachment";
-
-  return `attachment; filename="${safeName}"`;
 }

@@ -16,6 +16,7 @@ import {
 import {
   DRIZZLE_MIGRATIONS_FILE_NAME,
   POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
+  PRE_STRUCTURAL_DATA_MIGRATION_HOOK_FILE_NAME,
   PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
 } from "./migration-files.mjs";
 import {
@@ -136,6 +137,10 @@ function createMigrationFilePaths(projectRoot, migrationPairName) {
       migrationDirPath,
       POST_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
     ),
+    preStructuralHookPath: path.join(
+      migrationDirPath,
+      PRE_STRUCTURAL_DATA_MIGRATION_HOOK_FILE_NAME,
+    ),
     preStructuralPath: path.join(
       migrationDirPath,
       PRE_STRUCTURAL_DATA_MIGRATION_FILE_NAME,
@@ -200,7 +205,44 @@ function executeSqlIfPresent(db, sqlContents) {
   db.exec(sqlContents);
 }
 
-async function applyMigrationFiles(db, migrationFilePaths) {
+async function runPreStructuralHookIfPresent({
+  dbTarget,
+  migrationFilePaths,
+  migrationPairName,
+  projectRoot,
+  targetDbPath,
+}) {
+  try {
+    await access(migrationFilePaths.preStructuralHookPath);
+  } catch {
+    return;
+  }
+
+  const hookModuleUrl = new URL(
+    `file://${migrationFilePaths.preStructuralHookPath}`,
+  );
+  const hookModule = await import(hookModuleUrl.href);
+
+  if (typeof hookModule.runPreStructuralDataMigrationHook !== "function") {
+    throw new Error(
+      `Migration hook must export runPreStructuralDataMigrationHook(): ${migrationFilePaths.preStructuralHookPath}`,
+    );
+  }
+
+  await hookModule.runPreStructuralDataMigrationHook({
+    dbTarget,
+    migrationDirPath: migrationFilePaths.migrationDirPath,
+    migrationPairName,
+    projectRoot,
+    runtimeRoot: process.cwd(),
+    targetDbPath,
+  });
+}
+
+async function applyMigrationFiles(db, migrationContext) {
+  await runPreStructuralHookIfPresent(migrationContext);
+  const { migrationFilePaths } = migrationContext;
+
   const preStructuralSql = await readSqlFileStatements(
     migrationFilePaths.preStructuralPath,
   );
@@ -242,9 +284,11 @@ async function ensureMigrationFilesExist(migrationFilePaths) {
 }
 
 async function applyMigrationToSqliteDatabase({
+  dbTarget,
   fromSchemaName,
   migrationPairName,
   migrationFilePaths,
+  projectRoot,
   targetDbPath,
   toSchemaName,
 }) {
@@ -262,7 +306,13 @@ async function applyMigrationToSqliteDatabase({
 
   try {
     db.exec("BEGIN TRANSACTION;");
-    const migrationContents = await applyMigrationFiles(db, migrationFilePaths);
+    const migrationContents = await applyMigrationFiles(db, {
+      dbTarget,
+      migrationFilePaths,
+      migrationPairName,
+      projectRoot,
+      targetDbPath,
+    });
     writeCurrentSchemaName(db, toSchemaName);
     recordAppliedMigration(db, {
       appliedAt: new Date().toISOString(),
@@ -312,9 +362,11 @@ async function migrateDatabase({
   }
 
   await applyMigrationToSqliteDatabase({
+    dbTarget,
     fromSchemaName,
     migrationPairName,
     migrationFilePaths,
+    projectRoot,
     targetDbPath,
     toSchemaName,
   });

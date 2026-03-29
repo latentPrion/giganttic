@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import { projectJournalApi } from "../api/project-journal-api.js";
 import type { ProjectManagerSource } from "../../../lobby/contracts/lobby.contracts.js";
 import { ProjectManagerProjectPage } from "./ProjectManagerProjectPage.js";
 
@@ -30,7 +31,15 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
   },
 }));
 
+vi.mock("../api/project-journal-api.js", () => ({
+  projectJournalApi: {
+    getJournal: vi.fn(),
+    updateJournal: vi.fn(),
+  },
+}));
+
 const lobbyApiMock = vi.mocked(lobbyApi);
+const projectJournalApiMock = vi.mocked(projectJournalApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_CURRENT_USER_ID = 101;
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
@@ -59,7 +68,6 @@ function createProjectResponse() {
       createdAt: DEFAULT_TIMESTAMP,
       description: "Project description",
       id: 42,
-      journal: "Project execution journal",
       name: "Project 42",
       updatedAt: DEFAULT_TIMESTAMP,
     },
@@ -78,6 +86,12 @@ function createProjectResponse() {
   };
 }
 
+function requireProjectRow(): HTMLElement {
+  const projectRow = screen.getByText("Project 42").closest(".MuiPaper-root");
+  expect(projectRow).not.toBeNull();
+  return projectRow as HTMLElement;
+}
+
 describe("ProjectManagerProjectPage", () => {
   beforeEach(async () => {
     navigateMock.mockReset();
@@ -90,7 +104,17 @@ describe("ProjectManagerProjectPage", () => {
     lobbyApiMock.listOrganizations.mockReset();
     lobbyApiMock.listTeams.mockReset();
     lobbyApiMock.updateProject.mockReset();
+    projectJournalApiMock.getJournal.mockReset();
+    projectJournalApiMock.updateJournal.mockReset();
     lobbyApiMock.getProject.mockResolvedValue(createProjectResponse());
+    projectJournalApiMock.getJournal.mockResolvedValue({
+      journalExists: true,
+      markdown: "Project execution journal",
+    });
+    projectJournalApiMock.updateJournal.mockResolvedValue({
+      journalExists: true,
+      markdown: "Updated PM journal",
+    });
     lobbyApiMock.listOrganizations.mockResolvedValue({
       organizations: [{
         createdAt: DEFAULT_TIMESTAMP,
@@ -155,7 +179,7 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByText("Project")).toBeVisible();
     expect(await screen.findByText("Project 42")).toBeVisible();
     expect(screen.getByText("Detailed Project View")).toBeVisible();
-    expect(screen.getByText("Journal")).toBeVisible();
+    expect(screen.getByText("Project Journal")).toBeVisible();
     expect(screen.getByText("Project execution journal")).toBeVisible();
     expect(screen.getByText("Project Owners")).toBeVisible();
     expect(screen.getByText("Project Managers")).toBeVisible();
@@ -180,7 +204,7 @@ describe("ProjectManagerProjectPage", () => {
     expect(await screen.findByRole("dialog", { name: "Project Summary" })).toBeVisible();
   });
 
-  it("opens the edit modal with the journal field and submits journal updates", async () => {
+  it("opens the edit modal and submits project metadata updates", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
@@ -191,20 +215,16 @@ describe("ProjectManagerProjectPage", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByText("Project 42");
+    await user.click(within(requireProjectRow()).getByRole("button", { name: "Edit" }));
 
-    const journalInput = await screen.findByLabelText("Journal");
-    expect(journalInput).toHaveValue("Project execution journal");
-    await user.clear(journalInput);
-    await user.type(journalInput, "Updated PM journal");
-    const nameInput = screen.getByLabelText("Name");
+    const nameInput = await screen.findByLabelText("Name");
     nameInput.focus();
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(lobbyApiMock.updateProject).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, {
         description: "Project description",
-        journal: "Updated PM journal",
         name: "Project 42",
       });
     });
@@ -424,8 +444,8 @@ describe("ProjectManagerProjectPage", () => {
 
     expect(await screen.findByText("Project Owners")).toBeVisible();
     expect(screen.getAllByText("demo-user").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Delete" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(within(requireProjectRow()).getByRole("button", { name: "Delete" })).toBeVisible();
+    expect(within(requireProjectRow()).getByRole("button", { name: "Edit" })).toBeVisible();
     expect(screen.getByText("Project Managers")).toBeVisible();
     const managerRow = screen.getAllByRole("button", { name: /demo-user/i })[1]?.closest(".MuiPaper-root");
 
@@ -452,8 +472,9 @@ describe("ProjectManagerProjectPage", () => {
       />,
     );
 
-    expect(await screen.findByRole("button", { name: "Edit" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    await screen.findByText("Project 42");
+    expect(within(requireProjectRow()).getByRole("button", { name: "Edit" })).toBeVisible();
+    expect(within(requireProjectRow()).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("tab", { name: "Teams" }));
     expect(screen.queryByRole("button", { name: "Associate Existing Team" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create Team" })).not.toBeInTheDocument();

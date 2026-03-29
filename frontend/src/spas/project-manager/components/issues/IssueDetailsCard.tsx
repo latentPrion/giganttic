@@ -44,12 +44,6 @@ export function IssueDetailsCard(props: IssueDetailsCardProps) {
         <Typography variant="body2">
           Closed Reason Details: {props.issue.closedReasonDescription ?? "N/A"}
         </Typography>
-        <Stack spacing={0.5}>
-          <Typography variant="subtitle2">Journal</Typography>
-          <Typography variant="body2">
-            {props.issue.journal ?? "No journal notes yet."}
-          </Typography>
-        </Stack>
       </Stack>
     </Paper>
   );

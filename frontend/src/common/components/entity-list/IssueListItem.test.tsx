@@ -17,7 +17,6 @@ function createIssue() {
     createdAt: DEFAULT_TIMESTAMP,
     description: "Upload summary mismatch",
     id: 7,
-    journal: "Working notes",
     name: "Fix upload summary mismatch",
     openedAt: DEFAULT_TIMESTAMP,
     priority: 2,

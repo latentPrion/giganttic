@@ -45,7 +45,6 @@ function createIssue(overrides: Partial<Issue> = {}): Issue {
     createdAt: DEFAULT_TIMESTAMP,
     description: "Detailed issue description",
     id: 7,
-    journal: "Investigate the payload mismatch",
     name: "Issue 7",
     openedAt: DEFAULT_TIMESTAMP,
     priority: 2,

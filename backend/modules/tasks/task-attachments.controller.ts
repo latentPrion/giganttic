@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -15,6 +14,10 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { Authenticated } from "../auth/authenticated.decorator.js";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/discussion-attachment.service.js";
+import {
+  buildAttachmentContentDisposition,
+  requireUploadedBuffer,
+} from "../discussion/discussion-upload-controller.utils.js";
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
@@ -26,22 +29,6 @@ import {
   uploadTaskAttachmentResponseSchema,
 } from "./task-untrusted.contracts.js";
 import { TasksService } from "./tasks.service.js";
-
-const MISSING_UPLOAD_FILE_MESSAGE = "Multipart field 'file' is required";
-
-function requireUploadedBuffer(file: MemoryUploadedFile | undefined): Buffer {
-  if (!file?.buffer) {
-    throw new BadRequestException(MISSING_UPLOAD_FILE_MESSAGE);
-  }
-
-  return file.buffer;
-}
-
-function buildAttachmentContentDisposition(originalFilename: string): string {
-  const safeName = originalFilename.replace(/["\r\n]/g, "_").trim() || "attachment";
-
-  return `attachment; filename="${safeName}"`;
-}
 
 @Authenticated()
 @Controller("projects/:projectId/tasks/:taskId/attachments")

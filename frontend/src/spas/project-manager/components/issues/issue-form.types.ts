@@ -15,7 +15,6 @@ export interface IssueFormState {
   closedReason: ClosedReason | "";
   closedReasonDescription: string;
   description: string;
-  journal: string;
   name: string;
   priority: string;
   progressPercentage: string;
@@ -30,7 +29,6 @@ export function createIssueFormState(issue: Issue | null): IssueFormState {
     closedReason: issue?.closedReason ?? "",
     closedReasonDescription: issue?.closedReasonDescription ?? "",
     description: issue?.description ?? "",
-    journal: issue?.journal ?? "",
     name: issue?.name ?? "",
     priority: `${normalizedPriority}`,
     progressPercentage: `${issue?.progressPercentage ?? ISSUE_DEFAULT_PROGRESS}`,
@@ -71,7 +69,6 @@ export function normalizeCreateIssuePayload(
     closedReason: normalizeClosedReason(formState.closedReason),
     closedReasonDescription: normalizeTextValue(formState.closedReasonDescription),
     description: normalizeTextValue(formState.description),
-    journal: normalizeTextValue(formState.journal),
     name: formState.name,
     priority: normalizePriority(formState.priority),
     progressPercentage: normalizeProgressPercentage(formState.progressPercentage),
@@ -86,7 +83,6 @@ export function normalizeUpdateIssuePayload(
     closedReason: normalizeClosedReason(formState.closedReason),
     closedReasonDescription: normalizeTextValue(formState.closedReasonDescription),
     description: normalizeTextValue(formState.description),
-    journal: normalizeTextValue(formState.journal),
     name: formState.name,
     priority: normalizePriority(formState.priority),
     progressPercentage: normalizeProgressPercentage(formState.progressPercentage),

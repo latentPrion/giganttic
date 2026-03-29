@@ -18,6 +18,7 @@ import {
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
+import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { AttachmentService } from "./attachment.service.js";
 import type {
@@ -62,7 +63,6 @@ function toIssueResponse(issue: IssueRecord): IssueResponse {
     createdAt: issue.createdAt.toISOString(),
     description: issue.description ?? null,
     id: issue.id,
-    journal: issue.journal ?? null,
     name: issue.name,
     openedAt: issue.openedAt.toISOString(),
     priority: issue.priority,
@@ -84,7 +84,6 @@ function createIssueInsertValues(
     closedReason: normalizedState.closedReason,
     closedReasonDescription: normalizedState.closedReasonDescription,
     description: normalizeNullableText(payload.description) ?? null,
-    journal: normalizeNullableText(payload.journal) ?? null,
     name: payload.name.trim(),
     openedAt: now,
     priority: payload.priority ?? 0,
@@ -116,9 +115,6 @@ function createIssueUpdateValues(payload: UpdateIssueRequest, currentIssue: Issu
     description: payload.description === undefined
       ? undefined
       : normalizeNullableText(payload.description) ?? null,
-    journal: payload.journal === undefined
-      ? undefined
-      : normalizeNullableText(payload.journal) ?? null,
     name: payload.name?.trim(),
     priority: payload.priority,
     progressPercentage: payload.progressPercentage,
@@ -173,6 +169,8 @@ export class IssuesService {
     private readonly databaseService: DatabaseService,
     @Inject(AttachmentService)
     private readonly attachmentService: AttachmentService,
+    @Inject(DiscussionJournalStorageService)
+    private readonly journalStorage: DiscussionJournalStorageService,
     @Inject(IssueCommentService)
     private readonly issueCommentService: IssueCommentService,
   ) {}
@@ -190,6 +188,14 @@ export class IssuesService {
       .values(createIssueInsertValues(projectId, payload, now))
       .returning({ id: issues.id })
       .all();
+    try {
+      await this.journalStorage.writeIssueJournal(projectId, createdIssue.id, "");
+    } catch (error) {
+      this.databaseService.db.delete(issues)
+        .where(eq(issues.id, createdIssue.id))
+        .run();
+      throw error;
+    }
     return { issue: this.getIssueRecordByIdOrThrow(projectId, createdIssue.id) };
   }
 
@@ -217,6 +223,19 @@ export class IssuesService {
     this.assertCanViewProject(authContext, projectId);
 
     return { issue: this.getIssueRecordByIdOrThrow(projectId, issueId) };
+  }
+
+  async getIssueJournal(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+  ): Promise<{ journalExists: boolean; markdown: string | null }> {
+    this.validateIssueReadableForCurrentUser(authContext, projectId, issueId);
+    const markdown = await this.journalStorage.readIssueJournal(projectId, issueId);
+    return {
+      journalExists: markdown !== null,
+      markdown,
+    };
   }
 
   /**
@@ -249,6 +268,22 @@ export class IssuesService {
     return { issue: this.getIssueRecordByIdOrThrow(projectId, issueId) };
   }
 
+  async updateIssueJournal(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+    markdown: string,
+  ): Promise<{ journalExists: boolean; markdown: string | null }> {
+    this.assertProjectExists(projectId);
+    this.assertCanManageIssues(authContext, projectId);
+    this.getIssueEntityByIdOrThrow(projectId, issueId);
+    await this.journalStorage.writeIssueJournal(projectId, issueId, markdown);
+    return {
+      journalExists: true,
+      markdown,
+    };
+  }
+
   async deleteIssue(
     authContext: AuthContext,
     projectId: number,
@@ -262,6 +297,7 @@ export class IssuesService {
     this.databaseService.db.delete(issues)
       .where(eq(issues.id, issueId))
       .run();
+    await this.journalStorage.deleteIssueJournal(projectId, issueId);
     await this.attachmentService.removeOrphanAttachmentsAndFiles();
     return { deletedIssueId: issueId };
   }

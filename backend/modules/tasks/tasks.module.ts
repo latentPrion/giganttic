@@ -7,11 +7,12 @@ import { ProjectChartsModule } from "../project-charts/project-charts.module.js"
 import { TaskAttachmentsController } from "./task-attachments.controller.js";
 import { TaskCommentsController } from "./task-comments.controller.js";
 import { TaskCommentService } from "./task-comment.service.js";
+import { TaskJournalController } from "./task-journal.controller.js";
 import { TaskMirrorService } from "./task-mirror.service.js";
 import { TasksService } from "./tasks.service.js";
 
 @Module({
-  controllers: [TaskAttachmentsController, TaskCommentsController],
+  controllers: [TaskAttachmentsController, TaskCommentsController, TaskJournalController],
   imports: [AuthModule, DatabaseModule, DiscussionModule, ProjectChartsModule],
   providers: [TaskCommentService, TaskMirrorService, TasksService],
   exports: [TaskMirrorService],

@@ -10,9 +10,16 @@ describe("test data seed data", () => {
     expect(Object.keys(seeded.seededScopedFixtures).length).toBeGreaterThan(0);
   });
 
+  it("supports v7 test data seeding", () => {
+    const seeded = getSeededTestData("v7");
+
+    expect(Object.keys(seeded.seededTestAccounts).length).toBeGreaterThan(0);
+    expect(Object.keys(seeded.seededScopedFixtures).length).toBeGreaterThan(0);
+  });
+
   it("still rejects unsupported schema names", () => {
     expect(() => getSeededTestData("v999")).toThrow(
-      /only supported for schema v2\/v3\/v4\/v5\/v6/i,
+      /only supported for schema v2\/v3\/v4\/v5\/v6\/v7/i,
     );
   });
 });

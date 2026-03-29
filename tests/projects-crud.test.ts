@@ -701,43 +701,61 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     }
   });
 
-  it("persists project journal through create, get, and update", async () => {
+  it("persists project journal through dedicated journal endpoints", async () => {
     const creator = await harness.registerUser("project-journal");
     const createResponse = await createProject(creator.accessToken, {
       description: "Delivery project",
-      journal: "Initial planning journal",
       name: "Journal Project",
     });
     const { project } = harness.parseJson<{
       project: {
         id: number;
-        journal: string | null;
       };
     }>(createResponse.payload);
 
-    const getResponse = await harness.app.inject({
+    const initialJournalResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+      url: `/stc-proj-mgmt/api/projects/${project.id}/journal`,
     });
     const updateResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
-      method: "PATCH",
+      method: "PUT",
       payload: {
-        journal: "Updated execution journal",
+        markdown: "Updated execution journal",
       },
-      url: `/stc-proj-mgmt/api/projects/${project.id}`,
+      url: `/stc-proj-mgmt/api/projects/${project.id}/journal`,
+    });
+    const updatedJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${project.id}/journal`,
     });
 
     expect(createResponse.statusCode).toBe(201);
-    expect(project.journal).toBe("Initial planning journal");
-    expect(getResponse.statusCode).toBe(200);
+    expect(initialJournalResponse.statusCode).toBe(200);
     expect(
-      harness.parseJson<{ project: { journal: string | null } }>(getResponse.payload).project.journal,
-    ).toBe("Initial planning journal");
+      harness.parseJson<{ journalExists: boolean; markdown: string | null }>(
+        initialJournalResponse.payload,
+      ),
+    ).toEqual({
+      journalExists: true,
+      markdown: "",
+    });
     expect(updateResponse.statusCode).toBe(200);
     expect(
-      harness.parseJson<{ project: { journal: string | null } }>(updateResponse.payload).project.journal,
+      harness.parseJson<{ journalExists: boolean; markdown: string | null }>(
+        updateResponse.payload,
+      ),
+    ).toEqual({
+      journalExists: true,
+      markdown: "Updated execution journal",
+    });
+    expect(updatedJournalResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ journalExists: boolean; markdown: string | null }>(
+        updatedJournalResponse.payload,
+      ).markdown,
     ).toBe("Updated execution journal");
   });
 

@@ -5,7 +5,7 @@ import { DiscussionMarkdownRender } from "../discussion/DiscussionMarkdownRender
 
 export const GIGANTT_TASK_ATTACHMENT_URL_PREFIX = "gigantt://task-attachment/";
 
-const HELP_TEXT =
+export const TASK_MARKDOWN_HELP_TEXT =
   "Embed task attachments in markdown as ![alt](gigantt://task-attachment/<attachmentId>) or link them the same way.";
 
 interface TaskMarkdownRenderProps {
@@ -22,7 +22,7 @@ export function TaskMarkdownRender(props: TaskMarkdownRenderProps) {
   return (
     <DiscussionMarkdownRender
       attachmentUrlPrefix={GIGANTT_TASK_ATTACHMENT_URL_PREFIX}
-      helpText={HELP_TEXT}
+      helpText={TASK_MARKDOWN_HELP_TEXT}
       markdown={markdown}
       resolveAttachmentDownloadPath={(attachmentId) =>
         createTaskAttachmentDownloadPath(projectId, taskId, attachmentId)}

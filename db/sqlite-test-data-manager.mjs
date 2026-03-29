@@ -1,3 +1,6 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
 import {
   getSeededTestData,
   TEST_DATA_PROFILE_APP,
@@ -9,15 +12,22 @@ import {
 } from "../backend/modules/project-charts/project-chart-files.js";
 
 const MANAGED_TEST_DATA_RECORDS_TABLE = "ManagedTestDataRecords";
+const PROJECT_JOURNALS_DIR_NAME = "project-journals";
+const ISSUE_JOURNALS_DIR_NAME = "issue-journals";
 const TEST_DATA_ENTITY_TABLES = {
   organization: "Organizations",
   project: "Projects",
   team: "Teams",
   user: "Users",
 };
+const UNTRUSTED_CONTENT_DIR_NAME = "untrusted-content";
 
 function runDelete(db, sql) {
   db.exec(sql);
+}
+
+function ensureDirectoryExists(targetPath) {
+  mkdirSync(targetPath, { recursive: true });
 }
 
 function escapeSqlString(value) {
@@ -34,6 +44,48 @@ function toSqlNullableTimestamp(value) {
   return value === null || value === undefined
     ? "NULL"
     : `${Number(new Date(value).getTime())}`;
+}
+
+function createProjectRootFromChartsDir(chartsDir) {
+  if (!chartsDir) {
+    return process.cwd();
+  }
+
+  return path.dirname(chartsDir);
+}
+
+function createProjectJournalsDir(projectRoot) {
+  return path.join(projectRoot, UNTRUSTED_CONTENT_DIR_NAME, PROJECT_JOURNALS_DIR_NAME);
+}
+
+function createIssueJournalsDir(projectRoot) {
+  return path.join(projectRoot, UNTRUSTED_CONTENT_DIR_NAME, ISSUE_JOURNALS_DIR_NAME);
+}
+
+function createProjectJournalPath(projectRoot, projectId) {
+  return path.join(createProjectJournalsDir(projectRoot), `${projectId}.md`);
+}
+
+function createIssueJournalPath(projectRoot, projectId, issueId) {
+  return path.join(createIssueJournalsDir(projectRoot), `${projectId}-${issueId}.md`);
+}
+
+function writeProjectJournal(projectRoot, projectId, markdown = "") {
+  ensureDirectoryExists(createProjectJournalsDir(projectRoot));
+  writeFileSync(createProjectJournalPath(projectRoot, projectId), markdown, "utf8");
+}
+
+function writeIssueJournal(projectRoot, projectId, issueId, markdown = "") {
+  ensureDirectoryExists(createIssueJournalsDir(projectRoot));
+  writeFileSync(createIssueJournalPath(projectRoot, projectId, issueId), markdown, "utf8");
+}
+
+function deleteProjectJournal(projectRoot, projectId) {
+  rmSync(createProjectJournalPath(projectRoot, projectId), { force: true });
+}
+
+function deleteIssueJournal(projectRoot, projectId, issueId) {
+  rmSync(createIssueJournalPath(projectRoot, projectId, issueId), { force: true });
 }
 
 function readSingleId(db, sql) {
@@ -111,6 +163,20 @@ function purgeSeededProjectChildren(db, projectIds) {
     db,
     `DELETE FROM Users_Projects_ProjectRoles WHERE projectId IN ${ids};`,
   );
+}
+
+function readTrackedIssueJournalTargets(db, projectIds) {
+  if (projectIds.length === 0) {
+    return [];
+  }
+
+  const ids = createIdInClause(projectIds);
+  return db.prepare(
+    `SELECT id, projectId FROM Issues WHERE projectId IN ${ids};`,
+  ).raw(true).all().map((row) => ({
+    issueId: Number(row[0]),
+    projectId: Number(row[1]),
+  }));
 }
 
 function purgeSeededTeamChildren(db, teamIds) {
@@ -221,12 +287,25 @@ function purgeSeededProjectCharts(chartsDir, projectIds) {
   }
 }
 
+function purgeSeededJournalFiles(chartsDir, projectIds, issueTargets) {
+  const projectRoot = createProjectRootFromChartsDir(chartsDir);
+
+  for (const projectId of projectIds) {
+    deleteProjectJournal(projectRoot, projectId);
+  }
+
+  for (const issueTarget of issueTargets) {
+    deleteIssueJournal(projectRoot, issueTarget.projectId, issueTarget.issueId);
+  }
+}
+
 /**
  * @param {import("better-sqlite3").Database} db
  * @param {string | null | undefined} [chartsDir]
  */
 function purgeSeededTestData(db, chartsDir = null) {
   const trackedIds = readTrackedEntityIds(db);
+  const trackedIssueTargets = readTrackedIssueJournalTargets(db, trackedIds.projectIds);
 
   db.exec("BEGIN TRANSACTION;");
 
@@ -243,6 +322,8 @@ function purgeSeededTestData(db, chartsDir = null) {
     db.exec("ROLLBACK;");
     throw error;
   }
+
+  purgeSeededJournalFiles(chartsDir, trackedIds.projectIds, trackedIssueTargets);
 }
 
 function writeSeededProjectCharts(chartsDir, projectIds, seededCharts) {
@@ -321,10 +402,41 @@ VALUES ('${escapeSqlString(seed.name)}', ${toSqlNullableText(seed.description)})
   );
 }
 
-function insertSeedIssues(db, projectId, seededIssues) {
+function readInsertedIssueId(db, projectId, issueName) {
+  return readSingleId(
+    db,
+    `SELECT id FROM Issues WHERE projectId = ${projectId} AND name = '${escapeSqlString(issueName)}';`,
+  );
+}
+
+function insertSeedIssues(db, schemaName, projectId, seededIssues, projectRoot = null) {
   for (const seededIssue of seededIssues) {
-    db.exec(
-      `INSERT INTO Issues (
+    const insertSql = schemaName === "v7"
+      ? `INSERT INTO Issues (
+  projectId,
+  name,
+  description,
+  priority,
+  status,
+  closedReason,
+  progressPercentage,
+  openedAt,
+  closedAt,
+  closedReasonDescription
+)
+VALUES (
+  ${projectId},
+  '${escapeSqlString(seededIssue.name)}',
+  ${toSqlNullableText(seededIssue.description)},
+  ${seededIssue.priority},
+  '${escapeSqlString(seededIssue.status)}',
+  ${toSqlNullableText(seededIssue.closedReason)},
+  ${seededIssue.progressPercentage},
+  ${toSqlNullableTimestamp(seededIssue.openedAt)},
+  ${toSqlNullableTimestamp(seededIssue.closedAt)},
+  ${toSqlNullableText(seededIssue.closedReasonDescription)}
+);`
+      : `INSERT INTO Issues (
   projectId,
   name,
   description,
@@ -349,8 +461,17 @@ VALUES (
   ${toSqlNullableTimestamp(seededIssue.openedAt)},
   ${toSqlNullableTimestamp(seededIssue.closedAt)},
   ${toSqlNullableText(seededIssue.closedReasonDescription)}
-);`,
-    );
+);`;
+    db.exec(insertSql);
+
+    if (schemaName === "v7" && projectRoot) {
+      writeIssueJournal(
+        projectRoot,
+        projectId,
+        readInsertedIssueId(db, projectId, seededIssue.name),
+        seededIssue.journal ?? "",
+      );
+    }
   }
 }
 
@@ -359,6 +480,7 @@ function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
     seededScopedFixtures,
     seededTestAccounts,
   } = getSeededTestData(schemaName, profile);
+  const projectRoot = createProjectRootFromChartsDir(chartsDir);
 
   const seededUserIds = {
     admin: insertSeedUser(db, seededTestAccounts.admin),
@@ -445,6 +567,12 @@ function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
     projectIds.teamProjectManager,
   );
 
+  if (schemaName === "v7") {
+    writeProjectJournal(projectRoot, projectIds.projectProjectManager);
+    writeProjectJournal(projectRoot, projectIds.orgProjectManager);
+    writeProjectJournal(projectRoot, projectIds.teamProjectManager);
+  }
+
   const teamIds = {
     teamTeamManager: insertNamedEntity(
       db,
@@ -505,9 +633,27 @@ function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
   db.exec(`INSERT INTO Projects_Users (projectId, userId) VALUES (${projectIds.projectProjectManager}, ${seededUserIds.projectProjectManager});`);
   db.exec(`INSERT INTO Users_Projects_ProjectRoles (userId, projectId, roleCode) VALUES (${seededUserIds.projectProjectManager}, ${projectIds.projectProjectManager}, 'GGTC_PROJECTROLE_PROJECT_MANAGER');`);
 
-  insertSeedIssues(db, projectIds.orgProjectManager, seededScopedFixtures.issues.orgProjectManager);
-  insertSeedIssues(db, projectIds.projectProjectManager, seededScopedFixtures.issues.projectProjectManager);
-  insertSeedIssues(db, projectIds.teamProjectManager, seededScopedFixtures.issues.teamProjectManager);
+  insertSeedIssues(
+    db,
+    schemaName,
+    projectIds.orgProjectManager,
+    seededScopedFixtures.issues.orgProjectManager,
+    projectRoot,
+  );
+  insertSeedIssues(
+    db,
+    schemaName,
+    projectIds.projectProjectManager,
+    seededScopedFixtures.issues.projectProjectManager,
+    projectRoot,
+  );
+  insertSeedIssues(
+    db,
+    schemaName,
+    projectIds.teamProjectManager,
+    seededScopedFixtures.issues.teamProjectManager,
+    projectRoot,
+  );
   writeSeededProjectCharts(chartsDir, projectIds, seededScopedFixtures.projects.charts);
 }
 
@@ -543,8 +689,9 @@ function ensureSeededTestData(
       && schemaName !== "v4"
       && schemaName !== "v5"
       && schemaName !== "v6"
+      && schemaName !== "v7"
     ) {
-      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6, received ${schemaName}.`);
+      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6/v7, received ${schemaName}.`);
     }
 
     createV2StyleTestData(db, schemaName, profile, chartsDir);

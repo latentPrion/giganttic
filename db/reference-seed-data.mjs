@@ -345,6 +345,7 @@ function getReferenceSeedData(schemaName) {
   const resolvedSchemaName = (
     schemaName === "v5"
     || schemaName === "v6"
+    || schemaName === "v7"
   )
     ? "v4"
     : schemaName;

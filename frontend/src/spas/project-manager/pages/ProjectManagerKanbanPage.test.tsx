@@ -59,7 +59,6 @@ function createIssue(overrides: Partial<Awaited<ReturnType<typeof issuesApi.list
     createdAt: DEFAULT_TIMESTAMP,
     description: "Issue description",
     id: 7,
-    journal: "Issue journal",
     name: "Issue 7",
     openedAt: DEFAULT_TIMESTAMP,
     priority: 2,

@@ -65,6 +65,8 @@ import {
   listScopedTokenProjectIds,
   listScopedTokenTeamIds,
 } from "../scoped-access/scoped-access.policy.js";
+import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/discussion-attachment.service.js";
+import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import { TaskMirrorService } from "../tasks/task-mirror.service.js";
 import type {
   CreateProjectRequest,
@@ -127,22 +129,11 @@ function normalizeDescription(
   return description.trim();
 }
 
-function normalizeJournal(
-  journal: string | null | undefined,
-): string | null {
-  if (journal === undefined || journal === null) {
-    return journal ?? null;
-  }
-
-  return journal.trim();
-}
-
 function toProjectResponse(project: typeof projects.$inferSelect): ProjectResponse {
   return {
     createdAt: project.createdAt.toISOString(),
     description: project.description ?? null,
     id: project.id,
-    journal: project.journal ?? null,
     name: project.name,
     updatedAt: project.updatedAt.toISOString(),
   };
@@ -215,6 +206,10 @@ export class ProjectsService {
     private readonly config: BackendConfig,
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
+    @Inject(DiscussionAttachmentService)
+    private readonly attachmentService: DiscussionAttachmentService,
+    @Inject(DiscussionJournalStorageService)
+    private readonly journalStorage: DiscussionJournalStorageService,
     @Inject(ProjectChartsService)
     private readonly projectChartsService: ProjectChartsService,
     @Inject(TaskMirrorService)
@@ -229,6 +224,7 @@ export class ProjectsService {
 
     try {
       this.projectChartsService.createDefaultProjectChart(createdProjectId);
+      await this.journalStorage.writeProjectJournal(createdProjectId, "");
     } catch (error) {
       this.cleanupProjectAfterChartCreationFailure(createdProjectId);
       throw new InternalServerErrorException("Unable to create a chart for that project", {
@@ -369,9 +365,6 @@ export class ProjectsService {
           description: payload.description === undefined
             ? undefined
             : normalizeDescription(payload.description),
-          journal: payload.journal === undefined
-            ? undefined
-            : normalizeJournal(payload.journal),
           name: payload.name?.trim(),
           updatedAt: new Date(),
         })
@@ -473,7 +466,85 @@ export class ProjectsService {
 
     this.deleteProjectRecord(projectId);
     this.projectChartsService.deleteProjectChart(projectId);
+    await this.journalStorage.deleteProjectJournal(projectId);
     return { deletedProjectId: projectId };
+  }
+
+  async getProjectJournal(
+    authContext: AuthContext,
+    projectId: number,
+  ): Promise<{ journalExists: boolean; markdown: string | null }> {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+
+    const markdown = await this.journalStorage.readProjectJournal(projectId);
+    return {
+      journalExists: markdown !== null,
+      markdown,
+    };
+  }
+
+  async updateProjectJournal(
+    authContext: AuthContext,
+    projectId: number,
+    markdown: string,
+  ): Promise<{ journalExists: boolean; markdown: string | null }> {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+    await this.journalStorage.writeProjectJournal(projectId, markdown);
+    return {
+      journalExists: true,
+      markdown,
+    };
+  }
+
+  listProjectAttachments(
+    authContext: AuthContext,
+    projectId: number,
+  ): { attachments: ReturnType<typeof toAttachmentSummary>[] } {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+
+    return {
+      attachments: this.attachmentService
+        .listProjectLevelAttachmentRows(projectId)
+        .map(toAttachmentSummary),
+    };
+  }
+
+  async uploadProjectAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    buffer: Buffer,
+    originalFilename: string,
+  ): Promise<{ attachment: ReturnType<typeof toAttachmentSummary> }> {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+
+    const attachment = await this.attachmentService.createAttachmentAndLinkToProject({
+      buffer,
+      originalFilename,
+      projectId,
+      uploadedByUserId: authContext.userId,
+    });
+
+    return { attachment };
+  }
+
+  async deleteProjectAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    attachmentId: string,
+  ): Promise<{ deletedAttachmentId: string }> {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+
+    return {
+      deletedAttachmentId: await this.attachmentService.deleteProjectAttachmentLink(
+        projectId,
+        attachmentId,
+      ),
+    };
   }
 
   async associateProjectTeam(
@@ -543,7 +614,6 @@ export class ProjectsService {
       const [createdProject] = tx.insert(projects)
         .values({
           description: normalizeDescription(payload.description),
-          journal: normalizeJournal(payload.journal),
           name: payload.name.trim(),
         })
         .returning({ id: projects.id })

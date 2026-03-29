@@ -13,7 +13,6 @@ describe("IssueFormFields", () => {
           closedReason: "",
           closedReasonDescription: "",
           description: "",
-          journal: "",
           name: "",
           priority: "0",
           progressPercentage: "0",

@@ -5,7 +5,7 @@ import { DiscussionMarkdownRender } from "../discussion/DiscussionMarkdownRender
 
 export const GIGANTT_ISSUE_ATTACHMENT_URL_PREFIX = "gigantt://issue-attachment/";
 
-const HELP_TEXT =
+export const ISSUE_MARKDOWN_HELP_TEXT =
   "Embed issue attachments in markdown as ![alt](gigantt://issue-attachment/<attachmentId>) or link them the same way.";
 
 interface IssueMarkdownRenderProps {
@@ -22,7 +22,7 @@ export function IssueMarkdownRender(props: IssueMarkdownRenderProps) {
   return (
     <DiscussionMarkdownRender
       attachmentUrlPrefix={GIGANTT_ISSUE_ATTACHMENT_URL_PREFIX}
-      helpText={HELP_TEXT}
+      helpText={ISSUE_MARKDOWN_HELP_TEXT}
       markdown={markdown}
       resolveAttachmentDownloadPath={(attachmentId) =>
         createIssueAttachmentDownloadPath(projectId, issueId, attachmentId)}

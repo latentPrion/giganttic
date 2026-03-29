@@ -3,7 +3,6 @@ import { TextField } from "@mui/material";
 
 interface ProjectFormState {
   description: string;
-  journal: string;
   name: string;
 }
 
@@ -31,13 +30,6 @@ export function ProjectFormFields(props: ProjectFormFieldsProps) {
         multiline
         onChange={(event) => props.onFieldChange("description", event.target.value)}
         value={props.formState.description}
-      />
-      <TextField
-        label="Journal"
-        minRows={4}
-        multiline
-        onChange={(event) => props.onFieldChange("journal", event.target.value)}
-        value={props.formState.journal}
       />
     </>
   );

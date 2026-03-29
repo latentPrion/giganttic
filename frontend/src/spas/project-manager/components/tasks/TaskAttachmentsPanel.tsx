@@ -2,6 +2,7 @@ import React from "react";
 
 import { createTaskAttachmentDownloadPath } from "../../api/task-attachment-paths.js";
 import { taskAttachmentsApi } from "../../api/task-attachments-api.js";
+import { emitProjectManagerTaskDiscussionStateEvent } from "../../lib/task-discussion-state-events.js";
 import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsPanel.js";
 
 interface TaskAttachmentsPanelProps {
@@ -21,8 +22,16 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
           taskAttachmentsApi.deleteAttachment(token, projectId, taskId, attachmentId),
         listAttachments: async () =>
           taskAttachmentsApi.listAttachments(token, projectId, taskId),
-        uploadAttachment: async (file) =>
-          taskAttachmentsApi.uploadAttachment(token, projectId, taskId, file),
+        uploadAttachment: async (file) => {
+          const response = await taskAttachmentsApi.uploadAttachment(
+            token,
+            projectId,
+            taskId,
+            file,
+          );
+          emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
+          return response;
+        },
       }}
       emptyMessage="No task-level attachments yet."
       isActive={taskTab === "attachments"}

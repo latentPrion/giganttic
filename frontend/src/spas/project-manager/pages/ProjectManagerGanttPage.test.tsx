@@ -186,7 +186,6 @@ function createMockProjectResponse(
       createdAt: "2026-01-01T00:00:00.000Z",
       description: null,
       id: projectId,
-      journal: null,
       name: "Test Project",
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
