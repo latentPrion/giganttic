@@ -260,6 +260,18 @@ describe("ProjectManagerKanbanPage", () => {
     });
   });
 
+  it("opens the task detail view on single click", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    await user.click(taskCard);
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=101");
+    });
+  });
+
   it("updates non-milestone task status in cache and emits gantt metadata reload event", async () => {
     const user = userEvent.setup();
     const metadataReloadListener = vi.fn();
@@ -275,8 +287,22 @@ describe("ProjectManagerKanbanPage", () => {
       expect(metadataReloadListener).toHaveBeenCalled();
     });
     expect(within(getColumn("Blocked")).getByText("Started task")).toBeVisible();
+    expect(navigateMock).not.toHaveBeenCalled();
 
     window.removeEventListener(GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT, metadataReloadListener);
+  });
+
+  it("does not navigate when dismissing the task status menu after double click", async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ProjectManagerKanbanPage projectId={42} token={DEFAULT_TOKEN} />);
+
+    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    fireEvent.doubleClick(taskCard);
+    await user.click(document.body);
+
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("reloads issues when issue-updated event is emitted", async () => {

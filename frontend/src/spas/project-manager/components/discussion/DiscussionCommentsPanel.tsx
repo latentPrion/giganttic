@@ -66,6 +66,10 @@ function findCommentById<Comment extends DiscussionCommentLike>(
   return comments.find((row) => row.id === commentId);
 }
 
+function createReplyChipLabel(commentId: number): string {
+  return `Replying to comment #${commentId}`;
+}
+
 async function downloadAttachment(
   token: string,
   resolveAttachmentDownloadPath: (attachmentId: string) => string,
@@ -303,6 +307,7 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
       <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">
         <Stack spacing={1.5}>
           <TextField
+            autoFocus
             fullWidth
             label="New comment (markdown)"
             minRows={4}
@@ -312,8 +317,10 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
           />
           {parentCommentId !== null ? (
             <Chip
+              clickable
               color="primary"
-              label={<span>Replying to comment {parentCommentId}</span>}
+              label={<span>{createReplyChipLabel(parentCommentId)}</span>}
+              onClick={() => onNavigateToComment(parentCommentId)}
               onDelete={() => setParentCommentId(null)}
               variant="outlined"
             />
@@ -380,20 +387,14 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
                   </Typography>
                   {parent ? (
                     <Chip
+                      clickable
                       color="default"
                       label={(
                         <Typography component="span" variant="caption">
-                          Replying to comment{" "}
-                          <MuiLink
-                            component="button"
-                            onClick={() => onNavigateToComment(parent.id)}
-                            type="button"
-                            underline="hover"
-                          >
-                            {parent.id}
-                          </MuiLink>
+                          {createReplyChipLabel(parent.id)}
                         </Typography>
                       )}
+                      onClick={() => onNavigateToComment(parent.id)}
                       size="small"
                       sx={{
                         "& .MuiChip-label": {

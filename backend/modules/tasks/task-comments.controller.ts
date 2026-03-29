@@ -19,7 +19,6 @@ import { DiscussionAttachmentService } from "../discussion/discussion-attachment
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
-import { TaskMirrorService } from "./task-mirror.service.js";
 import { TaskCommentService } from "./task-comment.service.js";
 import {
   createTaskCommentRequestSchema,
@@ -50,8 +49,6 @@ export class TaskCommentsController {
   constructor(
     @Inject(TaskCommentService)
     private readonly taskCommentService: TaskCommentService,
-    @Inject(TaskMirrorService)
-    private readonly taskMirrorService: TaskMirrorService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
   ) {}
@@ -179,7 +176,6 @@ export class TaskCommentsController {
       params,
     );
 
-    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
     const attachment = await this.attachmentService.createAttachmentAndLinkToTaskComment({
       buffer: requireUploadedBuffer(file),
       commentId,

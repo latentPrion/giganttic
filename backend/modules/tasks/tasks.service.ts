@@ -43,6 +43,15 @@ export class TasksService {
     this.taskMirrorService.assertTaskExistsInCurrentChart(projectId, taskId);
   }
 
+  ensureTaskMirrorExistsForReadableTask(
+    authContext: AuthContext,
+    projectId: number,
+    taskId: string,
+  ): void {
+    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+  }
+
   assertTaskDiscussionManageableForCurrentUser(
     authContext: AuthContext,
     projectId: number,

@@ -16,12 +16,11 @@ import {
   KANBAN_STATUS_OPTIONS,
 } from "./kanban-status-options.js";
 import type { KanbanIssueCardData } from "./kanban.types.js";
+import { useKanbanCardInteraction } from "./useKanbanCardInteraction.js";
 
 const VIEW_MODE = "link-only-no-action-buttons";
 const CARD_BORDER_WIDTH = 1;
 const CARD_BORDER_RADIUS = 3;
-const SINGLE_CLICK_NAVIGATE_DELAY_MS = 220;
-const DOUBLE_CLICK_NAVIGATION_SUPPRESSION_MS = SINGLE_CLICK_NAVIGATE_DELAY_MS + 300;
 
 function createIssueStatusLabel(status: KanbanIssueCardData["issue"]["status"]): string {
   return formatKanbanStatusLabel(status);
@@ -47,85 +46,19 @@ export function KanbanIssueCard(props: {
   onUpdateStatus: (issueId: number, status: IssueStatus) => void;
 }) {
   const { issue } = props.card;
-  const [menuAnchor, setMenuAnchor] = React.useState<{
-    left: number;
-    top: number;
-  } | null>(null);
-  const pendingNavigateTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressSingleClickNavigationUntilRef = React.useRef<number>(0);
-
-  function clearPendingNavigateTimeout(): void {
-    if (pendingNavigateTimeoutRef.current === null) {
-      return;
-    }
-    clearTimeout(pendingNavigateTimeoutRef.current);
-    pendingNavigateTimeoutRef.current = null;
-  }
-
-  function scheduleSingleClickNavigation(): void {
-    if (props.disabled) {
-      return;
-    }
-    clearPendingNavigateTimeout();
-
-    if (menuAnchor !== null) {
-      return;
-    }
-
-    if (Date.now() < suppressSingleClickNavigationUntilRef.current) {
-      return;
-    }
-
-    if (!props.onNavigateToIssue) {
-      return;
-    }
-
-    pendingNavigateTimeoutRef.current = setTimeout(() => {
-      pendingNavigateTimeoutRef.current = null;
-      props.onNavigateToIssue?.(issue.id);
-    }, SINGLE_CLICK_NAVIGATE_DELAY_MS);
-  }
-
-  React.useEffect(() => () => {
-    clearPendingNavigateTimeout();
-  }, []);
-
-  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>): void {
-    if (props.disabled) {
-      return;
-    }
-
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-
-    event.preventDefault();
-    scheduleSingleClickNavigation();
-  }
-
-  function closeMenu(): void {
-    setMenuAnchor(null);
-    // Prevent a background click right after dismissing the menu
-    // from triggering our delayed single-click navigation.
-    suppressSingleClickNavigationUntilRef.current = Math.max(
-      suppressSingleClickNavigationUntilRef.current,
-      Date.now() + DOUBLE_CLICK_NAVIGATION_SUPPRESSION_MS,
-    );
-    clearPendingNavigateTimeout();
-  }
-
-  function handleDoubleClick(event: React.MouseEvent<HTMLElement>): void {
-    event.preventDefault();
-    clearPendingNavigateTimeout();
-    if (props.disabled) {
-      return;
-    }
-    suppressSingleClickNavigationUntilRef.current = Date.now() + DOUBLE_CLICK_NAVIGATION_SUPPRESSION_MS;
-    setMenuAnchor({
-      left: event.clientX,
-      top: event.clientY,
-    });
-  }
+  const {
+    closeMenu,
+    handleClick,
+    handleDoubleClick,
+    handleKeyDown,
+    menuAnchor,
+  } = useKanbanCardInteraction({
+    disabled: props.disabled,
+    onNavigate: props.onNavigateToIssue
+      ? () => props.onNavigateToIssue?.(issue.id)
+      : undefined,
+    shouldOpenMenuOnDoubleClick: () => true,
+  });
 
   function handleSelectStatus(status: IssueStatus): void {
     closeMenu();
@@ -140,7 +73,7 @@ export function KanbanIssueCard(props: {
       data-testid={`kanban-issue-card-${issue.id}`}
       role="button"
       tabIndex={0}
-      onClick={() => scheduleSingleClickNavigation()}
+      onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
     >

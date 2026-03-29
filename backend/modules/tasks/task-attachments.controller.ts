@@ -18,7 +18,6 @@ import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
-import { TaskMirrorService } from "./task-mirror.service.js";
 import {
   deleteTaskAttachmentResponseSchema,
   listTaskAttachmentsResponseSchema,
@@ -50,8 +49,6 @@ export class TaskAttachmentsController {
   constructor(
     @Inject(TasksService)
     private readonly tasksService: TasksService,
-    @Inject(TaskMirrorService)
-    private readonly taskMirrorService: TaskMirrorService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
   ) {}
@@ -82,15 +79,15 @@ export class TaskAttachmentsController {
     @UploadedMemoryFile() file: MemoryUploadedFile | undefined,
   ) {
     const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
-    this.tasksService.validateTaskReadableForCurrentUser(
+    const buffer = requireUploadedBuffer(file);
+    this.tasksService.ensureTaskMirrorExistsForReadableTask(
       request.authContext!,
       projectId,
       taskId,
     );
 
-    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
     const attachment = await this.attachmentService.createAttachmentAndLinkToTask({
-      buffer: requireUploadedBuffer(file),
+      buffer,
       originalFilename: file!.originalname,
       projectId,
       taskId,

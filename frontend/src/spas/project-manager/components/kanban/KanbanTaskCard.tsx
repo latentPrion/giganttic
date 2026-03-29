@@ -15,6 +15,7 @@ import {
   KANBAN_STATUS_OPTIONS,
 } from "./kanban-status-options.js";
 import type { KanbanTaskCardModel } from "./kanban.types.js";
+import { useKanbanCardInteraction } from "./useKanbanCardInteraction.js";
 
 const VIEW_MODE = "link-only-no-action-buttons";
 const CARD_BORDER_WIDTH = 1;
@@ -23,29 +24,24 @@ const CARD_BORDER_RADIUS = 3;
 export function KanbanTaskCard(props: {
   card: KanbanTaskCardModel;
   disabled?: boolean;
+  onNavigateToTask?: (taskId: string) => void;
   onUpdateStatus: (taskId: string, status: IssueStatus) => void;
 }) {
   const { task } = props.card;
-  const [menuAnchor, setMenuAnchor] = React.useState<{
-    left: number;
-    top: number;
-  } | null>(null);
   const isReadOnlyMilestone = task.isMilestone;
-
-  function closeMenu(): void {
-    setMenuAnchor(null);
-  }
-
-  function handleDoubleClick(event: React.MouseEvent<HTMLElement>): void {
-    event.preventDefault();
-    if (props.disabled || isReadOnlyMilestone) {
-      return;
-    }
-    setMenuAnchor({
-      left: event.clientX,
-      top: event.clientY,
-    });
-  }
+  const {
+    closeMenu,
+    handleClick,
+    handleDoubleClick,
+    handleKeyDown,
+    menuAnchor,
+  } = useKanbanCardInteraction({
+    disabled: props.disabled,
+    onNavigate: props.onNavigateToTask
+      ? () => props.onNavigateToTask?.(task.id)
+      : undefined,
+    shouldOpenMenuOnDoubleClick: () => !isReadOnlyMilestone,
+  });
 
   function handleSelectStatus(status: IssueStatus): void {
     closeMenu();
@@ -56,7 +52,14 @@ export function KanbanTaskCard(props: {
   }
 
   return (
-    <Box data-testid={`kanban-task-card-${task.id}`} onDoubleClick={handleDoubleClick}>
+    <Box
+      data-testid={`kanban-task-card-${task.id}`}
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+    >
       <EntityListItemCard
         description="Derived from the project gantt chart"
         paperSx={{

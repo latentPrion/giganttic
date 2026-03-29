@@ -19,6 +19,17 @@ vi.mock("../../api/issue-comments-api.js", () => ({
 
 const issueCommentsApiMock = vi.mocked(issueCommentsApi);
 
+function findReplyComposerChip(): HTMLElement {
+  const candidates = screen.getAllByRole("button", {
+    name: "Replying to comment #1",
+  });
+  const chip = candidates.find((candidate) => candidate.querySelector("[data-testid='CancelIcon']"));
+  if (!chip) {
+    throw new Error("Expected reply composer chip to be present");
+  }
+  return chip;
+}
+
 describe("IssueCommentsPanel", () => {
   beforeEach(() => {
     issueCommentsApiMock.listComments.mockReset();
@@ -69,7 +80,47 @@ describe("IssueCommentsPanel", () => {
       />,
     );
 
-    expect(await screen.findByText(/Replying to comment/i)).toBeVisible();
+    expect(await screen.findByText(/Replying to comment #1/i)).toBeVisible();
+  });
+
+  it("navigates to the parent comment when the reply chip is clicked", async () => {
+    const user = userEvent.setup();
+    const navigateToComment = vi.fn();
+
+    renderWithTheme(
+      <IssueCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        issueId={7}
+        issueTab="comments"
+        onNavigateToComment={navigateToComment}
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    await screen.findByText("Parent comment seventeen");
+    await user.click(screen.getAllByRole("button", { name: "Reply" })[0]!);
+    await user.click(findReplyComposerChip());
+
+    expect(navigateToComment).toHaveBeenCalledWith(1);
+  });
+
+  it("autofocuses the new comment box when the issue comments tab opens", async () => {
+    renderWithTheme(
+      <IssueCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        issueId={7}
+        issueTab="comments"
+        onNavigateToComment={() => {}}
+        projectId={42}
+        token="pm-token"
+      />,
+    );
+
+    const input = await screen.findByLabelText("New comment (markdown)");
+    expect(input).toHaveFocus();
   });
 
   it("deletes a comment attachment and reloads comments", async () => {
@@ -101,4 +152,3 @@ describe("IssueCommentsPanel", () => {
     expect(issueCommentsApiMock.listComments).toHaveBeenCalledTimes(2);
   });
 });
-

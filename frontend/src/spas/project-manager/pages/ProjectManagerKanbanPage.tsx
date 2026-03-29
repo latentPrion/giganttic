@@ -16,6 +16,7 @@ import { ProjectManagerProjectNavigation } from "../components/ProjectManagerPro
 import type { Issue } from "../contracts/issue.contracts.js";
 import type { IssueStatus } from "../contracts/issue.contracts.js";
 import { createProjectIssueRoute } from "../routes/project-route-paths.js";
+import { createProjectTaskRoute } from "../routes/project-route-paths.js";
 import {
   parseProjectKanbanTasksFromXml,
   type ParsedGanttKanbanTask,
@@ -200,6 +201,13 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     navigate(createProjectIssueRoute(props.projectId, issueId));
   }
 
+  function openTaskDetail(taskId: string): void {
+    if (props.projectId === null) {
+      return;
+    }
+    navigate(createProjectTaskRoute(props.projectId, taskId));
+  }
+
   function handleTaskStatusChange(taskId: string, status: IssueStatus): void {
     if (props.projectId === null) {
       return;
@@ -252,6 +260,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
         onIssueStatusChange={(issueId, status) => {
           void handleIssueStatusChange(issueId, status);
         }}
+        onTaskNavigateToDetail={openTaskDetail}
         onTaskStatusChange={handleTaskStatusChange}
       />
     );

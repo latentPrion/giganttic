@@ -20,6 +20,21 @@ vi.mock("../../api/task-comments-api.js", () => ({
 
 const taskCommentsApiMock = vi.mocked(taskCommentsApi);
 
+function findReplyComposerChip(): HTMLElement {
+  const candidates = screen.getAllByText("Replying to comment #1");
+  const chip = candidates
+    .map((candidate) => candidate.closest(".MuiChip-root"))
+    .find(
+      (candidate): candidate is HTMLElement =>
+        candidate instanceof HTMLElement
+        && candidate.querySelector(".MuiChip-deleteIcon") !== null,
+    );
+  if (chip === undefined) {
+    throw new Error("Expected reply composer chip to be present");
+  }
+  return chip;
+}
+
 describe("TaskCommentsPanel", () => {
   beforeEach(() => {
     taskCommentsApiMock.createComment.mockReset();
@@ -89,6 +104,78 @@ describe("TaskCommentsPanel", () => {
 
     await screen.findByText("Parent task comment");
     await user.type(screen.getByLabelText("New comment (markdown)"), "A new task comment body");
+    await user.click(screen.getByRole("button", { name: "Post comment" }));
+
+    await waitFor(() => {
+      expect(taskCommentsApiMock.createComment).toHaveBeenCalledWith(
+        "pm-token",
+        42,
+        "task-7",
+        { body: "A new task comment body", parentCommentId: undefined },
+      );
+    });
+  });
+
+  it("autofocuses the new comment box when the task comments tab opens", async () => {
+    renderWithTheme(
+      <TaskCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={() => {}}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    const input = await screen.findByLabelText("New comment (markdown)");
+    expect(input).toHaveFocus();
+  });
+
+  it("navigates to the parent comment when the reply chip is clicked", async () => {
+    const user = userEvent.setup();
+    const navigateToComment = vi.fn();
+
+    renderWithTheme(
+      <TaskCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={navigateToComment}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    await screen.findByText("Parent task comment");
+    await user.click(screen.getAllByRole("button", { name: "Reply" })[0]!);
+    await user.click(findReplyComposerChip());
+
+    expect(navigateToComment).toHaveBeenCalledWith(1);
+  });
+
+  it("allows posting the first task comment from an empty task discussion", async () => {
+    const user = userEvent.setup();
+    taskCommentsApiMock.listComments.mockResolvedValue({ comments: [] });
+
+    renderWithTheme(
+      <TaskCommentsPanel
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={() => {}}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    await user.type(
+      screen.getByLabelText("New comment (markdown)"),
+      "A new task comment body",
+    );
     await user.click(screen.getByRole("button", { name: "Post comment" }));
 
     await waitFor(() => {

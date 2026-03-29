@@ -69,6 +69,71 @@ describe("kanban cards", () => {
     expect(screen.getByText("Progress 65%")).toBeVisible();
   });
 
+  it("navigates to task detail on single click", () => {
+    vi.useFakeTimers();
+    const navigateToTask = vi.fn();
+
+    renderWithTheme(
+      <KanbanTaskCard
+        card={{
+          column: "ISSUE_STATUS_IN_PROGRESS",
+          id: "ganttTask:101",
+          kind: "ganttTask",
+          task: {
+            id: "101",
+            isMilestone: false,
+            progressPercentage: 65,
+            startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_IN_PROGRESS",
+            title: "Started task",
+          },
+          title: "Started task",
+        }}
+        onNavigateToTask={navigateToTask}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kanban-task-card-101"));
+    vi.advanceTimersByTime(250);
+
+    expect(navigateToTask).toHaveBeenCalledWith("101");
+    vi.useRealTimers();
+  });
+
+  it("opens the task status menu on double click without navigating", () => {
+    vi.useFakeTimers();
+    const navigateToTask = vi.fn();
+
+    renderWithTheme(
+      <KanbanTaskCard
+        card={{
+          column: "ISSUE_STATUS_IN_PROGRESS",
+          id: "ganttTask:101",
+          kind: "ganttTask",
+          task: {
+            id: "101",
+            isMilestone: false,
+            progressPercentage: 65,
+            startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_IN_PROGRESS",
+            title: "Started task",
+          },
+          title: "Started task",
+        }}
+        onNavigateToTask={navigateToTask}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-101"));
+    expect(screen.getByRole("menuitem", { name: "blocked" })).toBeVisible();
+    vi.advanceTimersByTime(600);
+
+    expect(navigateToTask).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it("does not open status menu for milestone cards on double click", async () => {
     renderWithTheme(
       <KanbanTaskCard
@@ -92,5 +157,37 @@ describe("kanban cards", () => {
 
     fireEvent.doubleClick(screen.getByTestId("kanban-task-card-mile-1"));
     expect(screen.queryByRole("menuitem", { name: "open" })).not.toBeInTheDocument();
+  });
+
+  it("still navigates milestone task cards on single click", () => {
+    vi.useFakeTimers();
+    const navigateToTask = vi.fn();
+
+    renderWithTheme(
+      <KanbanTaskCard
+        card={{
+          column: "ISSUE_STATUS_CLOSED",
+          id: "ganttTask:mile-1",
+          kind: "ganttTask",
+          task: {
+            id: "mile-1",
+            isMilestone: true,
+            progressPercentage: 100,
+            startDate: DEFAULT_TIMESTAMP,
+            status: "ISSUE_STATUS_CLOSED",
+            title: "Milestone Alpha",
+          },
+          title: "Milestone Alpha",
+        }}
+        onNavigateToTask={navigateToTask}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("kanban-task-card-mile-1"));
+    vi.advanceTimersByTime(250);
+
+    expect(navigateToTask).toHaveBeenCalledWith("mile-1");
+    vi.useRealTimers();
   });
 });
