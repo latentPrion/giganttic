@@ -12,12 +12,16 @@ import { LoggedOutSessionManager } from "../../common/session/components/LoggedO
 const FEATURE_SECTION_LABEL = "What Giganttic Can Do";
 const HERO_HEADLINE = "Run projects with clarity.";
 const HERO_SUPPORTING_COPY =
-  "Giganttic brings scheduling, issue tracking, task discussion, and access-controlled collaboration into one structured workspace, including client-facing read-only project access for viewing gantt charts and participating through issues, comments, and attachments.";
+  "Giganttic brings scheduling, issue tracking, task discussion, and access-controlled collaboration into one structured workspace, including client-facing project insight access for viewing gantt charts and participating through issues, comments, and attachments.";
 
 const HOME_FEATURES = [
   {
     description: "Plan timelines with gantt charts, milestones, and live task updates.",
     title: "Schedule work",
+  },
+  {
+    description: "Give clients project insight access so they can follow the gantt chart, raise issues, and collaborate through comments and attachments.",
+    title: "Share with clients",
   },
   {
     description: "Track blockers, progress, comments, and attachments without losing context.",
@@ -26,10 +30,6 @@ const HOME_FEATURES = [
   {
     description: "Coordinate projects, teams, and organizations with explicit scoped permissions.",
     title: "Control access",
-  },
-  {
-    description: "Give clients read-only access so they can follow the gantt chart, raise issues, and collaborate through comments and attachments.",
-    title: "Share with clients",
   },
   {
     description: "Keep journals and discussions close to the project, issue, or task they belong to.",
