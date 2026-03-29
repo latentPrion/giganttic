@@ -21,6 +21,7 @@ export function SessionNavSlot() {
         isScopedAccessSession={authState.auth.session.isScopedAccessSession}
         onLogout={actions.logout}
         roles={authState.auth.user.roles}
+        token={authState.auth.token}
         username={authState.auth.user.username}
       />
     );

@@ -411,7 +411,7 @@ function readInsertedIssueId(db, projectId, issueName) {
 
 function insertSeedIssues(db, schemaName, projectId, seededIssues, projectRoot = null) {
   for (const seededIssue of seededIssues) {
-    const insertSql = schemaName === "v7"
+    const insertSql = schemaName === "v7" || schemaName === "v8"
       ? `INSERT INTO Issues (
   projectId,
   name,
@@ -464,7 +464,7 @@ VALUES (
 );`;
     db.exec(insertSql);
 
-    if (schemaName === "v7" && projectRoot) {
+    if ((schemaName === "v7" || schemaName === "v8") && projectRoot) {
       writeIssueJournal(
         projectRoot,
         projectId,
@@ -567,7 +567,7 @@ function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
     projectIds.teamProjectManager,
   );
 
-  if (schemaName === "v7") {
+  if (schemaName === "v7" || schemaName === "v8") {
     writeProjectJournal(projectRoot, projectIds.projectProjectManager);
     writeProjectJournal(projectRoot, projectIds.orgProjectManager);
     writeProjectJournal(projectRoot, projectIds.teamProjectManager);
@@ -690,8 +690,9 @@ function ensureSeededTestData(
       && schemaName !== "v5"
       && schemaName !== "v6"
       && schemaName !== "v7"
+      && schemaName !== "v8"
     ) {
-      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6/v7, received ${schemaName}.`);
+      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6/v7/v8, received ${schemaName}.`);
     }
 
     createV2StyleTestData(db, schemaName, profile, chartsDir);

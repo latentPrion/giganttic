@@ -46,6 +46,10 @@ import { useProjectAccess } from "../hooks/use-project-access.js";
 import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
 import { issueCommentsApi } from "../api/issue-comments-api.js";
 import { issueAttachmentsApi } from "../api/issue-attachments-api.js";
+import {
+  ISSUE_ATTACHMENTS_SECTION_ANCHOR,
+  ISSUE_JOURNAL_SECTION_ANCHOR,
+} from "../lib/detail-section-anchor-routing.js";
 import { subscribeProjectManagerIssueDiscussionStateEvent } from "../lib/issue-discussion-state-events.js";
 
 interface ProjectManagerIssuePageProps {
@@ -397,6 +401,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
               token={props.token}
             />
           )}
+          sectionId={ISSUE_JOURNAL_SECTION_ANCHOR}
           title="Issue Journal"
         />
       </Stack>
@@ -478,6 +483,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
               issueId={props.issueId}
               issueTab={props.issueTab}
               projectId={props.projectId}
+              sectionId={ISSUE_ATTACHMENTS_SECTION_ANCHOR}
               token={props.token}
             />
           </>

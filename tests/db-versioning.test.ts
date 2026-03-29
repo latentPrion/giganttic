@@ -44,12 +44,13 @@ describe("db version selection pipeline", () => {
     }
   });
 
-  it("advertises v7 as the active schema version", () => {
+  it("advertises v8 as the active schema version", () => {
     expect(availableSchemaVersions).toContain("v4");
     expect(availableSchemaVersions).toContain("v5");
     expect(availableSchemaVersions).toContain("v6");
     expect(availableSchemaVersions).toContain("v7");
-    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v7");
+    expect(availableSchemaVersions).toContain("v8");
+    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v8");
   });
 
   it("resolves generated artifact paths from explicit version arguments", () => {
@@ -60,6 +61,7 @@ describe("db version selection pipeline", () => {
     expect(getGeneratedSqlDdlDir("v5")).toContain("db/v5/generated-sql-ddl");
     expect(getGeneratedSqlDdlDir("v6")).toContain("db/v6/generated-sql-ddl");
     expect(getGeneratedSqlDdlDir("v7")).toContain("db/v7/generated-sql-ddl");
+    expect(getGeneratedSqlDdlDir("v8")).toContain("db/v8/generated-sql-ddl");
     expect(getGeneratedSqlDdlFilePath("v1")).toContain(
       "db/v1/generated-sql-ddl/schema.sql",
     );
@@ -80,6 +82,9 @@ describe("db version selection pipeline", () => {
     );
     expect(getGeneratedSqlDdlFilePath("v7")).toContain(
       "db/v7/generated-sql-ddl/schema.sql",
+    );
+    expect(getGeneratedSqlDdlFilePath("v8")).toContain(
+      "db/v8/generated-sql-ddl/schema.sql",
     );
   });
 

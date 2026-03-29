@@ -30,6 +30,7 @@ import {
 } from "./issue-untrusted.contracts.js";
 import { IssueUploadMultipartInterceptor } from "./issue-upload-multipart.interceptor.js";
 import { IssuesService } from "./issues.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import type { MemoryUploadedFile } from "./memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "./uploaded-memory-file.decorator.js";
 
@@ -41,6 +42,8 @@ export class IssueAttachmentsController {
     private readonly issuesService: IssuesService,
     @Inject(AttachmentService)
     private readonly attachmentService: AttachmentService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get()
@@ -83,6 +86,12 @@ export class IssueAttachmentsController {
       originalFilename: file!.originalname,
       projectId,
       uploadedByUserId: request.authContext!.userId,
+    });
+    await this.notificationsService.notifyIssueAttachmentCreated({
+      actorUserId: request.authContext!.userId,
+      attachmentId: summary.id,
+      issueId,
+      projectId,
     });
 
     return uploadIssueAttachmentResponseSchema.parse({ attachment: summary });

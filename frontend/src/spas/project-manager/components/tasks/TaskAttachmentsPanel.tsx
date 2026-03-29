@@ -7,13 +7,14 @@ import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsP
 
 interface TaskAttachmentsPanelProps {
   projectId: number;
+  sectionId?: string;
   taskId: string;
   taskTab: string;
   token: string;
 }
 
 export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
-  const { projectId, taskId, taskTab, token } = props;
+  const { projectId, sectionId, taskId, taskTab, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -46,6 +47,7 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
       panelTitle="Task-level attachments"
       resolveAttachmentDownloadPath={(attachmentId) =>
         createTaskAttachmentDownloadPath(projectId, taskId, attachmentId)}
+      sectionId={sectionId}
       token={token}
     />
   );

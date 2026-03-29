@@ -5,6 +5,7 @@ import { BackendConfigModule } from "./config/backend-config.module.js";
 import { AuthModule } from "./modules/auth/auth.module.js";
 import { DatabaseModule } from "./modules/database/database.module.js";
 import { IssuesModule } from "./modules/issues/issues.module.js";
+import { NotificationsModule } from "./modules/notifications/notifications.module.js";
 import { OrganizationsModule } from "./modules/organizations/organizations.module.js";
 import { ProjectsModule } from "./modules/projects/projects.module.js";
 import { ScopedAccessModule } from "./modules/scoped-access/scoped-access.module.js";
@@ -26,6 +27,7 @@ export class AppModule {
         TasksModule,
         ScopedAccessModule,
         IssuesModule,
+        NotificationsModule,
         OrganizationsModule,
         UsersModule,
       ],

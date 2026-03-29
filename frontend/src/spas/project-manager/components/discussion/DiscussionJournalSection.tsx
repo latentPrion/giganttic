@@ -21,6 +21,7 @@ interface DiscussionJournalSectionProps {
   missingStateMessage?: string | null;
   onSave: (markdown: string) => Promise<void>;
   renderMarkdown: (markdown: string) => React.ReactNode;
+  sectionId?: string;
   title?: string;
 }
 
@@ -41,6 +42,7 @@ export function DiscussionJournalSection(
     missingStateMessage,
     onSave,
     renderMarkdown,
+    sectionId,
     title = "Journal",
   } = props;
 
@@ -120,7 +122,7 @@ export function DiscussionJournalSection(
   }
 
   return (
-    <Paper elevation={0} sx={{ p: 3 }}>
+    <Paper elevation={0} id={sectionId} sx={{ p: 3 }}>
       <Stack spacing={1.5}>
         <Stack
           alignItems={{ sm: "center", xs: "flex-start" }}

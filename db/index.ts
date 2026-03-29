@@ -12,6 +12,7 @@ import * as v4 from "./v4/index.js";
 import * as v5 from "./v5/index.js";
 import * as v6 from "./v6/index.js";
 import * as v7 from "./v7/index.js";
+import * as v8 from "./v8/index.js";
 
 const schemaModules = {
   v1,
@@ -21,6 +22,7 @@ const schemaModules = {
   v5,
   v6,
   v7,
+  v8,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -31,7 +33,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v7;
+] as typeof v8;
 
 export {
   availableSchemaVersions,
@@ -117,6 +119,10 @@ export const {
   organizationsTeamsInsertSchema,
   organizationsTeamsRelations,
   organizationsTeamsSelectSchema,
+  notifications,
+  notificationsInsertSchema,
+  notificationsRelations,
+  notificationsSelectSchema,
   projectRoleCodes,
   projectRoles,
   projectRolesInsertSchema,
@@ -169,6 +175,10 @@ export const {
   usersCredentialTypesRelations,
   usersCredentialTypesSelectSchema,
   usersInsertSchema,
+  usersNotifications,
+  usersNotificationsInsertSchema,
+  usersNotificationsRelations,
+  usersNotificationsSelectSchema,
   usersOrganizations,
   usersOrganizationsInsertSchema,
   usersOrganizationsOrganizationRoles,
@@ -203,6 +213,8 @@ export const {
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type Team = typeof teams.$inferSelect;
@@ -251,6 +263,8 @@ export type NewUserOrganizationRole =
   typeof usersOrganizationsOrganizationRoles.$inferInsert;
 export type UserCredentialType = typeof usersCredentialTypes.$inferSelect;
 export type NewUserCredentialType = typeof usersCredentialTypes.$inferInsert;
+export type UserNotification = typeof usersNotifications.$inferSelect;
+export type NewUserNotification = typeof usersNotifications.$inferInsert;
 export type UserPasswordCredential = typeof usersPasswordCredentials.$inferSelect;
 export type NewUserPasswordCredential =
   typeof usersPasswordCredentials.$inferInsert;

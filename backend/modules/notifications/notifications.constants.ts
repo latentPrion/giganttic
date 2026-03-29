@@ -1,0 +1,4 @@
+export const DEFAULT_NOTIFICATIONS_DROPDOWN_LIMIT = 20;
+
+export const NOTIFICATIONS_ROUTE_SEGMENT = "notifications";
+

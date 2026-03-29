@@ -9,11 +9,12 @@ interface IssueAttachmentsPanelProps {
   issueId: number;
   issueTab: string;
   projectId: number;
+  sectionId?: string;
   token: string;
 }
 
 export function IssueAttachmentsPanel(props: IssueAttachmentsPanelProps) {
-  const { issueId, issueTab, projectId, token } = props;
+  const { issueId, issueTab, projectId, sectionId, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -46,6 +47,7 @@ export function IssueAttachmentsPanel(props: IssueAttachmentsPanelProps) {
       panelTitle="Issue-level attachments"
       resolveAttachmentDownloadPath={(attachmentId) =>
         createIssueAttachmentDownloadPath(projectId, issueId, attachmentId)}
+      sectionId={sectionId}
       token={token}
     />
   );

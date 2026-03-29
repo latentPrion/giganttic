@@ -1,5 +1,5 @@
 import React from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 
 import {
   parseProjectIdFromSearchParameters,
@@ -7,11 +7,14 @@ import {
   parseTaskIdFromSearchParameters,
   parseTaskTabFromSearchParameters,
 } from "../contracts/route-query.contracts.js";
+import { inferTaskTabFromAnchor } from "../lib/detail-section-anchor-routing.js";
 import { ProjectManagerTaskPage } from "../pages/ProjectManagerTaskPage.js";
 import { ProjectManagerAuthenticatedRoute } from "./ProjectManagerAuthenticatedRoute.js";
 
 export function TaskRoute() {
+  const location = useLocation();
   const [searchParameters] = useSearchParams();
+  const inferredTab = inferTaskTabFromAnchor(location.hash);
 
   return (
     <ProjectManagerAuthenticatedRoute>
@@ -21,7 +24,7 @@ export function TaskRoute() {
           currentUserId={currentUserId}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
           taskId={parseTaskIdFromSearchParameters(searchParameters)}
-          taskTab={parseTaskTabFromSearchParameters(searchParameters)}
+          taskTab={inferredTab ?? parseTaskTabFromSearchParameters(searchParameters)}
           token={token}
         />
       )}

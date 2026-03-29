@@ -67,6 +67,7 @@ import {
 } from "../scoped-access/scoped-access.policy.js";
 import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/discussion-attachment.service.js";
 import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { TaskMirrorService } from "../tasks/task-mirror.service.js";
 import type {
   CreateProjectRequest,
@@ -212,6 +213,8 @@ export class ProjectsService {
     private readonly journalStorage: DiscussionJournalStorageService,
     @Inject(ProjectChartsService)
     private readonly projectChartsService: ProjectChartsService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
     @Inject(TaskMirrorService)
     private readonly taskMirrorService: TaskMirrorService,
   ) {}
@@ -283,6 +286,12 @@ export class ProjectsService {
       projectId,
       removedTaskIds,
     );
+    await this.notificationsService.notifyTaskStatusChanges({
+      actorUserId: authContext.userId,
+      nextXml: xml,
+      previousXml: existingXml,
+      projectId,
+    });
 
     return { ok: true };
   }
@@ -491,7 +500,14 @@ export class ProjectsService {
   ): Promise<{ journalExists: boolean; markdown: string | null }> {
     this.assertProjectExists(projectId);
     this.assertCanEditProject(authContext, projectId);
+    const previousMarkdown = await this.journalStorage.readProjectJournal(projectId);
     await this.journalStorage.writeProjectJournal(projectId, markdown);
+    await this.notificationsService.notifyProjectJournalUpdated({
+      actorUserId: authContext.userId,
+      markdown,
+      previousMarkdown,
+      projectId,
+    });
     return {
       journalExists: true,
       markdown,
@@ -526,6 +542,11 @@ export class ProjectsService {
       originalFilename,
       projectId,
       uploadedByUserId: authContext.userId,
+    });
+    await this.notificationsService.notifyProjectAttachmentCreated({
+      actorUserId: authContext.userId,
+      attachmentId: attachment.id,
+      projectId,
     });
 
     return { attachment };

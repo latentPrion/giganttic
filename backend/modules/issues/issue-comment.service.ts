@@ -15,6 +15,7 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { AttachmentService, toAttachmentSummary } from "./attachment.service.js";
 import type {
@@ -45,6 +46,8 @@ export class IssueCommentService {
     private readonly attachmentService: AttachmentService,
     @Inject(DiscussionCommentBodyStorageService)
     private readonly commentBodyStorage: DiscussionCommentBodyStorageService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async listComments(
@@ -111,6 +114,12 @@ export class IssueCommentService {
       created.id,
       payload.body,
     );
+    await this.notificationsService.notifyIssueCommentCreated({
+      actorUserId: authContext.userId,
+      commentId: created.id,
+      issueId,
+      projectId,
+    });
 
     const record = this.getCommentRecordOrThrow(issueId, created.id);
     return { comment: await this.buildCommentResponse(record, projectId) };

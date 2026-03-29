@@ -36,6 +36,10 @@ import {
   emitProjectManagerTaskDiscussionStateEvent,
   subscribeProjectManagerTaskDiscussionStateEvent,
 } from "../lib/task-discussion-state-events.js";
+import {
+  TASK_ATTACHMENTS_SECTION_ANCHOR,
+  TASK_JOURNAL_SECTION_ANCHOR,
+} from "../lib/detail-section-anchor-routing.js";
 import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import {
   createProjectTaskRoute,
@@ -202,6 +206,7 @@ function renderDetailsTab(options: {
             token={token}
           />
         )}
+        sectionId={TASK_JOURNAL_SECTION_ANCHOR}
         title="Task Journal"
       />
     </Stack>
@@ -489,12 +494,13 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
               taskTab={props.taskTab}
               token={props.token}
             />
-            <TaskAttachmentsPanel
-              projectId={props.projectId}
-              taskId={props.taskId}
-              taskTab={props.taskTab}
-              token={props.token}
-            />
+        <TaskAttachmentsPanel
+          projectId={props.projectId}
+          sectionId={TASK_ATTACHMENTS_SECTION_ANCHOR}
+          taskId={props.taskId}
+          taskTab={props.taskTab}
+          token={props.token}
+        />
           </>
         ) : null}
       </Stack>

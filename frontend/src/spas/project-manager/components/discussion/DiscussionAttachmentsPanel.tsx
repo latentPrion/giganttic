@@ -59,6 +59,7 @@ interface DiscussionAttachmentsPanelProps {
   notFoundMessage?: string;
   panelTitle: string;
   resolveAttachmentDownloadPath: (attachmentId: string) => string;
+  sectionId?: string;
   token: string;
 }
 
@@ -70,6 +71,7 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
     notFoundMessage,
     panelTitle,
     resolveAttachmentDownloadPath,
+    sectionId,
     token,
   } = props;
   const [attachments, setAttachments] = useState<DiscussionAttachmentSummary[]>([]);
@@ -141,7 +143,7 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
   }
 
   return (
-    <Stack spacing={2}>
+    <Stack id={sectionId} spacing={2}>
       <Typography variant="subtitle1">{panelTitle}</Typography>
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
       <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">

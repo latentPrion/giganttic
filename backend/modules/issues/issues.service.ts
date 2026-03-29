@@ -18,6 +18,7 @@ import {
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { AttachmentService } from "./attachment.service.js";
 import type {
@@ -170,6 +171,8 @@ export class IssuesService {
     private readonly attachmentService: AttachmentService,
     @Inject(DiscussionJournalStorageService)
     private readonly journalStorage: DiscussionJournalStorageService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
     @Inject(IssueCommentService)
     private readonly issueCommentService: IssueCommentService,
   ) {}
@@ -259,12 +262,22 @@ export class IssuesService {
     this.assertProjectExists(projectId);
     this.assertCanModifyIssues(authContext, projectId);
     const currentIssue = this.getIssueEntityByIdOrThrow(projectId, issueId);
+    const previousStatus = currentIssue.status;
+    const now = new Date();
 
     this.databaseService.db.update(issues)
-      .set(createIssueUpdateValues(payload, currentIssue, new Date()))
+      .set(createIssueUpdateValues(payload, currentIssue, now))
       .where(eq(issues.id, issueId))
       .run();
-    return { issue: this.getIssueRecordByIdOrThrow(projectId, issueId) };
+    const nextIssue = this.getIssueRecordByIdOrThrow(projectId, issueId);
+    await this.notificationsService.notifyIssueStatusChanged({
+      actorUserId: authContext.userId,
+      issueId,
+      nextStatus: nextIssue.status,
+      previousStatus,
+      projectId,
+    });
+    return { issue: nextIssue };
   }
 
   async updateIssueJournal(
@@ -276,7 +289,15 @@ export class IssuesService {
     this.assertProjectExists(projectId);
     this.assertCanModifyIssues(authContext, projectId);
     this.getIssueEntityByIdOrThrow(projectId, issueId);
+    const previousMarkdown = await this.journalStorage.readIssueJournal(projectId, issueId);
     await this.journalStorage.writeIssueJournal(projectId, issueId, markdown);
+    await this.notificationsService.notifyIssueJournalUpdated({
+      actorUserId: authContext.userId,
+      issueId,
+      markdown,
+      previousMarkdown,
+      projectId,
+    });
     return {
       journalExists: true,
       markdown,

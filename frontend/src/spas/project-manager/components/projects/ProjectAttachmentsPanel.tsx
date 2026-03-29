@@ -8,11 +8,12 @@ import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsP
 interface ProjectAttachmentsPanelProps {
   isActive: boolean;
   projectId: number;
+  sectionId?: string;
   token: string;
 }
 
 export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
-  const { isActive, projectId, token } = props;
+  const { isActive, projectId, sectionId, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -44,6 +45,7 @@ export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
       panelTitle="Project attachments"
       resolveAttachmentDownloadPath={(attachmentId) =>
         createProjectAttachmentDownloadPath(projectId, attachmentId)}
+      sectionId={sectionId}
       token={token}
     />
   );

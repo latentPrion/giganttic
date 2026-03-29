@@ -14,6 +14,7 @@ import { GanttRoute } from "../spas/project-manager/routes/GanttRoute.js";
 import { IssueRoute } from "../spas/project-manager/routes/IssueRoute.js";
 import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
 import { KanbanRoute } from "../spas/project-manager/routes/KanbanRoute.js";
+import { NotificationsRoute } from "../spas/project-manager/routes/NotificationsRoute.js";
 import { OrganizationRoute } from "../spas/project-manager/routes/OrganizationRoute.js";
 import { ProjectRoute } from "../spas/project-manager/routes/ProjectRoute.js";
 import { TaskRoute } from "../spas/project-manager/routes/TaskRoute.js";
@@ -49,6 +50,7 @@ export function AppRoutes() {
       <Route element={<UserSpaRoute />} path="/user/*" />
       <Route element={<GanttRoute />} path="/pm/project/gantt" />
       <Route element={<KanbanRoute />} path="/pm/project/kanban" />
+      <Route element={<NotificationsRoute />} path="/pm/notifications" />
       <Route element={<IssuesRoute />} path="/pm/project/issues" />
       <Route element={<TasksRoute />} path="/pm/project/tasks" />
       <Route element={<IssueRoute />} path="/pm/project/issue" />

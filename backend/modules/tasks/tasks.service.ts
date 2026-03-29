@@ -15,6 +15,7 @@ import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionAttachmentService } from "../discussion/discussion-attachment.service.js";
 import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
 import { TaskMirrorService } from "./task-mirror.service.js";
 
@@ -34,6 +35,8 @@ export class TasksService {
     private readonly attachmentService: DiscussionAttachmentService,
     @Inject(DiscussionJournalStorageService)
     private readonly journalStorage: DiscussionJournalStorageService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   validateTaskReadableForCurrentUser(
@@ -129,6 +132,7 @@ export class TasksService {
   }> {
     this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
     this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
+    const previousMarkdown = await this.journalStorage.readTaskJournal(projectId, taskId);
 
     const taskMirrorExisted = this.taskMirrorService.taskMirrorExists(projectId, taskId);
     if (!taskMirrorExisted) {
@@ -143,6 +147,13 @@ export class TasksService {
       }
       throw error;
     }
+    await this.notificationsService.notifyTaskJournalUpdated({
+      actorUserId: authContext.userId,
+      markdown,
+      previousMarkdown,
+      projectId,
+      taskId,
+    });
 
     return {
       journalExists: true,

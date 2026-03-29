@@ -47,6 +47,10 @@ export function createProjectTasksRoute(projectId: number): string {
   return `/pm/project/tasks?projectId=${projectId}`;
 }
 
+export function createProjectNotificationsRoute(): string {
+  return "/pm/notifications";
+}
+
 export function createProjectIssueRoute(
   projectId: number,
   issueId: number,

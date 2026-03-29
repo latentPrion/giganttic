@@ -6,10 +6,15 @@ import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 
 import {
+  attachments,
   closedReasons,
   credentialTypes,
+  issueComments,
+  issueCommentsAttachments,
+  issuesAttachments,
   issues,
   issueStatuses,
+  notifications,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -31,6 +36,7 @@ import {
   teamsUsers,
   users,
   usersCredentialTypes,
+  usersNotifications,
   usersOrganizations,
   usersOrganizationsOrganizationRoles,
   usersPasswordCredentials,
@@ -48,10 +54,15 @@ import {
 import { executeSqlStatements } from "../../../db/native-sqlite.mjs";
 
 const dbSchema = {
+  attachments,
   closedReasons,
   credentialTypes,
+  issueComments,
+  issueCommentsAttachments,
+  issuesAttachments,
   issues,
   issueStatuses,
+  notifications,
   organizationRoles,
   organizations,
   organizationsTeams,
@@ -73,6 +84,7 @@ const dbSchema = {
   teamsUsers,
   users,
   usersCredentialTypes,
+  usersNotifications,
   usersOrganizations,
   usersOrganizationsOrganizationRoles,
   usersPasswordCredentials,

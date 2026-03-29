@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { DEFAULT_DISCUSSION_ATTACHMENT_MAX_UPLOAD_BYTES } from "../../common/discussion/discussion-upload.constants.js";
+import { DEFAULT_NOTIFICATIONS_DROPDOWN_LIMIT } from "../modules/notifications/notifications.constants.js";
 import {
   resolveRuntimeSchemaSnapshotSubdir,
   resolveRuntimeTarget,
@@ -33,6 +34,7 @@ export interface BackendConfig {
   host: string;
   maxAttachmentUploadBytes: number;
   maxAttachmentsPerIssueOrComment: number;
+  notificationsDropdownLimit: number;
   port: number;
   routePrefix: string;
   runtimeSchemaSnapshotSubdir: string;
@@ -193,6 +195,13 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
     },
     { method: "GET", pattern: "/projects/:projectId/tasks/:taskId/journal" },
     { method: "PUT", pattern: "/projects/:projectId/tasks/:taskId/journal" },
+    { method: "GET", pattern: "/notifications" },
+    { method: "GET", pattern: "/notifications/summary" },
+    { method: "GET", pattern: "/notifications/unnoticed" },
+    {
+      method: "POST",
+      pattern: "/notifications/:notificationId/toggle-noticed",
+    },
   ];
 }
 
@@ -210,6 +219,7 @@ export function buildBackendConfig(
     host: "127.0.0.1",
     maxAttachmentUploadBytes: DEFAULT_MAX_ATTACHMENT_UPLOAD_BYTES,
     maxAttachmentsPerIssueOrComment: DEFAULT_MAX_ATTACHMENTS_PER_ISSUE_OR_COMMENT,
+    notificationsDropdownLimit: DEFAULT_NOTIFICATIONS_DROPDOWN_LIMIT,
     port: 3000,
     routePrefix: "stc-proj-mgmt/api",
     runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),

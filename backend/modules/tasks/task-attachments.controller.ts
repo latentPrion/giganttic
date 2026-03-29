@@ -21,6 +21,7 @@ import {
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import {
   deleteTaskAttachmentResponseSchema,
   listTaskAttachmentsResponseSchema,
@@ -38,6 +39,8 @@ export class TaskAttachmentsController {
     private readonly tasksService: TasksService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get()
@@ -79,6 +82,12 @@ export class TaskAttachmentsController {
       projectId,
       taskId,
       uploadedByUserId: request.authContext!.userId,
+    });
+    await this.notificationsService.notifyTaskAttachmentCreated({
+      actorUserId: request.authContext!.userId,
+      attachmentId: attachment.id,
+      projectId,
+      taskId,
     });
 
     return uploadTaskAttachmentResponseSchema.parse({ attachment });

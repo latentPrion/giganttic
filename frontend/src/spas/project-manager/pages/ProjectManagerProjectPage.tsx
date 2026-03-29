@@ -10,7 +10,7 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { isApiError } from "../../../common/api/api-error.js";
@@ -55,6 +55,11 @@ import { ProjectAttachmentsPanel } from "../components/projects/ProjectAttachmen
 import { ProjectMarkdownRender, PROJECT_MARKDOWN_HELP_TEXT } from "../components/projects/ProjectMarkdownRender.js";
 import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
+import {
+  inferProjectTabFromAnchor,
+  PROJECT_ATTACHMENTS_SECTION_ANCHOR,
+  PROJECT_JOURNAL_SECTION_ANCHOR,
+} from "../lib/detail-section-anchor-routing.js";
 import {
   subscribeProjectManagerProjectAttachmentStateEvent,
 } from "../lib/project-attachment-state-events.js";
@@ -220,6 +225,7 @@ function renderUsersList<T extends { userId: number; username: string }>(
 }
 
 export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps) {
+  const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ProjectDetailsTabValue>("details");
   const [availableOrganizations, setAvailableOrganizations] = useState<LobbyOrganization[]>([]);
@@ -260,6 +266,13 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
     props.currentUserRoles,
     projectResponse,
   );
+
+  useEffect(() => {
+    const inferredTab = inferProjectTabFromAnchor(location.hash);
+    if (inferredTab && inferredTab !== activeTab) {
+      setActiveTab(inferredTab);
+    }
+  }, [activeTab, location.hash]);
   const allowProjectDelete = canDeleteProject(
     props.currentUserId,
     props.currentUserRoles,
@@ -668,6 +681,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
               token={props.token}
             />
           )}
+          sectionId={PROJECT_JOURNAL_SECTION_ANCHOR}
           title="Project Journal"
         />
         <Stack spacing={1.25}>
@@ -724,6 +738,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           <ProjectAttachmentsPanel
             isActive={activeTab === "attachments"}
             projectId={project.id}
+            sectionId={PROJECT_ATTACHMENTS_SECTION_ANCHOR}
             token={props.token}
           />
         );

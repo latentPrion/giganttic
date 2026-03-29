@@ -12,6 +12,7 @@ import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
 import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/discussion-attachment.service.js";
 import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
+import { NotificationsService } from "../notifications/notifications.service.js";
 import { TasksService } from "./tasks.service.js";
 import type {
   CreateTaskCommentRequest,
@@ -39,6 +40,8 @@ export class TaskCommentService {
     private readonly attachmentService: DiscussionAttachmentService,
     @Inject(DiscussionCommentBodyStorageService)
     private readonly commentBodyStorage: DiscussionCommentBodyStorageService,
+    @Inject(NotificationsService)
+    private readonly notificationsService: NotificationsService,
     @Inject(TasksService)
     private readonly tasksService: TasksService,
   ) {}
@@ -119,6 +122,12 @@ export class TaskCommentService {
       created.id,
       payload.body,
     );
+    await this.notificationsService.notifyTaskCommentCreated({
+      actorUserId: authContext.userId,
+      commentId: created.id,
+      projectId,
+      taskId,
+    });
 
     const record = this.getCommentRecordOrThrow(projectId, taskId, created.id);
     return { comment: await this.buildCommentResponse(record) };
