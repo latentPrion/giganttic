@@ -13,6 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { isApiError } from "../../../common/api/api-error.js";
 import { OrganizationViewButton } from "../../../common/components/entity-actions/OrganizationViewButton.js";
 import { ProjectDeleteButton } from "../../../common/components/entity-actions/ProjectDeleteButton.js";
 import { ProjectEditButton } from "../../../common/components/entity-actions/ProjectEditButton.js";
@@ -82,6 +83,7 @@ const ORGANIZATIONS_TAB_LABEL = "Organizations";
 const ORGANIZATION_SOURCE_LABEL = "Org";
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Project";
+const PROJECT_JOURNAL_MISSING_MESSAGE = "No journal exists for this project as yet.";
 const PROJECT_DELETE_ERROR_MESSAGE = "Unable to delete that project.";
 const PROJECT_MANAGERS_HEADING = "Project Managers";
 const PROJECT_OWNERS_HEADING = "Project Owners";
@@ -324,6 +326,12 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
         }
       } catch (error) {
         if (mounted) {
+          if (isApiError(error) && error.kind === "http" && error.status === 404) {
+            setProjectJournalExists(false);
+            setProjectJournalMarkdown(null);
+            setProjectJournalErrorMessage(null);
+            return;
+          }
           setProjectJournalErrorMessage(buildErrorMessage(error, "Unable to load the project journal."));
         }
       } finally {
@@ -624,6 +632,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           isSaving={isProjectJournalSaving}
           journalExists={projectJournalExists}
           markdown={projectJournalMarkdown}
+          missingStateMessage={projectJournalExists ? null : PROJECT_JOURNAL_MISSING_MESSAGE}
           onSave={handleSaveProjectJournal}
           renderMarkdown={(markdown) => (
             <ProjectMarkdownRender

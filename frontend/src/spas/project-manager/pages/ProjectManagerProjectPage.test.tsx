@@ -3,6 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
+import { ApiError } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { projectJournalApi } from "../api/project-journal-api.js";
 import type { ProjectManagerSource } from "../../../lobby/contracts/lobby.contracts.js";
@@ -186,6 +187,26 @@ describe("ProjectManagerProjectPage", () => {
     expect(screen.getByText("Direct")).toBeVisible();
     expect(screen.getByText("Team")).toBeVisible();
     expect(lobbyApiMock.getProject).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+  });
+
+  it("shows a friendly missing-journal message instead of a raw API error", async () => {
+    projectJournalApiMock.getJournal.mockRejectedValueOnce(
+      new ApiError("http", "HTTP 404", {
+        responseBody: "Cannot GET journal",
+        status: 404,
+      }),
+    );
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByText("No journal exists for this project as yet.")).toBeVisible();
+    expect(screen.queryByText("Cannot GET journal")).not.toBeInTheDocument();
   });
 
   it("opens the summary modal from the project view button", async () => {

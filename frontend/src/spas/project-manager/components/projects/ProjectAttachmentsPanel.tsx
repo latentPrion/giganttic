@@ -11,7 +11,7 @@ interface ProjectAttachmentsPanelProps {
 }
 
 export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
-  const { isActive, projectId, token } = props;
+const { isActive, projectId, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -25,6 +25,7 @@ export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
       }}
       emptyMessage="No project-level attachments yet."
       isActive={isActive}
+      notFoundMessage="No attachments exist for this project as yet."
       panelTitle="Project attachments"
       resolveAttachmentDownloadPath={(attachmentId) =>
         createProjectAttachmentDownloadPath(projectId, attachmentId)}

@@ -14,6 +14,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 
 import { getApiErrorMessage } from "../../../../common/api/api-error.js";
+import { isApiError } from "../../../../common/api/api-error.js";
 import { requestBlob } from "../../../../common/api/http-client.js";
 import {
   createDiscussionMaxFileSizeMessage,
@@ -49,6 +50,7 @@ interface DiscussionAttachmentsPanelProps {
   };
   emptyMessage: string;
   isActive: boolean;
+  notFoundMessage?: string;
   panelTitle: string;
   resolveAttachmentDownloadPath: (attachmentId: string) => string;
   token: string;
@@ -59,6 +61,7 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
     api,
     emptyMessage,
     isActive,
+    notFoundMessage,
     panelTitle,
     resolveAttachmentDownloadPath,
     token,
@@ -74,11 +77,16 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
       const response = await api.listAttachments();
       setAttachments(response.attachments);
     } catch (error) {
+      if (notFoundMessage && isApiError(error) && error.kind === "http" && error.status === 404) {
+        setAttachments([]);
+        setErrorMessage(notFoundMessage);
+        return;
+      }
       setErrorMessage(getApiErrorMessage(error, "Unable to load attachments."));
     } finally {
       setBusy(false);
     }
-  }, [api]);
+  }, [api, notFoundMessage]);
 
   useEffect(() => {
     if (!isActive) {
