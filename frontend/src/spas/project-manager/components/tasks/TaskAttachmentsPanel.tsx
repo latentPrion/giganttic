@@ -18,8 +18,16 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
   return (
     <DiscussionAttachmentsPanel
       api={{
-        deleteAttachment: async (attachmentId) =>
-          taskAttachmentsApi.deleteAttachment(token, projectId, taskId, attachmentId),
+        deleteAttachment: async (attachmentId) => {
+          const response = await taskAttachmentsApi.deleteAttachment(
+            token,
+            projectId,
+            taskId,
+            attachmentId,
+          );
+          emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
+          return response;
+        },
         listAttachments: async () =>
           taskAttachmentsApi.listAttachments(token, projectId, taskId),
         uploadAttachment: async (file) => {

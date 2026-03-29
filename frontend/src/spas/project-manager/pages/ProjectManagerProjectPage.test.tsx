@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
 import { ApiError } from "../../../common/api/api-error.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import { projectAttachmentsApi } from "../api/project-attachments-api.js";
 import { projectJournalApi } from "../api/project-journal-api.js";
 import type { ProjectManagerSource } from "../../../lobby/contracts/lobby.contracts.js";
+import { emitProjectManagerProjectAttachmentStateEvent } from "../lib/project-attachment-state-events.js";
 import { ProjectManagerProjectPage } from "./ProjectManagerProjectPage.js";
 
 const navigateMock = vi.fn();
@@ -39,7 +41,16 @@ vi.mock("../api/project-journal-api.js", () => ({
   },
 }));
 
+vi.mock("../api/project-attachments-api.js", () => ({
+  projectAttachmentsApi: {
+    deleteAttachment: vi.fn(),
+    listAttachments: vi.fn(),
+    uploadAttachment: vi.fn(),
+  },
+}));
+
 const lobbyApiMock = vi.mocked(lobbyApi);
+const projectAttachmentsApiMock = vi.mocked(projectAttachmentsApi);
 const projectJournalApiMock = vi.mocked(projectJournalApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_CURRENT_USER_ID = 101;
@@ -105,9 +116,13 @@ describe("ProjectManagerProjectPage", () => {
     lobbyApiMock.listOrganizations.mockReset();
     lobbyApiMock.listTeams.mockReset();
     lobbyApiMock.updateProject.mockReset();
+    projectAttachmentsApiMock.listAttachments.mockReset();
     projectJournalApiMock.getJournal.mockReset();
     projectJournalApiMock.updateJournal.mockReset();
     lobbyApiMock.getProject.mockResolvedValue(createProjectResponse());
+    projectAttachmentsApiMock.listAttachments.mockResolvedValue({
+      attachments: [{ id: "att-1" }, { id: "att-2" }] as never[],
+    });
     projectJournalApiMock.getJournal.mockResolvedValue({
       journalExists: true,
       markdown: "Project execution journal",
@@ -186,6 +201,7 @@ describe("ProjectManagerProjectPage", () => {
     expect(screen.getByText("Project Managers")).toBeVisible();
     expect(screen.getByText("Direct")).toBeVisible();
     expect(screen.getByText("Team")).toBeVisible();
+    expect(screen.getByTestId("project-tab-count-attachments")).toHaveTextContent("2");
     expect(lobbyApiMock.getProject).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
   });
 
@@ -207,6 +223,47 @@ describe("ProjectManagerProjectPage", () => {
 
     expect(await screen.findByText("No journal exists for this project as yet.")).toBeVisible();
     expect(screen.queryByText("Cannot GET journal")).not.toBeInTheDocument();
+  });
+
+  it("shows a zero-valued project attachments count chip when attachments return 404", async () => {
+    projectAttachmentsApiMock.listAttachments.mockRejectedValueOnce(
+      new ApiError("http", "HTTP 404", {
+        responseBody: "Cannot GET attachments",
+        status: 404,
+      }),
+    );
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByTestId("project-tab-count-attachments")).toHaveTextContent("0");
+  });
+
+  it("refreshes the project attachments count chip when project attachment state changes", async () => {
+    projectAttachmentsApiMock.listAttachments
+      .mockResolvedValueOnce({ attachments: [{ id: "att-1" }] as never[] })
+      .mockResolvedValue({ attachments: [{ id: "att-1" }, { id: "att-2" }, { id: "att-3" }] as never[] });
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByTestId("project-tab-count-attachments")).toHaveTextContent("1");
+
+    emitProjectManagerProjectAttachmentStateEvent({ projectId: 42 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("project-tab-count-attachments")).toHaveTextContent("3");
+    });
   });
 
   it("opens the summary modal from the project view button", async () => {

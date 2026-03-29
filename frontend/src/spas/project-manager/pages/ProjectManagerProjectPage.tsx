@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -27,6 +27,7 @@ import { ProjectListItem } from "../../../common/components/entity-list/ProjectL
 import { TeamListItem } from "../../../common/components/entity-list/TeamListItem.js";
 import { UserListItem } from "../../../common/components/entity-list/UserListItem.js";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
+import { projectAttachmentsApi } from "../api/project-attachments-api.js";
 import { projectJournalApi } from "../api/project-journal-api.js";
 import { OrganizationCreateModal } from "../../../lobby/components/organization/OrganizationCreateModal.js";
 import { OrganizationSummaryModal } from "../../../lobby/components/organization/OrganizationSummaryModal.js";
@@ -48,10 +49,15 @@ import type {
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { EntityAssociationModal } from "../components/projects/EntityAssociationModal.js";
 import { DiscussionJournalSection } from "../components/discussion/DiscussionJournalSection.js";
+import { DiscussionTabLabel } from "../components/discussion/DiscussionTabLabel.js";
 import { ProjectDetailsCard } from "../components/projects/ProjectDetailsCard.js";
 import { ProjectAttachmentsPanel } from "../components/projects/ProjectAttachmentsPanel.js";
 import { ProjectMarkdownRender, PROJECT_MARKDOWN_HELP_TEXT } from "../components/projects/ProjectMarkdownRender.js";
+import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
+import {
+  subscribeProjectManagerProjectAttachmentStateEvent,
+} from "../lib/project-attachment-state-events.js";
 import {
   emitProjectManagerProjectJournalUpdatedEvent,
   subscribeProjectManagerProjectJournalUpdatedEvent,
@@ -260,6 +266,27 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
     projectResponse,
   );
   const allowProjectAssociations = allowProjectDelete;
+  const loadProjectAttachmentsCount = useCallback(async () => {
+    const response = await projectAttachmentsApi.listAttachments(
+      props.token,
+      props.projectId!,
+    );
+    return response.attachments.length;
+  }, [props.projectId, props.token]);
+  const subscribeToProjectAttachmentCountChanges = useCallback(
+    (handler: () => void) => subscribeProjectManagerProjectAttachmentStateEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+      handler();
+    }),
+    [props.projectId],
+  );
+  const projectAttachmentsCount = useDiscussionItemCount({
+    isEnabled: props.projectId !== null,
+    loadCount: loadProjectAttachmentsCount,
+    subscribeToChanges: subscribeToProjectAttachmentCountChanges,
+  });
 
   useEffect(() => {
     if (props.projectId === null) {
@@ -765,7 +792,16 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           value={activeTab}
         >
           <Tab label={DETAILS_TAB_LABEL} value="details" />
-          <Tab label={ATTACHMENTS_TAB_LABEL} value="attachments" />
+          <Tab
+            label={(
+              <DiscussionTabLabel
+                count={projectAttachmentsCount.count}
+                countTestId="project-tab-count-attachments"
+                label={ATTACHMENTS_TAB_LABEL}
+              />
+            )}
+            value="attachments"
+          />
           <Tab label={TEAMS_TAB_LABEL} value="teams" />
           <Tab label={ORGANIZATIONS_TAB_LABEL} value="organizations" />
         </Tabs>

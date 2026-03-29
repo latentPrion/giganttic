@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useMemo,
   useRef,
 } from "react";
@@ -14,6 +15,8 @@ import { useNavigate } from "react-router-dom";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { taskJournalApi } from "../api/task-journal-api.js";
+import { taskAttachmentsApi } from "../api/task-attachments-api.js";
+import { taskCommentsApi } from "../api/task-comments-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { DiscussionWorkspaceTabs } from "../components/discussion/DiscussionWorkspaceTabs.js";
 import { DiscussionJournalSection } from "../components/discussion/DiscussionJournalSection.js";
@@ -23,6 +26,7 @@ import { TaskDetailsCard } from "../components/tasks/TaskDetailsCard.js";
 import { TaskMarkdownRender, TASK_MARKDOWN_HELP_TEXT } from "../components/tasks/TaskMarkdownRender.js";
 import type { TaskDetailTab } from "../contracts/route-query.contracts.js";
 import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
+import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
 import { useProjectEditAccess } from "../hooks/use-project-edit-access.js";
 import {
   parseProjectTaskDetailFromXml,
@@ -241,6 +245,41 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
     projectId: props.projectId,
     token: props.token,
   });
+  const loadTaskCommentsCount = useCallback(async () => {
+    const response = await taskCommentsApi.listComments(
+      props.token,
+      props.projectId!,
+      props.taskId!,
+    );
+    return response.comments.length;
+  }, [props.projectId, props.taskId, props.token]);
+  const subscribeToTaskDiscussionCountChanges = useCallback(
+    (handler: () => void) => subscribeProjectManagerTaskDiscussionStateEvent((detail) => {
+      if (detail.projectId !== props.projectId || detail.taskId !== props.taskId) {
+        return;
+      }
+      handler();
+    }),
+    [props.projectId, props.taskId],
+  );
+  const taskCommentsCount = useDiscussionItemCount({
+    isEnabled: props.projectId !== null && props.taskId !== null,
+    loadCount: loadTaskCommentsCount,
+    subscribeToChanges: subscribeToTaskDiscussionCountChanges,
+  });
+  const loadTaskAttachmentsCount = useCallback(async () => {
+    const response = await taskAttachmentsApi.listAttachments(
+      props.token,
+      props.projectId!,
+      props.taskId!,
+    );
+    return response.attachments.length;
+  }, [props.projectId, props.taskId, props.token]);
+  const taskAttachmentsCount = useDiscussionItemCount({
+    isEnabled: props.projectId !== null && props.taskId !== null,
+    loadCount: loadTaskAttachmentsCount,
+    subscribeToChanges: subscribeToTaskDiscussionCountChanges,
+  });
 
   React.useEffect(() => {
     if (props.projectId === null || props.taskId === null) {
@@ -414,7 +453,9 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         </Stack>
         {props.projectId !== null && props.taskId !== null ? (
           <DiscussionWorkspaceTabs
+            attachmentsCount={taskAttachmentsCount.count}
             ariaLabel={TASK_DETAIL_WORKSPACE_TABLIST_LABEL}
+            commentsCount={taskCommentsCount.count}
             onChange={handleTaskTabChange}
             value={props.taskTab}
           />

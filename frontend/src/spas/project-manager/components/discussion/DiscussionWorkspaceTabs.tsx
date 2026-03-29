@@ -5,16 +5,21 @@ import {
 } from "@mui/material";
 
 import type { DiscussionDetailTab } from "../../contracts/route-query.contracts.js";
+import { DiscussionTabLabel } from "./DiscussionTabLabel.js";
 
 interface DiscussionWorkspaceTabsProps {
+  attachmentsCount?: number | null;
   ariaLabel: string;
+  commentsCount?: number | null;
   onChange: (_event: React.SyntheticEvent, nextTab: DiscussionDetailTab) => void;
   value: DiscussionDetailTab;
 }
 
 export function DiscussionWorkspaceTabs(props: DiscussionWorkspaceTabsProps) {
   const {
+    attachmentsCount = null,
     ariaLabel,
+    commentsCount = null,
     onChange,
     value,
   } = props;
@@ -27,8 +32,26 @@ export function DiscussionWorkspaceTabs(props: DiscussionWorkspaceTabsProps) {
       variant="fullWidth"
     >
       <Tab label="Details" value="details" />
-      <Tab label="Comments" value="comments" />
-      <Tab label="Attachments" value="attachments" />
+      <Tab
+        label={(
+          <DiscussionTabLabel
+            count={commentsCount}
+            countTestId="discussion-tab-count-comments"
+            label="Comments"
+          />
+        )}
+        value="comments"
+      />
+      <Tab
+        label={(
+          <DiscussionTabLabel
+            count={attachmentsCount}
+            countTestId="discussion-tab-count-attachments"
+            label="Attachments"
+          />
+        )}
+        value="attachments"
+      />
     </Tabs>
   );
 }

@@ -4,8 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
+import { issueAttachmentsApi } from "../api/issue-attachments-api.js";
+import { issueCommentsApi } from "../api/issue-comments-api.js";
+import { issueJournalApi } from "../api/issue-journal-api.js";
 import { issuesApi } from "../api/issues-api.js";
 import type { Issue } from "../contracts/issue.contracts.js";
+import { emitProjectManagerIssueDiscussionStateEvent } from "../lib/issue-discussion-state-events.js";
 import { PROJECT_MANAGER_ISSUE_UPDATED_EVENT } from "../lib/issue-updated-events.js";
 import { ProjectManagerIssuePage } from "./ProjectManagerIssuePage.js";
 
@@ -29,6 +33,32 @@ vi.mock("../api/issues-api.js", () => ({
   },
 }));
 
+vi.mock("../api/issue-comments-api.js", () => ({
+  issueCommentsApi: {
+    createComment: vi.fn(),
+    deleteComment: vi.fn(),
+    deleteCommentAttachment: vi.fn(),
+    listComments: vi.fn(),
+    updateComment: vi.fn(),
+    uploadCommentAttachment: vi.fn(),
+  },
+}));
+
+vi.mock("../api/issue-attachments-api.js", () => ({
+  issueAttachmentsApi: {
+    deleteAttachment: vi.fn(),
+    listAttachments: vi.fn(),
+    uploadAttachment: vi.fn(),
+  },
+}));
+
+vi.mock("../api/issue-journal-api.js", () => ({
+  issueJournalApi: {
+    getJournal: vi.fn(),
+    updateJournal: vi.fn(),
+  },
+}));
+
 vi.mock("../../../lobby/api/lobby-api.js", () => ({
   lobbyApi: {
     getProject: vi.fn(),
@@ -36,6 +66,9 @@ vi.mock("../../../lobby/api/lobby-api.js", () => ({
 }));
 
 const issuesApiMock = vi.mocked(issuesApi);
+const issueCommentsApiMock = vi.mocked(issueCommentsApi);
+const issueAttachmentsApiMock = vi.mocked(issueAttachmentsApi);
+const issueJournalApiMock = vi.mocked(issueJournalApi);
 const lobbyApiMock = vi.mocked(lobbyApi);
 const DEFAULT_TOKEN = "pm-token";
 const DEFAULT_TIMESTAMP = "2026-03-08T00:00:00.000Z";
@@ -68,10 +101,23 @@ describe("ProjectManagerIssuePage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     lobbyApiMock.getProject.mockReset();
+    issueAttachmentsApiMock.listAttachments.mockReset();
+    issueCommentsApiMock.listComments.mockReset();
+    issueJournalApiMock.getJournal.mockReset();
     issuesApiMock.deleteIssue.mockReset();
     issuesApiMock.getIssue.mockReset();
     issuesApiMock.updateIssue.mockReset();
     issuesApiMock.getIssue.mockResolvedValue({ issue: createIssue() });
+    issueCommentsApiMock.listComments.mockResolvedValue({
+      comments: [{ id: 1 }, { id: 2 }] as never[],
+    });
+    issueAttachmentsApiMock.listAttachments.mockResolvedValue({
+      attachments: [{ id: "att-1" }] as never[],
+    });
+    issueJournalApiMock.getJournal.mockResolvedValue({
+      journalExists: true,
+      markdown: "Issue journal",
+    });
     lobbyApiMock.getProject.mockResolvedValue({
       members: [{
         roleCodes: [],
@@ -106,6 +152,8 @@ describe("ProjectManagerIssuePage", () => {
     expect(screen.getByText("Detailed Issue View")).toBeVisible();
     expect(screen.getByText("Priority: High")).toBeVisible();
     expect(issuesApiMock.getIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
+    expect(screen.getByTestId("discussion-tab-count-comments")).toHaveTextContent("2");
+    expect(screen.getByTestId("discussion-tab-count-attachments")).toHaveTextContent("1");
   });
 
   it("opens the summary modal from the view button", async () => {
@@ -145,7 +193,7 @@ describe("ProjectManagerIssuePage", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click((await screen.findAllByRole("button", { name: "Edit" }))[0]);
     expect(await screen.findByRole("dialog", { name: "Edit Issue" })).toBeVisible();
     const nameField = screen.getByLabelText("Name");
     await user.clear(nameField);
@@ -262,7 +310,7 @@ describe("ProjectManagerIssuePage", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click((await screen.findAllByRole("button", { name: "Edit" }))[0]);
     const editDialog = await screen.findByRole("dialog", { name: "Edit Issue" });
     await user.clear(within(editDialog).getByLabelText("Name"));
     await user.type(within(editDialog).getByLabelText("Name"), "Issue 7 Retitled");
@@ -273,5 +321,33 @@ describe("ProjectManagerIssuePage", () => {
     });
 
     window.removeEventListener(PROJECT_MANAGER_ISSUE_UPDATED_EVENT, eventListener);
+  });
+
+  it("refreshes issue tab count chips when issue discussion state changes", async () => {
+    issueCommentsApiMock.listComments
+      .mockResolvedValueOnce({ comments: [{ id: 1 }] as never[] })
+      .mockResolvedValue({ comments: [{ id: 1 }, { id: 2 }, { id: 3 }] as never[] });
+    issueAttachmentsApiMock.listAttachments
+      .mockResolvedValueOnce({ attachments: [{ id: "att-1" }] as never[] })
+      .mockResolvedValue({ attachments: [{ id: "att-1" }, { id: "att-2" }] as never[] });
+
+    renderWithTheme(
+      <ProjectManagerIssuePage
+        {...DEFAULT_ISSUE_PAGE_PROPS}
+        issueId={7}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+    );
+
+    expect(await screen.findByTestId("discussion-tab-count-comments")).toHaveTextContent("1");
+    expect(screen.getByTestId("discussion-tab-count-attachments")).toHaveTextContent("1");
+
+    emitProjectManagerIssueDiscussionStateEvent({ issueId: 7, projectId: 42 });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("discussion-tab-count-comments")).toHaveTextContent("3");
+      expect(screen.getByTestId("discussion-tab-count-attachments")).toHaveTextContent("2");
+    });
   });
 });

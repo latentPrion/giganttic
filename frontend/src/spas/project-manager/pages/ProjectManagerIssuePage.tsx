@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -43,6 +43,10 @@ import {
   subscribeProjectManagerIssueJournalUpdatedEvent,
 } from "../lib/issue-journal-updated-events.js";
 import { useProjectAccess } from "../hooks/use-project-access.js";
+import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
+import { issueCommentsApi } from "../api/issue-comments-api.js";
+import { issueAttachmentsApi } from "../api/issue-attachments-api.js";
+import { subscribeProjectManagerIssueDiscussionStateEvent } from "../lib/issue-discussion-state-events.js";
 
 interface ProjectManagerIssuePageProps {
   commentId: number | null;
@@ -86,6 +90,41 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
     currentUserId: props.currentUserId,
     projectId: props.projectId,
     token: props.token,
+  });
+  const loadIssueCommentsCount = useCallback(async () => {
+    const response = await issueCommentsApi.listComments(
+      props.token,
+      props.projectId!,
+      props.issueId!,
+    );
+    return response.comments.length;
+  }, [props.issueId, props.projectId, props.token]);
+  const subscribeToIssueDiscussionCountChanges = useCallback(
+    (handler: () => void) => subscribeProjectManagerIssueDiscussionStateEvent((detail) => {
+      if (detail.projectId !== props.projectId || detail.issueId !== props.issueId) {
+        return;
+      }
+      handler();
+    }),
+    [props.issueId, props.projectId],
+  );
+  const issueCommentsCount = useDiscussionItemCount({
+    isEnabled: props.projectId !== null && props.issueId !== null,
+    loadCount: loadIssueCommentsCount,
+    subscribeToChanges: subscribeToIssueDiscussionCountChanges,
+  });
+  const loadIssueAttachmentsCount = useCallback(async () => {
+    const response = await issueAttachmentsApi.listAttachments(
+      props.token,
+      props.projectId!,
+      props.issueId!,
+    );
+    return response.attachments.length;
+  }, [props.issueId, props.projectId, props.token]);
+  const issueAttachmentsCount = useDiscussionItemCount({
+    isEnabled: props.projectId !== null && props.issueId !== null,
+    loadCount: loadIssueAttachmentsCount,
+    subscribeToChanges: subscribeToIssueDiscussionCountChanges,
   });
 
   useEffect(() => {
@@ -415,7 +454,9 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
         </Stack>
         {props.projectId !== null && props.issueId !== null ? (
           <DiscussionWorkspaceTabs
+            attachmentsCount={issueAttachmentsCount.count}
             ariaLabel={ISSUE_DETAIL_WORKSPACE_TABLIST_LABEL}
+            commentsCount={issueCommentsCount.count}
             onChange={handleIssueTabChange}
             value={props.issueTab}
           />

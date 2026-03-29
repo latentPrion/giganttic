@@ -41,8 +41,16 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
           emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
           return response;
         },
-        deleteComment: async (commentId) =>
-          taskCommentsApi.deleteComment(token, projectId, taskId, commentId),
+        deleteComment: async (commentId) => {
+          const response = await taskCommentsApi.deleteComment(
+            token,
+            projectId,
+            taskId,
+            commentId,
+          );
+          emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
+          return response;
+        },
         deleteCommentAttachment: async (commentId, attachmentId) =>
           taskCommentsApi.deleteCommentAttachment(
             token,

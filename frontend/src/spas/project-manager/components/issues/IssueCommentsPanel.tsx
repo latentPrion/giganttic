@@ -3,6 +3,7 @@ import React from "react";
 import { createIssueAttachmentDownloadPath } from "../../api/issue-attachment-paths.js";
 import { issueCommentsApi } from "../../api/issue-comments-api.js";
 import type { IssueComment } from "../../contracts/issue-comments.contracts.js";
+import { emitProjectManagerIssueDiscussionStateEvent } from "../../lib/issue-discussion-state-events.js";
 import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.js";
 import { IssueMarkdownRender } from "./IssueMarkdownRender.js";
 
@@ -30,10 +31,26 @@ export function IssueCommentsPanel(props: IssueCommentsPanelProps) {
   return (
     <DiscussionCommentsPanel<IssueComment>
       api={{
-        createComment: async (payload) =>
-          issueCommentsApi.createComment(token, projectId, issueId, payload),
-        deleteComment: async (commentId) =>
-          issueCommentsApi.deleteComment(token, projectId, issueId, commentId),
+        createComment: async (payload) => {
+          const response = await issueCommentsApi.createComment(
+            token,
+            projectId,
+            issueId,
+            payload,
+          );
+          emitProjectManagerIssueDiscussionStateEvent({ issueId, projectId });
+          return response;
+        },
+        deleteComment: async (commentId) => {
+          const response = await issueCommentsApi.deleteComment(
+            token,
+            projectId,
+            issueId,
+            commentId,
+          );
+          emitProjectManagerIssueDiscussionStateEvent({ issueId, projectId });
+          return response;
+        },
         deleteCommentAttachment: async (commentId, attachmentId) =>
           issueCommentsApi.deleteCommentAttachment(
             token,
