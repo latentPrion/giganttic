@@ -1,0 +1,1 @@
+-- v9 -> v10 repair migration is handled by the pre-structural hook.

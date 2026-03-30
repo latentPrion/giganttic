@@ -13,6 +13,7 @@ import { manageTestData } from "../db/test-data.mjs";
 import {
   openDatabaseFromPath,
   readCurrentSchemaName,
+  writeCurrentSchemaName,
 } from "../db/runtime-db-state.mjs";
 import {
   defaultDevSqliteDbPath,
@@ -419,6 +420,11 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v8--v9",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v9--v10",
+      projectRoot: tempDir,
+    });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
@@ -481,6 +487,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "proddev",
       migrationPairName: "v8--v9",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v9--v10",
       projectRoot: tempDir,
     });
 
@@ -853,7 +864,7 @@ describe("db lifecycle scripts", () => {
     ).toBe(1);
   }, 20_000);
 
-  it("migrates v2 through v9 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+  it("migrates v2 through v10 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -909,12 +920,17 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v8--v9",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v9--v10",
+      projectRoot: tempDir,
+    });
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe("v9");
+    expect(await readSchemaName(dbPath)).toBe("v10");
     expect(
       await countRowsWhere(
         dbPath,
@@ -929,6 +945,92 @@ describe("db lifecycle scripts", () => {
         "code = 'GGTC_PROJECTROLE_PROJECT_OWNER'",
       ),
     ).toBe(1);
+  }, 20_000);
+
+  it("repairs legacy v9 mention rows by adding and backfilling containerKey during v9--v10", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+      schemaName: "v8",
+    });
+
+    const db = openDatabaseConnection(dbPath);
+    db.exec(
+      `ALTER TABLE Notifications ADD COLUMN mentionedUserId integer REFERENCES Users(id);
+       CREATE INDEX Notifications_commentId_mentionedUserId_idx ON Notifications (commentId, mentionedUserId);
+       CREATE TABLE Mentions (
+         id integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+         speakerUserId integer NOT NULL,
+         mentionedUserId integer NOT NULL,
+         projectId integer NOT NULL,
+         issueId integer,
+         taskId text,
+         commentId integer,
+         mentionContainerType text NOT NULL,
+         createdAt integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+         updatedAt integer DEFAULT (CAST(unixepoch('subsec') * 1000 AS INTEGER)) NOT NULL,
+         FOREIGN KEY (speakerUserId) REFERENCES Users(id) ON UPDATE cascade ON DELETE cascade,
+         FOREIGN KEY (mentionedUserId) REFERENCES Users(id) ON UPDATE cascade ON DELETE cascade,
+         FOREIGN KEY (projectId) REFERENCES Projects(id) ON UPDATE cascade ON DELETE cascade,
+         FOREIGN KEY (issueId) REFERENCES Issues(id) ON UPDATE cascade ON DELETE cascade
+       );
+       CREATE INDEX Mentions_projectId_issueId_taskId_commentId_idx ON Mentions (projectId, issueId, taskId, commentId);
+       CREATE INDEX Mentions_mentionedUserId_idx ON Mentions (mentionedUserId);`,
+    );
+    db.exec(
+      `INSERT INTO Users (id, username, email, isActive, createdAt, updatedAt)
+       VALUES (101, 'legacy-speaker', 'legacy-speaker@example.com', 1, 0, 0),
+              (102, 'legacy-mentioned', 'legacy-mentioned@example.com', 1, 0, 0);`,
+    );
+    db.exec(
+      `INSERT INTO Projects (id, name, createdAt, updatedAt)
+       VALUES (501, 'Legacy Project', 0, 0);`,
+    );
+    db.exec(
+      `INSERT INTO IssueStatuses (code, displayName, createdAt)
+       VALUES ('ISSUE_STATUS_OPEN', 'Open', 0);`,
+    );
+    db.exec(
+      `INSERT INTO Issues (id, projectId, name, status, priority, progressPercentage, openedAt, createdAt, updatedAt)
+       VALUES (601, 501, 'Legacy Issue', 'ISSUE_STATUS_OPEN', 0, 0, 0, 0, 0);`,
+    );
+    db.exec(
+      `INSERT INTO Mentions (speakerUserId, mentionedUserId, projectId, issueId, taskId, commentId, mentionContainerType, createdAt, updatedAt)
+       VALUES (101, 102, 501, 601, NULL, 701, 'MENTION_CONTAINER_ISSUE_COMMENT', 0, 0);`,
+    );
+    writeCurrentSchemaName(db, "v9");
+    db.close();
+
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v9--v10",
+      projectRoot: tempDir,
+    });
+
+    const migratedDb = openDatabaseConnection(dbPath, { readonly: true });
+    const mentionColumns = migratedDb.prepare("PRAGMA table_info(Mentions);").all() as Array<{ name: string }>;
+    const mentionRow = migratedDb.prepare(
+      "SELECT containerKey FROM Mentions WHERE mentionedUserId = 102;",
+    ).get() as { containerKey: string } | undefined;
+    const mentionIndexNames = migratedDb.prepare("PRAGMA index_list(Mentions);").all() as Array<{ name: string }>;
+    migratedDb.close();
+
+    expect(mentionColumns.some((column) => column.name === "containerKey")).toBe(true);
+    expect(mentionRow).toMatchObject({ containerKey: "501:601:-:701" });
+    expect(
+      mentionIndexNames.some((indexRow) => indexRow.name === "Mentions_containerKey_idx"),
+    ).toBe(true);
+    expect(
+      mentionIndexNames.some(
+        (indexRow) => indexRow.name === "Mentions_mentionedUserId_mentionContainerType_containerKey_unique",
+      ),
+    ).toBe(true);
+    expect(await readSchemaName(dbPath)).toBe("v10");
   }, 20_000);
 
   it("prepareDatabase fails cleanly when the DB exists but has no schema metadata", async () => {
