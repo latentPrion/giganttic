@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import { emitFrontendDebugLog } from "../../../common/debug/frontend-debug-ingest.js";
 import { ganttApi } from "../api/gantt-api.js";
 import { DEFAULT_PROJECT_CHART_XML } from "../lib/default-project-chart-xml.js";
 import {
@@ -48,8 +49,6 @@ export interface UseGanttChartFileManagerResult {
 
 const DEFAULT_ERROR = "Unable to load that gantt chart right now.";
 const SAVE_ERROR = "Unable to save the gantt chart right now.";
-const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
-const DEBUG_SESSION_ID = "117825";
 const LEGACY_EMPTY_PROJECT_CHART_XML_VALUES = new Set(["<project/>", "<project />"]);
 
 function normalizeKnownLegacyChartXml(xml: string): string {
@@ -67,24 +66,13 @@ function emitDebugLog(
   runId: string,
   data: Record<string, unknown>,
 ): void {
-  // #region agent log
-  fetch(DEBUG_INGEST_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": DEBUG_SESSION_ID,
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      runId,
-      hypothesisId,
-    }),
-  }).catch(() => {});
-  // #endregion
+  emitFrontendDebugLog({
+    data,
+    hypothesisId,
+    location,
+    message,
+    runId,
+  });
 }
 
 export function useGanttChartFileManager(options: {

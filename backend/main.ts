@@ -9,6 +9,10 @@ async function bootstrap(): Promise<void> {
   const config = buildBackendConfigFromEnv();
   const app = await NestFactory.create(AppModule.register(config));
 
+  if (config.trustProxy) {
+    app.getHttpAdapter().getInstance().set("trust proxy", true);
+  }
+
   app.setGlobalPrefix(config.routePrefix);
   await app.listen(config.port, config.host);
 }

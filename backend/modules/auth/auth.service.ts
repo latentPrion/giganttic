@@ -32,6 +32,7 @@ import {
   type BackendConfig,
 } from "../../config/backend-config.js";
 import { DatabaseService } from "../database/database.service.js";
+import { extractAuthRequestMetadata } from "./auth-request-metadata.js";
 import {
   type ActivePasswordCredentialRecord,
   type AuthUserResponse,
@@ -288,27 +289,12 @@ export class AuthService {
     ip?: string;
     socket?: { remoteAddress?: string | undefined };
   }): { ipAddress: string; location: string | null } {
-    const forwardedFor = request.headers["x-forwarded-for"];
-    const forwardedValue = Array.isArray(forwardedFor)
-      ? forwardedFor[0]
-      : forwardedFor;
-    const candidateIp = forwardedValue?.split(",")[0]?.trim()
-      || request.ip
-      || request.socket?.remoteAddress
-      || "unknown";
-    const normalizedIp = candidateIp.startsWith("::ffff:")
-      ? candidateIp.slice("::ffff:".length)
-      : candidateIp;
-
-    const locationHeader = request.headers["x-client-location"];
-    const location = Array.isArray(locationHeader)
-      ? locationHeader[0]
-      : locationHeader;
-
-    return {
-      ipAddress: normalizedIp,
-      location: location ?? null,
-    };
+    return extractAuthRequestMetadata({
+      headers: request.headers,
+      ip: request.ip,
+      socket: request.socket,
+      trustProxy: this.config.trustProxy,
+    });
   }
 
   async hashPassword(password: string): Promise<string> {

@@ -39,6 +39,7 @@ export interface BackendConfig {
   routePrefix: string;
   runtimeSchemaSnapshotSubdir: string;
   sessionTtlMs: number;
+  trustProxy: boolean;
   scopedSessionRouteAllowlist: ReadonlyArray<{
     method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
     pattern: string;
@@ -224,6 +225,7 @@ export function buildBackendConfig(
     routePrefix: "stc-proj-mgmt/api",
     runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
+    trustProxy: false,
     scopedSessionRouteAllowlist: createDefaultScopedSessionRouteAllowlist(),
     untrustedContentAttachmentsDir: createDefaultUntrustedAttachmentsDir(cwd),
     untrustedContentIssueCommentsDir: createDefaultUntrustedIssueCommentsDir(cwd),
@@ -336,6 +338,10 @@ export function buildBackendConfigFromEnv(
     if (Number.isFinite(sessionTtlMs)) {
       overrides.sessionTtlMs = sessionTtlMs;
     }
+  }
+
+  if (env.GGTC_TRUST_PROXY) {
+    overrides.trustProxy = env.GGTC_TRUST_PROXY !== "false";
   }
 
   return buildBackendConfig(overrides);

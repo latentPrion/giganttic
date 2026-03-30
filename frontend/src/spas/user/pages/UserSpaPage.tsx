@@ -24,7 +24,13 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useNavigate } from "react-router-dom";
 
+import { SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
+import {
+  buildAppRelativeUrl,
+  createScopedAccessLoginAbsoluteUrl,
+  createScopedAccessLoginRelativeUrl,
+} from "../../../common/routing/public-app-url.js";
 import { authApi } from "../../../common/session/api/auth-api.js";
 import { useAuthSessionContext } from "../../../common/session/context/AuthSessionContext.js";
 import { EntityItemList } from "../../../common/components/entity-list/EntityItemList.js";
@@ -84,7 +90,6 @@ const TOKEN_SCOPE_TAB_VALUES = [
   "organizations",
 ] as const;
 type TokenScopeTab = typeof TOKEN_SCOPE_TAB_VALUES[number];
-const SCOPED_ACCESS_LOGIN_PATH = "/auth/scoped-token-login";
 const SCOPED_ACCESS_OBJECT_TYPE_PROJECT = "SCOPED_ACCESS_OBJECT_TYPE_PROJECT";
 const SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION = "SCOPED_ACCESS_OBJECT_TYPE_ORGANIZATION";
 const SCOPED_ACCESS_OBJECT_TYPE_TEAM = "SCOPED_ACCESS_OBJECT_TYPE_TEAM";
@@ -169,11 +174,11 @@ export function UserSpaPage(props: UserSpaPageProps) {
   );
 
   function createScopedLoginLink(tokenValue: string): string {
-    const loginPathWithQuery = `${SCOPED_ACCESS_LOGIN_PATH}?token=${encodeURIComponent(tokenValue)}`;
+    const loginPathWithQuery = createScopedAccessLoginRelativeUrl(tokenValue);
     if (typeof window === "undefined" || !window.location.origin) {
       return loginPathWithQuery;
     }
-    return `${window.location.origin}${loginPathWithQuery}`;
+    return createScopedAccessLoginAbsoluteUrl(tokenValue, window.location.origin);
   }
 
   useEffect(() => {
@@ -598,7 +603,7 @@ export function UserSpaPage(props: UserSpaPageProps) {
           SPA permanently loses any un-copied token values.
         </Alert>
         <Alert severity="info">
-          Login links use this format: <code>{`<origin>${SCOPED_ACCESS_LOGIN_PATH}?token=<token-value>`}</code>.
+          Login links use this format: <code>{`<origin>${buildAppRelativeUrl(SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH)}?token=<token-value>`}</code>.
           Replace <code>{`<origin>`}</code> with this app base URL and <code>{`<token-value>`}</code> with
           the minted token.
         </Alert>

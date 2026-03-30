@@ -1,10 +1,9 @@
 import type { IssueStatus } from "../contracts/issue.contracts.js";
+import { emitFrontendDebugLog } from "../../../common/debug/frontend-debug-ingest.js";
 
 const STATUS_BLOCKED: IssueStatus = "ISSUE_STATUS_BLOCKED";
 const STATUS_CLOSED: IssueStatus = "ISSUE_STATUS_CLOSED";
 const STATUS_IN_PROGRESS: IssueStatus = "ISSUE_STATUS_IN_PROGRESS";
-const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
-const DEBUG_SESSION_ID = "117825";
 
 export interface MilestoneInferenceTaskLike {
   id: string;
@@ -26,24 +25,13 @@ function emitDebugLog(
   runId: string,
   data: Record<string, unknown>,
 ): void {
-  // #region agent log
-  fetch(DEBUG_INGEST_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": DEBUG_SESSION_ID,
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      runId,
-      hypothesisId,
-    }),
-  }).catch(() => {});
-  // #endregion
+  emitFrontendDebugLog({
+    data,
+    hypothesisId,
+    location,
+    message,
+    runId,
+  });
 }
 
 function hasBlockedDependency(

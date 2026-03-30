@@ -1,4 +1,5 @@
 import type { IssueStatus } from "../contracts/issue.contracts.js";
+import { emitFrontendDebugLog } from "../../../common/debug/frontend-debug-ingest.js";
 import {
   GGTC_TASK_DESCRIPTION_ATTRIBUTE,
   GGTC_TASK_STATUS_ATTRIBUTE,
@@ -22,8 +23,6 @@ const TASK_SELECTOR = "task";
 const LINK_SELECTOR = 'link, coll_options[for="links"] item';
 
 type ParsedTaskNodeType = "milestone" | "project" | "task";
-const DEBUG_INGEST_ENDPOINT = "http://127.0.0.1:7725/ingest/79f6b8a3-16b6-41b4-b9c7-8a49362b3407";
-const DEBUG_SESSION_ID = "117825";
 
 interface ParsedTaskNode {
   description: string;
@@ -62,24 +61,13 @@ function emitDebugLog(
   runId: string,
   data: Record<string, unknown>,
 ): void {
-  // #region agent log
-  fetch(DEBUG_INGEST_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": DEBUG_SESSION_ID,
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      runId,
-      hypothesisId,
-    }),
-  }).catch(() => {});
-  // #endregion
+  emitFrontendDebugLog({
+    data,
+    hypothesisId,
+    location,
+    message,
+    runId,
+  });
 }
 
 export interface ParsedProjectTaskHistoryEntry {

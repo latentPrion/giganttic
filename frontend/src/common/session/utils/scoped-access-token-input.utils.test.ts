@@ -20,6 +20,11 @@ describe("parseScopedAccessTokenInput", () => {
     expect(parseScopedAccessTokenInput(input, "https://app.example.com")).toBe("rel-token");
   });
 
+  it("parses token from a /pm-prefixed path-only url using base URL", () => {
+    const input = "/pm/auth/scoped-token-login?token=rel-token";
+    expect(parseScopedAccessTokenInput(input, TEST_BASE)).toBe("rel-token");
+  });
+
   it("parses token from a bare query string", () => {
     expect(parseScopedAccessTokenInput("?token=bare-query", TEST_BASE)).toBe("bare-query");
   });
