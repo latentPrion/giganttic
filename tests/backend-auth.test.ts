@@ -57,6 +57,7 @@ describe("backend auth api", () => {
       createDbIfMissing: false,
       dbPath,
       port: 0,
+      trustProxy: true,
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],
