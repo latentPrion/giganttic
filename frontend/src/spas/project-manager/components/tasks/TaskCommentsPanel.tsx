@@ -8,6 +8,7 @@ import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.j
 import { TASK_COMMENT_MARKDOWN_HELP_TEXT, TaskMarkdownRender } from "./TaskMarkdownRender.js";
 
 interface TaskCommentsPanelProps {
+  canManageTaskDiscussion?: boolean;
   currentUserId: number;
   highlightCommentId: number | null;
   onNavigateToComment: (commentId: number) => void;
@@ -73,6 +74,8 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
           ),
       }}
       commentDomIdPrefix="task-comment"
+      canManageCommentAttachments={(comment) =>
+        comment.createdByUserId === currentUserId || props.canManageTaskDiscussion === true}
       currentUserId={currentUserId}
       editorHelpText={TASK_COMMENT_MARKDOWN_HELP_TEXT}
       highlightCommentId={highlightCommentId}

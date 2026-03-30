@@ -2837,10 +2837,9 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     ).toHaveLength(1);
   });
 
-  it("allows a project owner to associate teams and organizations to a project", async () => {
+  it("allows a project owner to associate a team and an organization they manage to a project", async () => {
     const creator = await harness.registerUser("project-association-owner");
     const teamCreator = await harness.registerUser("project-association-team-owner");
-    const organizationCreator = await harness.registerUser("project-association-org-owner");
     const createResponse = await createProject(creator.accessToken, {
       name: "Association Project",
     });
@@ -2852,7 +2851,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     });
     const { team } = harness.parseJson<{ team: { id: number } }>(teamCreateResponse.payload);
     const organizationCreateResponse = await harness.app.inject({
-      headers: harness.createAuthHeaders(organizationCreator.accessToken),
+      headers: harness.createAuthHeaders(creator.accessToken),
       method: "POST",
       payload: { name: "Association Organization" },
       url: "/stc-proj-mgmt/api/organizations",
@@ -2889,6 +2888,42 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
         .where(eq(projectsOrganizations.projectId, project.id))
         .all(),
     ).toHaveLength(1);
+  });
+
+  it("forbids a project owner from associating an organization they do not manage", async () => {
+    const creator = await harness.registerUser("project-association-owner-forbidden");
+    const organizationCreator = await harness.registerUser("project-association-org-owner-forbidden");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Forbidden Organization Association Project",
+    });
+    const { project } = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    );
+    const organizationCreateResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(organizationCreator.accessToken),
+      method: "POST",
+      payload: { name: "Forbidden Association Organization" },
+      url: "/stc-proj-mgmt/api/organizations",
+    });
+    const { organization } = harness.parseJson<{ organization: { id: number } }>(
+      organizationCreateResponse.payload,
+    );
+
+    const organizationAssociationResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { organizationId: organization.id },
+      url: `/stc-proj-mgmt/api/projects/${project.id}/organizations`,
+    });
+
+    expect(organizationAssociationResponse.statusCode).toBe(403);
+    expect(
+      harness.databaseService.db
+        .select()
+        .from(projectsOrganizations)
+        .where(eq(projectsOrganizations.projectId, project.id))
+        .all(),
+    ).toHaveLength(0);
   });
 
   it("deleting a project cascades its memberships, role assignments, and team links", async () => {

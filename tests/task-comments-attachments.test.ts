@@ -243,6 +243,70 @@ describe("task comments and attachments api", () => {
     });
     expect(wrongTaskDownload.statusCode).toBe(404);
   });
+
+  it("forbids a non-project-manager member from uploading task-level attachments", async () => {
+    const owner = await harness.registerUser("task-attachment-owner");
+    const member = await harness.registerUser("task-attachment-member");
+    const { projectId } = await createProjectWithDefaultTask(owner.accessToken, "Task attachment perms");
+    await replaceProjectMembers(projectId, owner.user.id, member.user.id, owner.accessToken);
+
+    const uploadResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(member.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("member-task-upload.png"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID),
+    });
+
+    expect(uploadResponse.statusCode).toBe(403);
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID)).toEqual([]);
+  });
+
+  it("forbids a non-author non-project-manager member from uploading or deleting task comment attachments", async () => {
+    const owner = await harness.registerUser("task-comment-attachment-owner");
+    const member = await harness.registerUser("task-comment-attachment-member");
+    const { projectId } = await createProjectWithDefaultTask(
+      owner.accessToken,
+      "Task comment attachment perms",
+    );
+    await replaceProjectMembers(projectId, owner.user.id, member.user.id, owner.accessToken);
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "POST",
+      payload: { body: VALID_COMMENT_BODY },
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment.id;
+
+    const ownerUploadResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(owner.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("owner-comment-attachment.png"),
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments`,
+    });
+    expect(ownerUploadResponse.statusCode).toBe(201);
+    const uploaded = harness.parseJson<{ attachment: { id: string } }>(
+      ownerUploadResponse.payload,
+    );
+
+    const memberUploadResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(member.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("member-comment-attachment.png"),
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments`,
+    });
+    expect(memberUploadResponse.statusCode).toBe(403);
+
+    const memberDeleteResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(member.accessToken),
+      method: "DELETE",
+      url: `${buildTaskCommentsPath(projectId, DEFAULT_TASK_ID)}/${commentId}/attachments/${uploaded.attachment.id}`,
+    });
+    expect(memberDeleteResponse.statusCode).toBe(403);
+  });
 });
 
 async function createProjectWithDefaultTask(accessToken: string, name: string) {
@@ -322,4 +386,34 @@ function selectTaskMirrorRows(projectId: number, taskId: string) {
       ),
     )
     .all();
+}
+
+async function replaceProjectMembers(
+  projectId: number,
+  ownerUserId: number,
+  memberUserId: number,
+  ownerAccessToken: string,
+): Promise<void> {
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(ownerAccessToken),
+    method: "PUT",
+    payload: {
+      members: [
+        {
+          roleCodes: [
+            "GGTC_PROJECTROLE_PROJECT_MANAGER",
+            "GGTC_PROJECTROLE_PROJECT_OWNER",
+          ],
+          userId: ownerUserId,
+        },
+        {
+          roleCodes: [],
+          userId: memberUserId,
+        },
+      ],
+    },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+  });
+
+  expect(response.statusCode).toBe(200);
 }

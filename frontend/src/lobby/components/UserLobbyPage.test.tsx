@@ -265,6 +265,12 @@ async function findOrganizationCard(): Promise<HTMLElement> {
   );
 }
 
+async function findProjectCard(): Promise<HTMLElement> {
+  return await screen.findByText("Apollo").then((element) =>
+    element.closest(".MuiPaper-root") as HTMLElement
+  );
+}
+
 beforeEach(() => {
   navigateMock.mockReset();
   lobbyApiMock.createOrganization.mockReset();
@@ -337,6 +343,25 @@ describe("UserLobbyPage", () => {
     expect(lobbyApiMock.listProjects).toHaveBeenCalledWith(TOKEN);
     expect(lobbyApiMock.listTeams).toHaveBeenCalledWith(TOKEN);
     expect(lobbyApiMock.listOrganizations).toHaveBeenCalledWith(TOKEN);
+  });
+
+  it("hides project edit and delete actions when the current user lacks project management roles", async () => {
+    lobbyApiMock.getProject.mockResolvedValueOnce(createProjectDetailResponse({
+      members: [
+        createProjectMember({
+          roleCodes: [],
+          userId: CURRENT_USER_ID,
+        }),
+      ],
+      projectManagers: [],
+    }));
+
+    renderLobbyPage();
+
+    const projectCard = await findProjectCard();
+    expect(within(projectCard).getByRole("button", { name: "View" })).toBeVisible();
+    expect(within(projectCard).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(within(projectCard).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 
   it("renders each lobby section list inside an entity item list container using main-listing-view", async () => {
@@ -488,6 +513,7 @@ describe("UserLobbyPage", () => {
     const user = userEvent.setup();
     lobbyApiMock.getProject
       .mockResolvedValueOnce(createProjectDetailResponse())
+      .mockResolvedValueOnce(createProjectDetailResponse())
       .mockResolvedValueOnce(createProjectDetailResponse({
         members: [
           createProjectMember({
@@ -526,18 +552,28 @@ describe("UserLobbyPage", () => {
     await user.click((await screen.findAllByRole("button", { name: "View" }))[0]!);
 
     expect(await screen.findByText("updated-manager (GGTC_PROJECTROLE_PROJECT_MANAGER)")).toBeVisible();
-    expect(lobbyApiMock.getProject).toHaveBeenCalledTimes(2);
+    expect(lobbyApiMock.getProject).toHaveBeenCalledTimes(3);
   });
 
   it("deletes a project and removes it from the lobby list", async () => {
     const user = userEvent.setup();
     lobbyApiMock.deleteProject.mockResolvedValue({ deletedProjectId: 1 });
+    lobbyApiMock.getProject.mockResolvedValueOnce(createProjectDetailResponse({
+      members: [
+        createProjectMember({
+          roleCodes: [
+            "GGTC_PROJECTROLE_PROJECT_MANAGER",
+            "GGTC_PROJECTROLE_PROJECT_OWNER",
+          ],
+        }),
+      ],
+    }));
 
     renderLobbyPage();
 
-    expect(await screen.findByText("Apollo")).toBeVisible();
+    const projectCard = await findProjectCard();
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(within(projectCard).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
       expect(lobbyApiMock.deleteProject).toHaveBeenCalledWith(TOKEN, 1);
@@ -558,12 +594,22 @@ describe("UserLobbyPage", () => {
       }),
       status: 409,
     }));
+    lobbyApiMock.getProject.mockResolvedValueOnce(createProjectDetailResponse({
+      members: [
+        createProjectMember({
+          roleCodes: [
+            "GGTC_PROJECTROLE_PROJECT_MANAGER",
+            "GGTC_PROJECTROLE_PROJECT_OWNER",
+          ],
+        }),
+      ],
+    }));
 
     renderLobbyPage();
 
-    expect(await screen.findByText("Apollo")).toBeVisible();
+    const projectCard = await findProjectCard();
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(within(projectCard).getByRole("button", { name: "Delete" }));
 
     expect(
       await screen.findByText(
@@ -716,7 +762,10 @@ describe("UserLobbyPage", () => {
     renderLobbyPage();
 
     await openTeamsSection(user);
-    await user.click(screen.getAllByRole("button", { name: "Delete" })[1]!);
+    const teamCard = await screen.findByText("Operators").then((element) =>
+      element.closest(".MuiPaper-root") as HTMLElement
+    );
+    await user.click(within(teamCard).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => {
       expect(lobbyApiMock.deleteTeam).toHaveBeenCalledWith(TOKEN, 11);

@@ -122,4 +122,20 @@ describe("TaskAttachmentsPanel", () => {
 
     expect(await screen.findByText("ID: att-1 • 12 B")).toBeVisible();
   });
+
+  it("hides upload and delete controls when attachment management is disabled", async () => {
+    renderWithTheme(
+      <TaskAttachmentsPanel
+        canManageAttachments={false}
+        projectId={42}
+        taskId="task-7"
+        taskTab="attachments"
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText("one.png")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Add attachment(s)" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
 });

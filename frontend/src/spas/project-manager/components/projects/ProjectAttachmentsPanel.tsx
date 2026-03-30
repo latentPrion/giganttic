@@ -6,6 +6,7 @@ import { emitProjectManagerProjectAttachmentStateEvent } from "../../lib/project
 import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsPanel.js";
 
 interface ProjectAttachmentsPanelProps {
+  canManageAttachments?: boolean;
   isActive: boolean;
   projectId: number;
   sectionId?: string;
@@ -13,7 +14,7 @@ interface ProjectAttachmentsPanelProps {
 }
 
 export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
-  const { isActive, projectId, sectionId, token } = props;
+  const { canManageAttachments = true, isActive, projectId, sectionId, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -39,6 +40,7 @@ export function ProjectAttachmentsPanel(props: ProjectAttachmentsPanelProps) {
           return response;
         },
       }}
+      canManageAttachments={canManageAttachments}
       emptyMessage="No project-level attachments yet."
       isActive={isActive}
       notFoundMessage="No attachments exist for this project as yet."

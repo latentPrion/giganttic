@@ -9,7 +9,7 @@ function hasRoleCode(
   return member.roleCodes.includes(roleCode);
 }
 
-function canDeleteProject(
+export function canDeleteProject(
   currentUserId: number | undefined,
   _currentUserRoles: readonly string[] | undefined,
   response: GetProjectResponse | null,

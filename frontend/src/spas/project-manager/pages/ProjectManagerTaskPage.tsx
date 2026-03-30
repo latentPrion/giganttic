@@ -486,6 +486,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         {props.projectId !== null && props.taskId !== null ? (
           <>
             <TaskCommentsPanel
+              canManageTaskDiscussion={canEditProjectContent}
               currentUserId={props.currentUserId}
               highlightCommentId={props.commentId}
               onNavigateToComment={navigateToCommentAnchor}
@@ -495,6 +496,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
               token={props.token}
             />
         <TaskAttachmentsPanel
+          canManageAttachments={canEditProjectContent}
           projectId={props.projectId}
           sectionId={TASK_ATTACHMENTS_SECTION_ANCHOR}
           taskId={props.taskId}

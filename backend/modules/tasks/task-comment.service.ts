@@ -8,9 +8,13 @@ import {
 import { and, asc, count, eq } from "drizzle-orm";
 
 import { projects, taskComments } from "../../../db/index.js";
+import type { DiscussionAttachmentSummary } from "../../../common/discussion/discussion.contracts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
-import { DiscussionAttachmentService, toAttachmentSummary } from "../discussion/discussion-attachment.service.js";
+import {
+  DiscussionAttachmentService,
+  toAttachmentSummary,
+} from "../discussion/discussion-attachment.service.js";
 import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { TasksService } from "./tasks.service.js";
@@ -236,6 +240,35 @@ export class TaskCommentService {
     );
 
     return { deletedAttachmentId };
+  }
+
+  async uploadCommentAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    taskId: string,
+    commentId: number,
+    buffer: Buffer,
+    originalFilename: string,
+  ): Promise<{ attachment: DiscussionAttachmentSummary }> {
+    this.tasksService.validateTaskReadableForCurrentUser(
+      authContext,
+      projectId,
+      taskId,
+    );
+
+    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    this.assertCanEditComment(authContext, projectId, record);
+
+    const attachment = await this.attachmentService.createAttachmentAndLinkToTaskComment({
+      buffer,
+      commentId,
+      originalFilename,
+      projectId,
+      taskId,
+      uploadedByUserId: authContext.userId,
+    });
+
+    return { attachment };
   }
 
   async deleteAllCommentBodiesForTask(

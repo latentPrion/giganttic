@@ -63,6 +63,7 @@ interface DiscussionCommentsPanelProps<Comment extends DiscussionCommentLike> {
     uploadCommentAttachment: (commentId: number, file: File) => Promise<unknown>;
   };
   commentDomIdPrefix: string;
+  canManageCommentAttachments?: (comment: Comment) => boolean;
   currentUserId: number;
   editorHelpText: string;
   highlightCommentId: number | null;
@@ -107,6 +108,7 @@ async function downloadAttachment(
 }
 
 function CommentAttachmentsList(props: {
+  canDelete: boolean;
   onDelete: (attachmentId: string) => void;
   onDownload: (attachmentId: string, filename: string) => void;
   rows: DiscussionAttachmentSummary[];
@@ -127,15 +129,17 @@ function CommentAttachmentsList(props: {
           justifyContent="space-between"
           key={attachment.id}
         >
-          <Button
-            color="error"
-            onClick={() => props.onDelete(attachment.id)}
-            size="small"
-            type="button"
-            variant="text"
-          >
-            Delete
-          </Button>
+          {props.canDelete ? (
+            <Button
+              color="error"
+              onClick={() => props.onDelete(attachment.id)}
+              size="small"
+              type="button"
+              variant="text"
+            >
+              Delete
+            </Button>
+          ) : <Box />}
           <Box sx={{ flex: "1 1 auto", textAlign: "right" }}>
             <MuiLink
               component="button"
@@ -167,6 +171,7 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
   const {
     api,
     commentDomIdPrefix,
+    canManageCommentAttachments,
     currentUserId,
     editorHelpText,
     highlightCommentId,
@@ -376,6 +381,7 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
             : findCommentById(comments, comment.parentCommentId);
           const isHighlighted = highlightCommentId === comment.id;
           const canEdit = comment.createdByUserId === currentUserId;
+          const canManageAttachments = canManageCommentAttachments?.(comment) ?? true;
           const hasAttachments = comment.attachments.length > 0;
 
           return (
@@ -514,27 +520,30 @@ export function DiscussionCommentsPanel<Comment extends DiscussionCommentLike>(
                     </Button>
                   </>
                 ) : null}
-                <Button
-                  component="label"
-                  disabled={busy}
-                  size="small"
-                  variant="text"
-                >
-                  Add attachment(s)
-                  <input
-                    hidden
-                    multiple
-                    onChange={(event) =>
-                      void handleCommentAttachmentUpload(comment.id, event.target.files)}
-                    type="file"
-                  />
-                </Button>
+                {canManageAttachments ? (
+                  <Button
+                    component="label"
+                    disabled={busy}
+                    size="small"
+                    variant="text"
+                  >
+                    Add attachment(s)
+                    <input
+                      hidden
+                      multiple
+                      onChange={(event) =>
+                        void handleCommentAttachmentUpload(comment.id, event.target.files)}
+                      type="file"
+                    />
+                  </Button>
+                ) : null}
               </Stack>
               <Typography color="text.secondary" sx={{ mt: 0.5 }} variant="caption">
                 {COMMENT_ATTACHMENT_MAX_FILE_SIZE_MESSAGE}
               </Typography>
               {hasAttachments ? <Divider sx={{ mt: 1.5 }} /> : null}
               <CommentAttachmentsList
+                canDelete={canManageAttachments}
                 onDelete={(attachmentId) =>
                   void handleDeleteCommentAttachment(comment.id, attachmentId)}
                 onDownload={(attachmentId, filename) =>

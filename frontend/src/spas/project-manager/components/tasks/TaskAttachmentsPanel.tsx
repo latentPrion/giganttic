@@ -6,6 +6,7 @@ import { emitProjectManagerTaskDiscussionStateEvent } from "../../lib/task-discu
 import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsPanel.js";
 
 interface TaskAttachmentsPanelProps {
+  canManageAttachments?: boolean;
   projectId: number;
   sectionId?: string;
   taskId: string;
@@ -14,7 +15,7 @@ interface TaskAttachmentsPanelProps {
 }
 
 export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
-  const { projectId, sectionId, taskId, taskTab, token } = props;
+  const { canManageAttachments = true, projectId, sectionId, taskId, taskTab, token } = props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -42,6 +43,7 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
           return response;
         },
       }}
+      canManageAttachments={canManageAttachments}
       emptyMessage="No task-level attachments yet."
       isActive={taskTab === "attachments"}
       panelTitle="Task-level attachments"

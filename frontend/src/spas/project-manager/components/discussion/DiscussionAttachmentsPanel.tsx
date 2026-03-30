@@ -54,6 +54,7 @@ interface DiscussionAttachmentsPanelProps {
     listAttachments: () => Promise<{ attachments: DiscussionAttachmentSummary[] }>;
     uploadAttachment: (file: File) => Promise<unknown>;
   };
+  canManageAttachments?: boolean;
   emptyMessage: string;
   isActive: boolean;
   notFoundMessage?: string;
@@ -66,6 +67,7 @@ interface DiscussionAttachmentsPanelProps {
 export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProps) {
   const {
     api,
+    canManageAttachments = true,
     emptyMessage,
     isActive,
     notFoundMessage,
@@ -146,25 +148,27 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
     <Stack id={sectionId} spacing={2}>
       <Typography variant="subtitle1">{panelTitle}</Typography>
       {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
-      <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">
-        <Stack alignItems="flex-start" direction="row" spacing={2}>
-          <Button component="label" disabled={busy} variant="outlined">
-            Add attachment(s)
-            <input
-              accept={FILE_INPUT_ACCEPT}
-              hidden
-              multiple
-              onChange={(event) => void handleUpload(event.target.files)}
-              type="file"
-            />
-          </Button>
-          {busy ? <CircularProgress size={22} /> : null}
-        </Stack>
-        <Typography color="text.secondary" sx={{ mt: 1.5 }} variant="body2">
-          Choose one or more files. {ATTACHMENT_MAX_FILE_SIZE_MESSAGE} Allowed types are enforced on
-          the server.
-        </Typography>
-      </Paper>
+      {canManageAttachments ? (
+        <Paper sx={{ bgcolor: "action.hover", p: 2 }} variant="outlined">
+          <Stack alignItems="flex-start" direction="row" spacing={2}>
+            <Button component="label" disabled={busy} variant="outlined">
+              Add attachment(s)
+              <input
+                accept={FILE_INPUT_ACCEPT}
+                hidden
+                multiple
+                onChange={(event) => void handleUpload(event.target.files)}
+                type="file"
+              />
+            </Button>
+            {busy ? <CircularProgress size={22} /> : null}
+          </Stack>
+          <Typography color="text.secondary" sx={{ mt: 1.5 }} variant="body2">
+            Choose one or more files. {ATTACHMENT_MAX_FILE_SIZE_MESSAGE} Allowed types are enforced on
+            the server.
+          </Typography>
+        </Paper>
+      ) : null}
       <List dense>
         {attachments.map((row) => (
           <ListItem
@@ -172,15 +176,17 @@ export function DiscussionAttachmentsPanel(props: DiscussionAttachmentsPanelProp
             disablePadding
             sx={{ alignItems: "center", justifyContent: "space-between", py: 0.5 }}
           >
-            <Button
-              color="error"
-              disabled={busy}
-              onClick={() => void handleDelete(row.id)}
-              size="small"
-              variant="text"
-            >
-              Delete
-            </Button>
+            {canManageAttachments ? (
+              <Button
+                color="error"
+                disabled={busy}
+                onClick={() => void handleDelete(row.id)}
+                size="small"
+                variant="text"
+              >
+                Delete
+              </Button>
+            ) : <Box />}
             <ListItemText
               primary={(
                 <MuiLink

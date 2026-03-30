@@ -181,16 +181,16 @@ export class TaskCommentsController {
       params,
     );
 
-    const attachment = await this.attachmentService.createAttachmentAndLinkToTaskComment({
-      buffer: requireUploadedBuffer(file),
-      commentId,
-      originalFilename: file!.originalname,
-      projectId,
-      taskId,
-      uploadedByUserId: request.authContext!.userId,
-    });
-
-    return uploadTaskAttachmentResponseSchema.parse({ attachment });
+    return uploadTaskAttachmentResponseSchema.parse(
+      await this.taskCommentService.uploadCommentAttachment(
+        request.authContext!,
+        projectId,
+        taskId,
+        commentId,
+        requireUploadedBuffer(file),
+        file!.originalname,
+      ),
+    );
   }
 
   @Get(":commentId/attachments/:attachmentId/download")

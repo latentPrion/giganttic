@@ -30,6 +30,7 @@ import {
   hasDirectProjectMembership,
   hasDirectProjectOwnerRole,
   hasEffectiveProjectManagerRole,
+  hasOrganizationManagerRole,
   hasOrganizationTeamManagerRoleForTeam,
   hasProjectAccess,
   hasSystemAdminRole,
@@ -606,6 +607,7 @@ export class ProjectsService {
     this.assertProjectExists(projectId);
     this.assertOrganizationExists(payload.organizationId);
     this.assertCanManageProjectMembership(authContext, projectId);
+    this.assertCanManageOrganizationAssociation(authContext, payload.organizationId);
     this.assertProjectOrganizationAssociationAbsent(projectId, payload.organizationId);
 
     this.databaseService.db.transaction((tx) => {
@@ -733,6 +735,21 @@ export class ProjectsService {
     }
 
     throw new ForbiddenException("Not permitted to manage that project");
+  }
+
+  private assertCanManageOrganizationAssociation(
+    authContext: AuthContext,
+    organizationId: number,
+  ): void {
+    if (hasSystemAdminRole(authContext)) {
+      return;
+    }
+
+    if (hasOrganizationManagerRole(this.databaseService.db, organizationId, authContext.userId)) {
+      return;
+    }
+
+    throw new ForbiddenException("Not permitted to manage that organization");
   }
 
   private canEditProject(

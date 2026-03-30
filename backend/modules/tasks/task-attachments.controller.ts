@@ -21,7 +21,6 @@ import {
 import { DiscussionUploadMultipartInterceptor } from "../discussion/discussion-upload-multipart.interceptor.js";
 import type { MemoryUploadedFile } from "../discussion/memory-uploaded-file.types.js";
 import { UploadedMemoryFile } from "../discussion/uploaded-memory-file.decorator.js";
-import { NotificationsService } from "../notifications/notifications.service.js";
 import {
   deleteTaskAttachmentResponseSchema,
   listTaskAttachmentsResponseSchema,
@@ -39,8 +38,6 @@ export class TaskAttachmentsController {
     private readonly tasksService: TasksService,
     @Inject(DiscussionAttachmentService)
     private readonly attachmentService: DiscussionAttachmentService,
-    @Inject(NotificationsService)
-    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get()
@@ -69,28 +66,15 @@ export class TaskAttachmentsController {
     @UploadedMemoryFile() file: MemoryUploadedFile | undefined,
   ) {
     const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
-    const buffer = requireUploadedBuffer(file);
-    this.tasksService.ensureTaskMirrorExistsForReadableTask(
-      request.authContext!,
-      projectId,
-      taskId,
+    return uploadTaskAttachmentResponseSchema.parse(
+      await this.tasksService.uploadTaskAttachment(
+        request.authContext!,
+        projectId,
+        taskId,
+        requireUploadedBuffer(file),
+        file!.originalname,
+      ),
     );
-
-    const attachment = await this.attachmentService.createAttachmentAndLinkToTask({
-      buffer,
-      originalFilename: file!.originalname,
-      projectId,
-      taskId,
-      uploadedByUserId: request.authContext!.userId,
-    });
-    await this.notificationsService.notifyTaskAttachmentCreated({
-      actorUserId: request.authContext!.userId,
-      attachmentId: attachment.id,
-      projectId,
-      taskId,
-    });
-
-    return uploadTaskAttachmentResponseSchema.parse({ attachment });
   }
 
   @Delete(":attachmentId")

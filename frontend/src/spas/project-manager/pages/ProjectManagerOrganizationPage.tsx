@@ -165,6 +165,22 @@ function canCreateOrganizationTeams(
   return response.organizationManagers.some((manager) => manager.userId === currentUserId);
 }
 
+function canCreateOrganizationProjects(
+  currentUserId: number | undefined,
+  currentUserRoles: readonly string[] | undefined,
+  response: GetOrganizationResponse | null,
+): boolean {
+  if (hasSystemAdminRole(currentUserRoles)) {
+    return true;
+  }
+
+  if (!response || currentUserId === undefined) {
+    return false;
+  }
+
+  return response.organizationManagers.some((manager) => manager.userId === currentUserId);
+}
+
 function createOrganizationUsersPayload(
   response: GetOrganizationResponse,
   userId: number,
@@ -325,6 +341,11 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
     organizationResponse,
   );
   const allowCreateOrganizationTeams = canCreateOrganizationTeams(
+    props.currentUserId,
+    props.currentUserRoles,
+    organizationResponse,
+  );
+  const allowCreateOrganizationProjects = canCreateOrganizationProjects(
     props.currentUserId,
     props.currentUserRoles,
     organizationResponse,
@@ -586,10 +607,12 @@ export function ProjectManagerOrganizationPage(props: ProjectManagerOrganization
       <Stack spacing={2}>
         <OrganizationListItem
           actionContent={(
-            <ProjectCreateButton
-              disabled={busyKey === createProjectCreateBusyKey(props.organizationId)}
-              onClick={() => setIsCreateProjectModalOpen(true)}
-            />
+            allowCreateOrganizationProjects ? (
+              <ProjectCreateButton
+                disabled={busyKey === createProjectCreateBusyKey(props.organizationId)}
+                onClick={() => setIsCreateProjectModalOpen(true)}
+              />
+            ) : undefined
           )}
           organization={organizationResponse.organization}
           viewMode={LIST_ITEM_VIEW_MODE}

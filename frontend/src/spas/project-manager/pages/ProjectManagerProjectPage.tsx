@@ -736,6 +736,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
       case "attachments":
         return (
           <ProjectAttachmentsPanel
+            canManageAttachments={allowProjectEdit}
             isActive={activeTab === "attachments"}
             projectId={project.id}
             sectionId={PROJECT_ATTACHMENTS_SECTION_ANCHOR}

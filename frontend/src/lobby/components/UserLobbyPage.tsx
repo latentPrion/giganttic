@@ -53,6 +53,10 @@ import {
   createProjectManagerOrganizationRoute,
   createProjectManagerTeamRoute,
 } from "../../spas/project-manager/routes/project-route-paths.js";
+import {
+  canDeleteProject,
+  canEditProject,
+} from "../../spas/project-manager/lib/project-edit-permissions.js";
 
 interface UserLobbyPageProps {
   currentUserId: number;
@@ -63,6 +67,11 @@ interface LobbyData {
   organizations: LobbyOrganization[];
   projects: LobbyProject[];
   teams: LobbyTeam[];
+}
+
+interface LobbyProjectPermissions {
+  canDelete: boolean;
+  canEdit: boolean;
 }
 
 const DEFAULT_ERROR_MESSAGE = "Unable to load your lobby right now.";
@@ -108,12 +117,50 @@ function upsertEntityById<T extends { id: number }>(entities: T[], entity: T): T
   return sortEntitiesById([...remainingEntities, entity]);
 }
 
+function createDeniedLobbyProjectPermissions(): LobbyProjectPermissions {
+  return {
+    canDelete: false,
+    canEdit: false,
+  };
+}
+
+function createLobbyProjectPermissions(
+  currentUserId: number,
+  response: Awaited<ReturnType<typeof lobbyApi.getProject>>,
+): LobbyProjectPermissions {
+  return {
+    canDelete: canDeleteProject(currentUserId, undefined, response),
+    canEdit: canEditProject(currentUserId, undefined, response),
+  };
+}
+
+async function loadLobbyProjectPermissions(options: {
+  currentUserId: number;
+  projects: readonly LobbyProject[];
+  token: string;
+}): Promise<Record<number, LobbyProjectPermissions>> {
+  const { currentUserId, projects, token } = options;
+  const permissions = await Promise.all(
+    projects.map(async (project) => {
+      try {
+        const response = await lobbyApi.getProject(token, project.id);
+        return [project.id, createLobbyProjectPermissions(currentUserId, response)] as const;
+      } catch {
+        return [project.id, createDeniedLobbyProjectPermissions()] as const;
+      }
+    }),
+  );
+
+  return Object.fromEntries(permissions);
+}
+
 interface ProjectSectionContentProps {
   busyKey: string | null;
   onDeleteProject(projectId: number): void;
   onEditProject(projectId: number): void;
   onOpenSummary(projectId: number): void;
   onProjectNavigate(projectId: number): void;
+  projectPermissionsById: Record<number, LobbyProjectPermissions>;
   projects: LobbyProject[];
   viewMode: EntityListItemViewMode;
 }
@@ -137,14 +184,18 @@ function ProjectSectionContent(props: ProjectSectionContentProps) {
                 disabled={props.busyKey === `project:${project.id}`}
                 onClick={() => props.onOpenSummary(project.id)}
               />
-              <ProjectEditButton
-                disabled={props.busyKey === `project:${project.id}`}
-                onClick={() => props.onEditProject(project.id)}
-              />
-              <ProjectDeleteButton
-                disabled={props.busyKey === `project:${project.id}`}
-                onClick={() => props.onDeleteProject(project.id)}
-              />
+              {props.projectPermissionsById[project.id]?.canEdit ? (
+                <ProjectEditButton
+                  disabled={props.busyKey === `project:${project.id}`}
+                  onClick={() => props.onEditProject(project.id)}
+                />
+              ) : null}
+              {props.projectPermissionsById[project.id]?.canDelete ? (
+                <ProjectDeleteButton
+                  disabled={props.busyKey === `project:${project.id}`}
+                  onClick={() => props.onDeleteProject(project.id)}
+                />
+              ) : null}
             </>
           )}
           key={project.id}
@@ -255,7 +306,7 @@ function OrganizationSectionContent(props: OrganizationSectionContentProps) {
   );
 }
 
-export function UserLobbyPage({ token }: UserLobbyPageProps) {
+export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
   const navigate = useNavigate();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -273,6 +324,9 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
     null,
   );
   const [projectEditTargetId, setProjectEditTargetId] = useState<number | null>(null);
+  const [projectPermissionsById, setProjectPermissionsById] = useState<
+    Record<number, LobbyProjectPermissions>
+  >({});
   const [projectSummaryRefreshKey, setProjectSummaryRefreshKey] = useState(0);
   const [projectSummaryTargetId, setProjectSummaryTargetId] = useState<number | null>(null);
   const [teamEditTargetId, setTeamEditTargetId] = useState<number | null>(null);
@@ -292,18 +346,24 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
           "organizations",
         ),
       ]);
+      const projectPermissions = await loadLobbyProjectPermissions({
+        currentUserId,
+        projects,
+        token,
+      });
 
       setLobbyData({
         organizations,
         projects,
         teams,
       });
+      setProjectPermissionsById(projectPermissions);
     } catch (error) {
       setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [currentUserId, token]);
 
   useEffect(() => {
     void loadLobbyData();
@@ -443,6 +503,13 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
         ...previousData,
         projects: upsertEntityById(previousData.projects, response.project),
       }));
+      setProjectPermissionsById((previous) => ({
+        ...previous,
+        [response.project.id]: {
+          canDelete: true,
+          canEdit: true,
+        },
+      }));
       return response.project;
     } finally {
       setBusyKey(null);
@@ -501,6 +568,11 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
         ...previousData,
         projects: previousData.projects.filter((project) => project.id !== projectId),
       }));
+      setProjectPermissionsById((previous) => {
+        const next = { ...previous };
+        delete next[projectId];
+        return next;
+      });
       if (projectSummaryTargetId === projectId) {
         closeProjectSummaryModal();
       }
@@ -648,6 +720,7 @@ export function UserLobbyPage({ token }: UserLobbyPageProps) {
                 onEditProject={openProjectEditModal}
                 onOpenSummary={openProjectSummaryModal}
                 onProjectNavigate={navigateToProject}
+                projectPermissionsById={projectPermissionsById}
                 projects={lobbyData.projects}
                 viewMode={LIST_ITEM_VIEW_MODE}
               />

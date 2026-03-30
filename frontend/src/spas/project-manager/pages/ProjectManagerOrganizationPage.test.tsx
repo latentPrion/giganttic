@@ -327,6 +327,7 @@ describe("ProjectManagerOrganizationPage", () => {
     expect(await screen.findByText("Org 9")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Add Member User" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add Member Team" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create Project" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Create Team" })).not.toBeInTheDocument();
   });
 

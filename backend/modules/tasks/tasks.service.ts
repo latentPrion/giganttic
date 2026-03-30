@@ -7,13 +7,16 @@ import {
 import { eq } from "drizzle-orm";
 
 import { projects } from "../../../db/index.js";
+import type { DiscussionAttachmentSummary } from "../../../common/discussion/discussion.contracts.js";
 import {
   hasEffectiveProjectManagerRole,
   hasProjectAccess,
 } from "../access-control/access-control.utils.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
-import { DiscussionAttachmentService } from "../discussion/discussion-attachment.service.js";
+import {
+  DiscussionAttachmentService,
+} from "../discussion/discussion-attachment.service.js";
 import { DiscussionJournalStorageService } from "../discussion/discussion-journal-storage.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
@@ -96,6 +99,34 @@ export class TasksService {
     );
 
     return { deletedAttachmentId };
+  }
+
+  async uploadTaskAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    taskId: string,
+    buffer: Buffer,
+    originalFilename: string,
+  ): Promise<{ attachment: DiscussionAttachmentSummary }> {
+    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
+    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+
+    const attachment = await this.attachmentService.createAttachmentAndLinkToTask({
+      buffer,
+      originalFilename,
+      projectId,
+      taskId,
+      uploadedByUserId: authContext.userId,
+    });
+    await this.notificationsService.notifyTaskAttachmentCreated({
+      actorUserId: authContext.userId,
+      attachmentId: attachment.id,
+      projectId,
+      taskId,
+    });
+
+    return { attachment };
   }
 
   async getTaskJournal(

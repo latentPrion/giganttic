@@ -232,6 +232,7 @@ describe("TaskCommentsPanel", () => {
 
     renderWithTheme(
       <TaskCommentsPanel
+        canManageTaskDiscussion
         currentUserId={999}
         highlightCommentId={null}
         onNavigateToComment={() => {}}
@@ -256,5 +257,24 @@ describe("TaskCommentsPanel", () => {
       );
     });
     expect(taskCommentsApiMock.listComments).toHaveBeenCalledTimes(2);
+  });
+
+  it("hides task comment attachment controls for non-authors without task discussion management", async () => {
+    renderWithTheme(
+      <TaskCommentsPanel
+        canManageTaskDiscussion={false}
+        currentUserId={999}
+        highlightCommentId={null}
+        onNavigateToComment={() => {}}
+        projectId={42}
+        taskId="task-7"
+        taskTab="comments"
+        token="pm-token"
+      />,
+    );
+
+    expect(await screen.findByText("child.png")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add attachment(s)" })).not.toBeInTheDocument();
   });
 });
