@@ -28,12 +28,14 @@ interface FeedbackState {
 }
 
 interface RegisterFormState {
+  confirmPassword: string;
   email: string;
   password: string;
   username: string;
 }
 
 const DEFAULT_FORM_STATE: RegisterFormState = {
+  confirmPassword: "",
   email: "",
   password: "",
   username: "",
@@ -54,6 +56,8 @@ const DEFAULT_REGISTRATION_FAILURE_MESSAGE = "Registration failed.";
 const REGISTRATION_SUCCESS_TITLE = "Registration Succeeded";
 const REGISTRATION_SUCCESS_MESSAGE =
   "Registration succeeded. You can now log in.";
+const PASSWORD_CONFIRMATION_LABEL = "Confirm Password";
+const PASSWORD_MISMATCH_MESSAGE = "Passwords do not match.";
 
 function toRegisterPayload(formState: RegisterFormState): RegisterRequest {
   return {
@@ -71,9 +75,14 @@ function buildRegistrationFailureMessage(error: unknown): string {
   return getApiErrorMessage(error, DEFAULT_REGISTRATION_FAILURE_MESSAGE);
 }
 
+function doPasswordsMatch(formState: RegisterFormState): boolean {
+  return formState.password === formState.confirmPassword;
+}
+
 export function RegisterModal(props: RegisterModalProps) {
   const [formState, setFormState] = useState<RegisterFormState>(DEFAULT_FORM_STATE);
   const [feedbackState, setFeedbackState] = useState<FeedbackState>(DEFAULT_FEEDBACK_STATE);
+  const [passwordMismatchMessage, setPasswordMismatchMessage] = useState<string | null>(null);
   const usernameInputReference = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -92,6 +101,7 @@ export function RegisterModal(props: RegisterModalProps) {
 
   function closeDialog(): void {
     setFormState(DEFAULT_FORM_STATE);
+    setPasswordMismatchMessage(null);
     props.onClose();
   }
 
@@ -106,6 +116,10 @@ export function RegisterModal(props: RegisterModalProps) {
     key: K,
     value: RegisterFormState[K],
   ): void {
+    if (key === "password" || key === "confirmPassword") {
+      setPasswordMismatchMessage(null);
+    }
+
     setFormState((current) => ({
       ...current,
       [key]: value,
@@ -113,6 +127,11 @@ export function RegisterModal(props: RegisterModalProps) {
   }
 
   async function submitRegistration(): Promise<void> {
+    if (!doPasswordsMatch(formState)) {
+      setPasswordMismatchMessage(PASSWORD_MISMATCH_MESSAGE);
+      return;
+    }
+
     try {
       await props.onRegister(toRegisterPayload(formState));
       closeDialog();
@@ -164,6 +183,14 @@ export function RegisterModal(props: RegisterModalProps) {
               onChange={(event) => updateField("password", event.target.value)}
               type="password"
               value={formState.password}
+            />
+            <TextField
+              error={passwordMismatchMessage !== null}
+              helperText={passwordMismatchMessage ?? " "}
+              label={PASSWORD_CONFIRMATION_LABEL}
+              onChange={(event) => updateField("confirmPassword", event.target.value)}
+              type="password"
+              value={formState.confirmPassword}
             />
           </DialogContent>
           <DialogActions

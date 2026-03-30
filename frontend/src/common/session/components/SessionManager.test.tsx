@@ -39,6 +39,7 @@ const SESSION_ERROR_DIALOG_NAME = "Session Error";
 const USERNAME_LABEL = "Username";
 const EMAIL_LABEL = "Email";
 const PASSWORD_LABEL = "Password";
+const CONFIRM_PASSWORD_LABEL = "Confirm Password";
 const LOGIN_BUTTON_LABEL = "Login";
 const REGISTER_BUTTON_LABEL = "Register";
 const MENU_BUTTON_LABEL = "Menu";
@@ -111,11 +112,20 @@ async function fillLoginForm(
 
 async function fillRegisterForm(
   user: ReturnType<typeof userEvent.setup>,
-  values: { email: string; password: string; username: string },
+  values: {
+    confirmPassword?: string;
+    email: string;
+    password: string;
+    username: string;
+  },
 ) {
   await user.type(screen.getByLabelText(USERNAME_LABEL), values.username);
   await user.type(screen.getByLabelText(EMAIL_LABEL), values.email);
   await user.type(screen.getByLabelText(PASSWORD_LABEL), values.password);
+  await user.type(
+    screen.getByLabelText(CONFIRM_PASSWORD_LABEL),
+    values.confirmPassword ?? values.password,
+  );
 }
 
 async function expectDialogToClose(dialogName: string) {
@@ -466,7 +476,8 @@ describe("SessionManager", () => {
     await openRegisterDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "enter-user");
     await user.type(screen.getByLabelText(EMAIL_LABEL), "enter@example.com");
-    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret{Enter}");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret");
+    await user.type(screen.getByLabelText(CONFIRM_PASSWORD_LABEL), "secret{Enter}");
 
     await waitFor(() => {
       expect(authApiMock.register).toHaveBeenCalledWith({
@@ -520,7 +531,8 @@ describe("SessionManager", () => {
     await openRegisterDialog(user);
     await user.type(screen.getByLabelText(USERNAME_LABEL), "taken-user");
     await user.type(screen.getByLabelText(EMAIL_LABEL), "taken@example.com");
-    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret{Enter}");
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "secret");
+    await user.type(screen.getByLabelText(CONFIRM_PASSWORD_LABEL), "secret{Enter}");
 
     expect(
       await screen.findByRole("dialog", { name: REGISTRATION_FAILURE_DIALOG_NAME }),
@@ -546,6 +558,7 @@ describe("SessionManager", () => {
     expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
     expect(screen.getByLabelText(EMAIL_LABEL)).toHaveValue("");
     expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(CONFIRM_PASSWORD_LABEL)).toHaveValue("");
   });
 
   it("closes the registration dialog when Escape is pressed", async () => {
@@ -582,6 +595,7 @@ describe("SessionManager", () => {
     expect(screen.getByLabelText(USERNAME_LABEL)).toHaveValue("");
     expect(screen.getByLabelText(EMAIL_LABEL)).toHaveValue("");
     expect(screen.getByLabelText(PASSWORD_LABEL)).toHaveValue("");
+    expect(screen.getByLabelText(CONFIRM_PASSWORD_LABEL)).toHaveValue("");
   });
 
   it("shows the fallback registration failure message for network errors", async () => {
