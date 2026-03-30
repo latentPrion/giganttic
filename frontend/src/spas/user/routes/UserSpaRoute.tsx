@@ -6,6 +6,7 @@ import {
   parseUserIdFromSearchParameters,
   parseUserTopTab,
 } from "../contracts/user-route.contracts.js";
+import { USER_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import { USER_LOBBY_PATH, isUserLobbyPath } from "../routes/user-route-paths.js";
 import { UserSpaPage } from "../pages/UserSpaPage.js";
 import { UserAuthenticatedRoute } from "./UserAuthenticatedRoute.js";
@@ -21,7 +22,7 @@ export function UserSpaRoute() {
   const credentialsTab = parseUserCredentialsTab(searchParameters);
 
   useEffect(() => {
-    if (location.pathname === "/user" && searchParameters.toString() === "") {
+    if (location.pathname === USER_ROUTE_PATH && searchParameters.toString() === "") {
       navigate(USER_LOBBY_PATH, { replace: true });
     }
   }, [location.pathname, navigate, searchParameters]);

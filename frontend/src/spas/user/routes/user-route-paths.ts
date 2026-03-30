@@ -1,4 +1,9 @@
-export const USER_LOBBY_PATH = "/user/lobby";
+import {
+  USER_LOBBY_ROUTE_PATH,
+  USER_ROUTE_PATH,
+} from "../../../../../common/routes/app-route-paths.js";
+
+export const USER_LOBBY_PATH = USER_LOBBY_ROUTE_PATH;
 
 export const USER_TOP_TAB_VALUES = [
   "lobby",
@@ -30,5 +35,5 @@ export function createUserRoute(
     tab: topTab,
     userId: String(userId),
   });
-  return `/user?${params.toString()}`;
+  return `${USER_ROUTE_PATH}?${params.toString()}`;
 }

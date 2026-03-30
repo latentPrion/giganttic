@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { appTheme } from "../theme/app-theme.js";
 
 interface RenderWithThemeOptions {
+  basename?: string;
   initialEntries?: string[];
 }
 
@@ -17,6 +18,7 @@ export function renderWithTheme(
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
       <MemoryRouter
+        basename={options.basename}
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true,

@@ -1,7 +1,9 @@
-const PROJECT_ROUTE_PREFIX = "/pm/project";
-const ISSUE_ROUTE_PREFIX = "/pm/project/issue";
-const TASK_ROUTE_PREFIX = "/pm/project/task";
-const NOTIFICATIONS_ROUTE_PREFIX = "/pm/notifications";
+import {
+  PROJECT_MANAGER_ISSUE_ROUTE_PATH as ISSUE_ROUTE_PREFIX,
+  PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH as NOTIFICATIONS_ROUTE_PREFIX,
+  PROJECT_MANAGER_ROUTE_PATH as PROJECT_ROUTE_PREFIX,
+  PROJECT_MANAGER_TASK_ROUTE_PATH as TASK_ROUTE_PREFIX,
+} from "../routes/app-route-paths.js";
 
 export const PROJECT_JOURNAL_SECTION_ANCHOR = "project-journal";
 export const PROJECT_ATTACHMENTS_SECTION_ANCHOR = "project-attachments";

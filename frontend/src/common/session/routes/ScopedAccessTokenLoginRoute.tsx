@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Alert, CircularProgress, Stack, Typography } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { HOME_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import { getApiErrorMessage } from "../../api/api-error.js";
 import { useAuthSessionContext } from "../context/AuthSessionContext.js";
 
@@ -24,7 +25,7 @@ export function ScopedAccessTokenLoginRoute() {
       try {
         await actions.loginWithScopedAccessToken(scopedAccessToken);
         if (!cancelled) {
-          navigate("/", { replace: true });
+          navigate(HOME_ROUTE_PATH, { replace: true });
         }
       } catch (error) {
         if (!cancelled) {

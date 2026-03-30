@@ -8,6 +8,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { PROJECT_MANAGER_ISSUES_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import { IssueDeleteButton } from "../../../common/components/entity-actions/IssueDeleteButton.js";
 import { IssueEditButton } from "../../../common/components/entity-actions/IssueEditButton.js";
 import { IssueViewButton } from "../../../common/components/entity-actions/IssueViewButton.js";
@@ -231,7 +232,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
 
   function goBackToIssues(): void {
     if (props.projectId === null) {
-      navigate("/pm/project/issues");
+      navigate(PROJECT_MANAGER_ISSUES_ROUTE_PATH);
       return;
     }
 

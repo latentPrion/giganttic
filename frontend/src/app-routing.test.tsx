@@ -303,6 +303,17 @@ describe("app routing", () => {
     ).toBeVisible();
   });
 
+  it("renders public home routes correctly when mounted under a /pm basename", () => {
+    renderWithTheme(<App />, {
+      basename: "/pm",
+      initialEntries: ["/pm/about"],
+    });
+
+    expect(
+      screen.getByText(/Giganttic is built by LatentPrion/i),
+    ).toBeVisible();
+  });
+
   it("does not render the profile links on the public home route", () => {
     renderWithTheme(<App />, {
       initialEntries: ["/"],
@@ -367,6 +378,19 @@ describe("app routing", () => {
     expect(screen.getByRole("button", { name: /^Organizations$/i })).toBeVisible();
   });
 
+  it("renders user routes correctly when mounted under a /pm basename", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      basename: "/pm",
+      initialEntries: ["/pm/user/lobby"],
+    });
+
+    expect(await screen.findByText("User Lobby")).toBeVisible();
+    expect(await screen.findByText("Your projects, teams, and organizations")).toBeVisible();
+  });
+
   it("redirects unauthenticated PM project requests to the public home route", async () => {
     renderWithTheme(<App />, {
       initialEntries: ["/pm/project?projectId=1"],
@@ -383,6 +407,20 @@ describe("app routing", () => {
 
     renderWithTheme(<App />, {
       initialEntries: ["/pm/project?projectId=1"],
+    });
+
+    expect(await screen.findByText("Project")).toBeVisible();
+    expect(screen.getByText("Selected project: 1")).toBeVisible();
+    expect(await screen.findByText("Detailed Project View")).toBeVisible();
+  });
+
+  it("renders PM routes correctly when the app is mounted under a /pm basename", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      basename: "/pm",
+      initialEntries: ["/pm/pm/project?projectId=1"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();

@@ -1,3 +1,16 @@
+import {
+  PROJECT_MANAGER_GANTT_ROUTE_PATH,
+  PROJECT_MANAGER_ISSUES_ROUTE_PATH,
+  PROJECT_MANAGER_ISSUE_ROUTE_PATH,
+  PROJECT_MANAGER_KANBAN_ROUTE_PATH,
+  PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
+  PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
+  PROJECT_MANAGER_ROUTE_PATH,
+  PROJECT_MANAGER_TASKS_ROUTE_PATH,
+  PROJECT_MANAGER_TASK_ROUTE_PATH,
+  PROJECT_MANAGER_TEAM_ROUTE_PATH,
+  USER_ROUTE_PATH,
+} from "../../../../../common/routes/app-route-paths.js";
 import type {
   IssueDetailTab,
   TaskDetailTab,
@@ -16,39 +29,39 @@ export const PROJECT_ROUTE_SECTION_VALUES = [
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
 
 export function createProjectDetailRoute(projectId: number): string {
-  return `/pm/project?projectId=${projectId}`;
+  return `${PROJECT_MANAGER_ROUTE_PATH}?projectId=${projectId}`;
 }
 
 export function createProjectManagerTeamRoute(teamId: number): string {
-  return `/pm/team?teamId=${teamId}`;
+  return `${PROJECT_MANAGER_TEAM_ROUTE_PATH}?teamId=${teamId}`;
 }
 
 export function createProjectManagerOrganizationRoute(organizationId: number): string {
-  return `/pm/organization?organizationId=${organizationId}`;
+  return `${PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH}?organizationId=${organizationId}`;
 }
 
 export function createProjectManagerUserRoute(userId: number): string {
-  return `/user?userId=${userId}`;
+  return `${USER_ROUTE_PATH}?userId=${userId}`;
 }
 
 export function createProjectGanttRoute(projectId: number): string {
-  return `/pm/project/gantt?projectId=${projectId}`;
+  return `${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=${projectId}`;
 }
 
 export function createProjectKanbanRoute(projectId: number): string {
-  return `/pm/project/kanban?projectId=${projectId}`;
+  return `${PROJECT_MANAGER_KANBAN_ROUTE_PATH}?projectId=${projectId}`;
 }
 
 export function createProjectIssuesRoute(projectId: number): string {
-  return `/pm/project/issues?projectId=${projectId}`;
+  return `${PROJECT_MANAGER_ISSUES_ROUTE_PATH}?projectId=${projectId}`;
 }
 
 export function createProjectTasksRoute(projectId: number): string {
-  return `/pm/project/tasks?projectId=${projectId}`;
+  return `${PROJECT_MANAGER_TASKS_ROUTE_PATH}?projectId=${projectId}`;
 }
 
 export function createProjectNotificationsRoute(): string {
-  return "/pm/notifications";
+  return PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH;
 }
 
 export function createProjectIssueRoute(
@@ -69,7 +82,7 @@ export function createProjectIssueRoute(
     parameters.set("commentId", String(options.commentId));
   }
 
-  return `/pm/project/issue?${parameters.toString()}`;
+  return `${PROJECT_MANAGER_ISSUE_ROUTE_PATH}?${parameters.toString()}`;
 }
 
 export function createProjectTaskRoute(
@@ -90,5 +103,5 @@ export function createProjectTaskRoute(
     parameters.set("commentId", String(options.commentId));
   }
 
-  return `/pm/project/task?${parameters.toString()}`;
+  return `${PROJECT_MANAGER_TASK_ROUTE_PATH}?${parameters.toString()}`;
 }

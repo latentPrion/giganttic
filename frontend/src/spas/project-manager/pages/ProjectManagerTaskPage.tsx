@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { PROJECT_MANAGER_TASKS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { taskJournalApi } from "../api/task-journal-api.js";
@@ -335,7 +336,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
 
   function goBackToTasks(): void {
     if (props.projectId === null) {
-      navigate("/pm/project/tasks");
+      navigate(PROJECT_MANAGER_TASKS_ROUTE_PATH);
       return;
     }
 

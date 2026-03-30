@@ -71,6 +71,21 @@ describe("NotificationBell", () => {
     expect(within(menu).getByRole("link", { name: "View all notifications" })).toBeVisible();
   });
 
+  it("renders notification links correctly when mounted under a /pm basename", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(<NotificationBell token="token-1" />, {
+      basename: "/pm",
+      initialEntries: ["/pm/pm/project?projectId=4"],
+    });
+
+    await user.click(await screen.findByLabelText("Notifications (2 unnoticed)"));
+
+    expect(
+      await screen.findByRole("link", { name: "View all notifications" }),
+    ).toHaveAttribute("href", "/pm/pm/notifications");
+  });
+
   it("renders mention notifications through the shared bell row UI", async () => {
     const user = userEvent.setup();
     notificationsApiMock.listUnnoticedNotifications.mockResolvedValueOnce({

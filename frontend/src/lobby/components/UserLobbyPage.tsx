@@ -50,6 +50,7 @@ import { TeamCreateModal } from "./team/TeamCreateModal.js";
 import { TeamEditModal } from "./team/TeamEditModal.js";
 import { TeamSummaryModal } from "./team/TeamSummaryModal.js";
 import {
+  createProjectDetailRoute,
   createProjectManagerOrganizationRoute,
   createProjectManagerTeamRoute,
 } from "../../spas/project-manager/routes/project-route-paths.js";
@@ -462,7 +463,7 @@ export function UserLobbyPage({ currentUserId, token }: UserLobbyPageProps) {
   }
 
   function navigateToProject(projectId: number): void {
-    navigate(`/pm/project?projectId=${projectId}`);
+    navigate(createProjectDetailRoute(projectId));
   }
 
   function navigateToTeam(teamId: number): void {

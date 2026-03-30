@@ -4,6 +4,7 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./App.js";
+import { frontendConfig } from "./config/frontend-config.js";
 import { appTheme } from "./theme/app-theme.js";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -11,6 +12,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
       <BrowserRouter
+        basename={frontendConfig.appBasePath}
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true,

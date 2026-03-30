@@ -1,5 +1,22 @@
 import React from "react";
 import {
+  ABOUT_ROUTE_PATH,
+  CONTACT_ROUTE_PATH,
+  LEGACY_PROJECT_ROUTE_PATTERN,
+  PROJECT_MANAGER_GANTT_ROUTE_PATH,
+  PROJECT_MANAGER_ISSUES_ROUTE_PATH,
+  PROJECT_MANAGER_ISSUE_ROUTE_PATH,
+  PROJECT_MANAGER_KANBAN_ROUTE_PATH,
+  PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
+  PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
+  PROJECT_MANAGER_ROUTE_PATH,
+  PROJECT_MANAGER_TASKS_ROUTE_PATH,
+  PROJECT_MANAGER_TASK_ROUTE_PATH,
+  PROJECT_MANAGER_TEAM_ROUTE_PATH,
+  SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
+  USER_ROUTE_PATH,
+} from "../../../common/routes/app-route-paths.js";
+import {
   Navigate,
   Route,
   Routes,
@@ -28,8 +45,8 @@ function LegacyProjectRouteRedirect() {
   const rawProjectId = params.projectId?.trim() ?? "";
   const parsedProjectId = Number(rawProjectId);
   const targetPath = Number.isInteger(parsedProjectId) && parsedProjectId > 0
-    ? `/pm/project?projectId=${parsedProjectId}`
-    : "/pm/project";
+    ? `${PROJECT_MANAGER_ROUTE_PATH}?projectId=${parsedProjectId}`
+    : PROJECT_MANAGER_ROUTE_PATH;
 
   return <Navigate replace to={targetPath} />;
 }
@@ -39,22 +56,22 @@ export function AppRoutes() {
     <Routes>
       <Route element={<PublicHomeLayout />}>
         <Route element={<HomeHero />} index />
-        <Route element={<ContactPage />} path="/contact" />
-        <Route element={<AboutPage />} path="/about" />
+        <Route element={<ContactPage />} path={CONTACT_ROUTE_PATH} />
+        <Route element={<AboutPage />} path={ABOUT_ROUTE_PATH} />
       </Route>
-      <Route element={<ScopedAccessTokenLoginRoute />} path="/auth/scoped-token-login" />
-      <Route element={<LegacyProjectRouteRedirect />} path="/project/:projectId" />
-      <Route element={<ProjectRoute />} path="/pm/project" />
-      <Route element={<TeamRoute />} path="/pm/team" />
-      <Route element={<OrganizationRoute />} path="/pm/organization" />
-      <Route element={<UserSpaRoute />} path="/user/*" />
-      <Route element={<GanttRoute />} path="/pm/project/gantt" />
-      <Route element={<KanbanRoute />} path="/pm/project/kanban" />
-      <Route element={<NotificationsRoute />} path="/pm/notifications" />
-      <Route element={<IssuesRoute />} path="/pm/project/issues" />
-      <Route element={<TasksRoute />} path="/pm/project/tasks" />
-      <Route element={<IssueRoute />} path="/pm/project/issue" />
-      <Route element={<TaskRoute />} path="/pm/project/task" />
+      <Route element={<ScopedAccessTokenLoginRoute />} path={SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH} />
+      <Route element={<LegacyProjectRouteRedirect />} path={LEGACY_PROJECT_ROUTE_PATTERN} />
+      <Route element={<ProjectRoute />} path={PROJECT_MANAGER_ROUTE_PATH} />
+      <Route element={<TeamRoute />} path={PROJECT_MANAGER_TEAM_ROUTE_PATH} />
+      <Route element={<OrganizationRoute />} path={PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH} />
+      <Route element={<UserSpaRoute />} path={`${USER_ROUTE_PATH}/*`} />
+      <Route element={<GanttRoute />} path={PROJECT_MANAGER_GANTT_ROUTE_PATH} />
+      <Route element={<KanbanRoute />} path={PROJECT_MANAGER_KANBAN_ROUTE_PATH} />
+      <Route element={<NotificationsRoute />} path={PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH} />
+      <Route element={<IssuesRoute />} path={PROJECT_MANAGER_ISSUES_ROUTE_PATH} />
+      <Route element={<TasksRoute />} path={PROJECT_MANAGER_TASKS_ROUTE_PATH} />
+      <Route element={<IssueRoute />} path={PROJECT_MANAGER_ISSUE_ROUTE_PATH} />
+      <Route element={<TaskRoute />} path={PROJECT_MANAGER_TASK_ROUTE_PATH} />
     </Routes>
   );
 }

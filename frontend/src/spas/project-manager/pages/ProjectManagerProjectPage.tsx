@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { PROJECT_MANAGER_ISSUES_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import { getApiErrorMessage } from "../../../common/api/api-error.js";
 import { isApiError } from "../../../common/api/api-error.js";
 import { OrganizationViewButton } from "../../../common/components/entity-actions/OrganizationViewButton.js";
@@ -394,7 +395,7 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
 
   function navigateToIssues(): void {
     if (props.projectId === null) {
-      navigate("/pm/project/issues");
+      navigate(PROJECT_MANAGER_ISSUES_ROUTE_PATH);
       return;
     }
 
