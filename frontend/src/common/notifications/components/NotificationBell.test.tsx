@@ -71,6 +71,30 @@ describe("NotificationBell", () => {
     expect(within(menu).getByRole("link", { name: "View all notifications" })).toBeVisible();
   });
 
+  it("renders mention notifications through the shared bell row UI", async () => {
+    const user = userEvent.setup();
+    notificationsApiMock.listUnnoticedNotifications.mockResolvedValueOnce({
+      notifications: [
+        {
+          createdAt: "2026-03-29T00:00:00.000Z",
+          eventCategory: "mentions",
+          eventType: "NOTIFICATION_EVENT_ISSUE_COMMENT_MENTIONED",
+          hasBeenNoticed: false,
+          id: 8,
+          message: "alice mentioned you in a comment on Issue \"API rollout\" under Project 4.",
+          noticedTimestamp: null,
+          targetUrl: "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+        },
+      ],
+    });
+
+    renderWithTheme(<NotificationBell token="token-1" />);
+    await user.click(await screen.findByLabelText("Notifications (2 unnoticed)"));
+
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByText(/alice mentioned you in a comment/i)).toBeVisible();
+  });
+
   it("marks a notification noticed and navigates when the row is clicked", async () => {
     const user = userEvent.setup();
 

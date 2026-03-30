@@ -1,11 +1,24 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { eq } from "drizzle-orm";
+
 import {
+  mentions,
   notifications,
+  organizations,
+  projectsOrganizations,
   projectsUsers,
+  projectsTeams,
+  teams,
+  teamsUsers,
+  usersOrganizations,
   usersNotifications,
 } from "../db/index.js";
-import { createCrudTestHarness } from "./crud-test-helpers.js";
+import { createIssueDetailsNotificationTarget } from "../common/notifications/notification-targets.js";
+import {
+  createCrudTestHarness,
+  type AuthSession,
+} from "./crud-test-helpers.js";
 import { createMultipartFileBuffer } from "./multipart-form.helpers.js";
 
 const harness = createCrudTestHarness("notifications-api.sqlite");
@@ -17,6 +30,8 @@ const MULTIPART_BOUNDARY = "----notificationBoundary";
 const DEFAULT_TASK_ID = "1";
 const PROJECT_MANAGER_ROLE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
 const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
+const ISSUE_UPDATES_CATEGORY = "issue-updates";
+const MENTIONS_CATEGORY = "mentions";
 const VALID_OPEN_TASK_CHART_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <data>
   <task id="1" open="1" parent="0" progress="0" start_date="2026-03-01 09:00" duration="3" ggtc_task_status="ISSUE_STATUS_OPEN"><![CDATA[Edit your new Gantt chart]]></task>
@@ -27,6 +42,72 @@ const VALID_BLOCKED_TASK_CHART_XML = `<?xml version="1.0" encoding="UTF-8"?>
   <task id="1" open="1" parent="0" progress="0" start_date="2026-03-01 09:00" duration="3" ggtc_task_status="ISSUE_STATUS_BLOCKED"><![CDATA[Edit your new Gantt chart]]></task>
 </data>
 `;
+
+async function createProject(accessToken: string, name: string): Promise<number> {
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { name },
+    url: "/stc-proj-mgmt/api/projects",
+  });
+
+  expect(response.statusCode).toBe(201);
+  return harness.parseJson<{ project: { id: number } }>(response.payload).project.id;
+}
+
+async function createIssue(
+  accessToken: string,
+  projectId: number,
+  name: string,
+): Promise<number> {
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { name },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/issues`,
+  });
+
+  expect(response.statusCode).toBe(201);
+  return harness.parseJson<{ issue: { id: number } }>(response.payload).issue.id;
+}
+
+async function replaceProjectMembers(
+  accessToken: string,
+  projectId: number,
+  members: Array<{ roleCodes: string[]; userId: number }>,
+): Promise<void> {
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: { members },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+  });
+
+  expect(response.statusCode).toBe(200);
+}
+
+async function createScopedSession(accessToken: string): Promise<AuthSession> {
+  const createTokenResponse = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: {},
+    url: "/stc-proj-mgmt/api/scoped-access/tokens",
+  });
+  expect(createTokenResponse.statusCode).toBe(201);
+  const token = harness.parseJson<{
+    token: string;
+    tokenCredential: { id: number };
+  }>(createTokenResponse.payload).token;
+
+  const redeemResponse = await harness.app.inject({
+    method: "POST",
+    payload: { token },
+    url: "/stc-proj-mgmt/api/scoped-access/redeem",
+  });
+  expect(redeemResponse.statusCode).toBe(201);
+
+  return harness.parseJson<AuthSession>(redeemResponse.payload);
+}
 
 describe("notifications api", () => {
   beforeAll(async () => {
@@ -88,12 +169,65 @@ describe("notifications api", () => {
     });
 
     expect(createCommentResponse.statusCode).toBe(201);
-    expect(harness.databaseService.db.select().from(notifications).all()).toHaveLength(1);
+    const createdCommentNotifications = harness.databaseService.db.select()
+      .from(notifications)
+      .all()
+      .filter((row) => row.eventType === "NOTIFICATION_EVENT_ISSUE_COMMENT_CREATED");
+    expect(createdCommentNotifications).toHaveLength(1);
 
     const deliveries = harness.databaseService.db.select().from(usersNotifications).all();
     expect(deliveries.map((row) => row.userId)).toContain(teammate.user.id);
     expect(deliveries.map((row) => row.userId)).not.toContain(actor.user.id);
     expect(deliveries.map((row) => row.userId)).not.toContain(outsider.user.id);
+  });
+
+  it("creates an issue creation notification in the issue-updates category", async () => {
+    const actor = await harness.registerUser("notif-issue-create-actor");
+    const recipient = await harness.registerUser("notif-issue-create-recipient");
+    const projectId = await createProject(actor.accessToken, "Issue creation project");
+
+    await replaceProjectMembers(actor.accessToken, projectId, [
+      {
+        roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+        userId: actor.user.id,
+      },
+      { roleCodes: [], userId: recipient.user.id },
+    ]);
+
+    const issueId = await createIssue(
+      actor.accessToken,
+      projectId,
+      "Created issue notification",
+    );
+
+    const createdNotification = harness.databaseService.db.select()
+      .from(notifications)
+      .where(eq(notifications.issueId, issueId))
+      .all()
+      .find((row) => row.eventType === "NOTIFICATION_EVENT_ISSUE_CREATED");
+    const expectedIssueDetailsTarget = createIssueDetailsNotificationTarget(
+      projectId,
+      issueId,
+    );
+
+    expect(createdNotification).toBeDefined();
+    expect(createdNotification?.targetUrl).toBe(expectedIssueDetailsTarget);
+
+    const recipientListResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/notifications?limit=20&offset=0&includeNoticed=true&sort=desc&eventTypes=${ISSUE_UPDATES_CATEGORY}`,
+    });
+    expect(recipientListResponse.statusCode).toBe(200);
+
+    const body = harness.parseJson<{
+      notifications: Array<{ eventCategory: string; eventType: string; targetUrl: string }>;
+    }>(recipientListResponse.payload);
+    expect(body.notifications.some((row) =>
+      row.eventType === "NOTIFICATION_EVENT_ISSUE_CREATED"
+      && row.eventCategory === ISSUE_UPDATES_CATEGORY
+      && row.targetUrl === expectedIssueDetailsTarget
+    )).toBe(true);
   });
 
   it("does not create a notification for a no-op issue status patch", async () => {
@@ -359,7 +493,7 @@ describe("notifications api", () => {
     expect(summaryResponse.statusCode).toBe(200);
     expect(
       harness.parseJson<{ unnoticedCount: number }>(summaryResponse.payload).unnoticedCount,
-    ).toBe(2);
+    ).toBe(3);
 
     const unnoticedResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(recipient.accessToken),
@@ -370,7 +504,7 @@ describe("notifications api", () => {
     const unnoticedBody = harness.parseJson<{
       notifications: Array<{ hasBeenNoticed: boolean; id: number }>;
     }>(unnoticedResponse.payload);
-    expect(unnoticedBody.notifications).toHaveLength(2);
+    expect(unnoticedBody.notifications).toHaveLength(3);
     expect(unnoticedBody.notifications.every((row) => row.hasBeenNoticed === false)).toBe(true);
 
     const toggleResponse = await harness.app.inject({
@@ -393,7 +527,7 @@ describe("notifications api", () => {
       harness.parseJson<{ notifications: Array<{ hasBeenNoticed: boolean }> }>(
         fullListResponse.payload,
       ).notifications,
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 
   it("filters notifications by category in the paginated list", async () => {
@@ -450,5 +584,363 @@ describe("notifications api", () => {
     );
     expect(commentsOnly.notifications).toHaveLength(1);
     expect(commentsOnly.notifications[0]!.eventCategory).toBe("comments");
+  });
+
+  it("creates issue comment mention notifications only for first-time mentions", async () => {
+    const actor = await harness.registerUser("notif-issue-mention-actor");
+    const recipient = await harness.registerUser("notif-issue-mention-recipient");
+    const outsider = await harness.registerUser("notif-issue-mention-outsider");
+    const projectId = await createProject(actor.accessToken, "Issue mention project");
+
+    await replaceProjectMembers(actor.accessToken, projectId, [
+      {
+        roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+        userId: actor.user.id,
+      },
+      { roleCodes: [], userId: recipient.user.id },
+    ]);
+
+    const issueId = await createIssue(actor.accessToken, projectId, "Issue mention target");
+    const createCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "POST",
+      payload: {
+        body:
+          `Please review this update with @${recipient.user.username} and `
+          + `@[${outsider.user.username}] before tomorrow.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(createCommentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      createCommentResponse.payload,
+    ).comment.id;
+
+    const mentionRowsAfterCreate = harness.databaseService.db.select()
+      .from(mentions)
+      .where(eq(mentions.commentId, commentId))
+      .all();
+    expect(mentionRowsAfterCreate).toHaveLength(1);
+    expect(mentionRowsAfterCreate[0]?.mentionedUserId).toBe(recipient.user.id);
+
+    const firstMentionNotifications = harness.databaseService.db.select()
+      .from(notifications)
+      .where(eq(notifications.commentId, commentId))
+      .all()
+      .filter((row) => row.eventType === "NOTIFICATION_EVENT_ISSUE_COMMENT_MENTIONED");
+    expect(firstMentionNotifications).toHaveLength(1);
+
+    const editResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PATCH",
+      payload: {
+        body:
+          `Still looping in @${recipient.user.username}, and adding `
+          + `@[${actor.user.username}] here too.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}`,
+    });
+    expect(editResponse.statusCode).toBe(200);
+
+    const mentionRowsAfterEdit = harness.databaseService.db.select()
+      .from(mentions)
+      .where(eq(mentions.commentId, commentId))
+      .all();
+    expect(mentionRowsAfterEdit).toHaveLength(1);
+
+    const mentionNotificationsAfterEdit = harness.databaseService.db.select()
+      .from(notifications)
+      .where(eq(notifications.commentId, commentId))
+      .all()
+      .filter((row) => row.eventType === "NOTIFICATION_EVENT_ISSUE_COMMENT_MENTIONED");
+    expect(mentionNotificationsAfterEdit).toHaveLength(1);
+
+    const recipientMentionsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/notifications?limit=20&offset=0&includeNoticed=true&sort=desc&eventTypes=${MENTIONS_CATEGORY}`,
+    });
+    expect(recipientMentionsResponse.statusCode).toBe(200);
+    const recipientMentions = harness.parseJson<{
+      notifications: Array<{ eventCategory: string; eventType: string }>;
+    }>(recipientMentionsResponse.payload);
+    expect(recipientMentions.notifications.some((row) =>
+      row.eventCategory === MENTIONS_CATEGORY
+      && row.eventType === "NOTIFICATION_EVENT_ISSUE_COMMENT_MENTIONED"
+    )).toBe(true);
+
+    const outsiderSummaryResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    expect(outsiderSummaryResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ unnoticedCount: number }>(outsiderSummaryResponse.payload).unnoticedCount,
+    ).toBe(0);
+  });
+
+  it("creates task comment mention notifications only for first-time mentions", async () => {
+    const actor = await harness.registerUser("notif-task-mention-actor");
+    const recipient = await harness.registerUser("notif-task-mention-recipient");
+    const projectId = await createProject(actor.accessToken, "Task mention project");
+
+    await replaceProjectMembers(actor.accessToken, projectId, [
+      {
+        roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+        userId: actor.user.id,
+      },
+      { roleCodes: [], userId: recipient.user.id },
+    ]);
+
+    const createCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "POST",
+      payload: {
+        body: `Please review this task with @${recipient.user.username} today.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/comments`,
+    });
+    expect(createCommentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      createCommentResponse.payload,
+    ).comment.id;
+
+    const firstMentions = harness.databaseService.db.select()
+      .from(mentions)
+      .where(eq(mentions.commentId, commentId))
+      .all();
+    expect(firstMentions).toHaveLength(1);
+
+    const editResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PATCH",
+      payload: {
+        body: `Still need @${recipient.user.username} on this task update today.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/comments/${commentId}`,
+    });
+    expect(editResponse.statusCode).toBe(200);
+
+    const secondMentionNotifications = harness.databaseService.db.select()
+      .from(notifications)
+      .where(eq(notifications.commentId, commentId))
+      .all()
+      .filter((row) => row.eventType === "NOTIFICATION_EVENT_TASK_COMMENT_MENTIONED");
+    expect(secondMentionNotifications).toHaveLength(1);
+  });
+
+  it("creates journal mention notifications only for newly added users across project, issue, and task journals", async () => {
+    const actor = await harness.registerUser("notif-journal-mention-actor");
+    const directUser = await harness.registerUser("notif-journal-direct");
+    const teamUser = await harness.registerUser("notif-journal-team");
+    const organizationUser = await harness.registerUser("notif-journal-org");
+    const outsider = await harness.registerUser("notif-journal-outsider");
+
+    const projectId = await createProject(actor.accessToken, "Journal mention project");
+    await replaceProjectMembers(actor.accessToken, projectId, [
+      {
+        roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+        userId: actor.user.id,
+      },
+      { roleCodes: [], userId: directUser.user.id },
+    ]);
+
+    harness.databaseService.db.insert(teams).values({ name: "Mention Team" }).run();
+    const teamId = harness.databaseService.db.select({ id: teams.id })
+      .from(teams)
+      .orderBy(teams.id)
+      .all()
+      .at(-1)?.id;
+    expect(teamId).toBeDefined();
+    harness.databaseService.db.insert(teamsUsers).values({
+      teamId: teamId!,
+      userId: teamUser.user.id,
+    }).run();
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId,
+      teamId: teamId!,
+    }).run();
+
+    harness.databaseService.db.insert(organizations).values({ name: "Mention Org" }).run();
+    const organizationId = harness.databaseService.db.select({ id: organizations.id })
+      .from(organizations)
+      .orderBy(organizations.id)
+      .all()
+      .at(-1)?.id;
+    expect(organizationId).toBeDefined();
+    harness.databaseService.db.insert(usersOrganizations).values({
+      organizationId: organizationId!,
+      userId: organizationUser.user.id,
+    }).run();
+    harness.databaseService.db.insert(projectsOrganizations).values({
+      organizationId: organizationId!,
+      projectId,
+    }).run();
+
+    const issueId = await createIssue(actor.accessToken, projectId, "Journal issue");
+
+    const projectJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PUT",
+      payload: {
+        markdown:
+          `Project journal mentions @${directUser.user.username}, `
+          + `@[${teamUser.user.username}], and @${organizationUser.user.username}.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/journal`,
+    });
+    expect(projectJournalResponse.statusCode).toBe(200);
+
+    const issueJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PUT",
+      payload: {
+        markdown:
+          `Issue journal mentions @${directUser.user.username} for context and `
+          + `@${outsider.user.username} should be ignored.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/journal`,
+    });
+    expect(issueJournalResponse.statusCode).toBe(200);
+
+    const taskJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PUT",
+      payload: {
+        markdown: `Task journal mentions @${teamUser.user.username} for follow-up work.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/journal`,
+    });
+    expect(taskJournalResponse.statusCode).toBe(200);
+
+    const mentionRows = harness.databaseService.db.select().from(mentions).all();
+    expect(mentionRows.length).toBeGreaterThanOrEqual(4);
+
+    const mentionNotifications = harness.databaseService.db.select().from(notifications).all()
+      .filter((row) =>
+        row.eventType === "NOTIFICATION_EVENT_PROJECT_JOURNAL_MENTIONED"
+        || row.eventType === "NOTIFICATION_EVENT_ISSUE_JOURNAL_MENTIONED"
+        || row.eventType === "NOTIFICATION_EVENT_TASK_JOURNAL_MENTIONED"
+      );
+    expect(mentionNotifications.length).toBeGreaterThanOrEqual(4);
+
+    const outsiderMentionsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    expect(outsiderMentionsResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ unnoticedCount: number }>(outsiderMentionsResponse.payload).unnoticedCount,
+    ).toBe(0);
+
+    const directMentionsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(directUser.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/notifications?limit=20&offset=0&includeNoticed=true&sort=desc&eventTypes=${MENTIONS_CATEGORY}`,
+    });
+    expect(directMentionsResponse.statusCode).toBe(200);
+    const directMentions = harness.parseJson<{
+      notifications: Array<{ eventCategory: string; message: string }>;
+    }>(directMentionsResponse.payload);
+    expect(directMentions.notifications.every((row) => row.eventCategory === MENTIONS_CATEGORY)).toBe(true);
+
+    const repeatedProjectJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "PUT",
+      payload: {
+        markdown:
+          `Project journal still mentions @${directUser.user.username}, `
+          + `@[${teamUser.user.username}], and @${organizationUser.user.username}.`,
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/journal`,
+    });
+    expect(repeatedProjectJournalResponse.statusCode).toBe(200);
+
+    const repeatedMentionRows = harness.databaseService.db.select().from(mentions).all();
+    expect(repeatedMentionRows).toHaveLength(mentionRows.length);
+  });
+
+  it("shares notification state between standard and scoped sessions for the same user", async () => {
+    const actor = await harness.registerUser("notif-scoped-actor");
+    const recipient = await harness.registerUser("notif-scoped-recipient");
+    const projectId = await createProject(actor.accessToken, "Scoped notification project");
+
+    await replaceProjectMembers(actor.accessToken, projectId, [
+      {
+        roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+        userId: actor.user.id,
+      },
+      { roleCodes: [], userId: recipient.user.id },
+    ]);
+
+    const issueId = await createIssue(actor.accessToken, projectId, "Scoped issue");
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(actor.accessToken),
+      method: "POST",
+      payload: { body: "Scoped state should be shared." },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+
+    const scopedSession = await createScopedSession(recipient.accessToken);
+
+    const standardSummary = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    const scopedSummary = await harness.app.inject({
+      headers: harness.createAuthHeaders(scopedSession.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    expect(standardSummary.statusCode).toBe(200);
+    expect(scopedSummary.statusCode).toBe(200);
+    expect(standardSummary.payload).toBe(scopedSummary.payload);
+
+    const standardList = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/unnoticed?limit=20",
+    });
+    expect(standardList.statusCode).toBe(200);
+    const notificationId = harness.parseJson<{
+      notifications: Array<{ id: number }>;
+    }>(standardList.payload).notifications[0]?.id;
+    expect(notificationId).toBeDefined();
+
+    const scopedToggle = await harness.app.inject({
+      headers: harness.createAuthHeaders(scopedSession.accessToken),
+      method: "POST",
+      url: `/stc-proj-mgmt/api/notifications/${notificationId}/toggle-noticed`,
+    });
+    expect(scopedToggle.statusCode).toBe(200);
+
+    const standardAfterToggle = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    expect(
+      harness.parseJson<{ unnoticedCount: number }>(standardAfterToggle.payload).unnoticedCount,
+    ).toBe(1);
+
+    const standardToggleBack = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "POST",
+      url: `/stc-proj-mgmt/api/notifications/${notificationId}/toggle-noticed`,
+    });
+    expect(standardToggleBack.statusCode).toBe(200);
+
+    const scopedAfterToggleBack = await harness.app.inject({
+      headers: harness.createAuthHeaders(scopedSession.accessToken),
+      method: "GET",
+      url: "/stc-proj-mgmt/api/notifications/summary",
+    });
+    expect(
+      harness.parseJson<{ unnoticedCount: number }>(scopedAfterToggleBack.payload).unnoticedCount,
+    ).toBe(2);
   });
 });

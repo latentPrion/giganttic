@@ -154,6 +154,12 @@ export class TasksService {
       projectId,
       taskId,
     });
+    await this.notificationsService.notifyTaskJournalMentions({
+      actorUserId: authContext.userId,
+      markdown,
+      projectId,
+      taskId,
+    });
 
     return {
       journalExists: true,

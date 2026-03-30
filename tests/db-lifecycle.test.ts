@@ -414,6 +414,11 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v7--v8",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v8--v9",
+      projectRoot: tempDir,
+    });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
@@ -471,6 +476,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "proddev",
       migrationPairName: "v7--v8",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v8--v9",
       projectRoot: tempDir,
     });
 
@@ -843,7 +853,7 @@ describe("db lifecycle scripts", () => {
     ).toBe(1);
   }, 20_000);
 
-  it("migrates v2 through v8 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+  it("migrates v2 through v9 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -894,12 +904,17 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v7--v8",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v8--v9",
+      projectRoot: tempDir,
+    });
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe("v8");
+    expect(await readSchemaName(dbPath)).toBe("v9");
     expect(
       await countRowsWhere(
         dbPath,

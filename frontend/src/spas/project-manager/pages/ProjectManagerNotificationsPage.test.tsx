@@ -70,6 +70,24 @@ describe("ProjectManagerNotificationsPage", () => {
     expect(screen.getByText("Include noticed notifications")).toBeVisible();
   });
 
+  it("lists the new issue-updates and mentions categories in the filter menu", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerNotificationsPage
+        currentUserId={1}
+        currentUserRoles={[]}
+        token="token-1"
+      />,
+    );
+
+    await screen.findByText("Notifications");
+    await user.click(screen.getByRole("button", { name: "Event types" }));
+
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Issue updates" })).toBeVisible();
+    expect(screen.getByRole("menuitemcheckbox", { name: "Mentions" })).toBeVisible();
+  });
+
   it("filters by category and sort order through the shared list query state", async () => {
     const user = userEvent.setup();
 

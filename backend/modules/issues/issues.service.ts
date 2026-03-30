@@ -198,6 +198,11 @@ export class IssuesService {
         .run();
       throw error;
     }
+    await this.notificationsService.notifyIssueCreated({
+      actorUserId: authContext.userId,
+      issueId: createdIssue.id,
+      projectId,
+    });
     return { issue: this.getIssueRecordByIdOrThrow(projectId, createdIssue.id) };
   }
 
@@ -296,6 +301,12 @@ export class IssuesService {
       issueId,
       markdown,
       previousMarkdown,
+      projectId,
+    });
+    await this.notificationsService.notifyIssueJournalMentions({
+      actorUserId: authContext.userId,
+      issueId,
+      markdown,
       projectId,
     });
     return {

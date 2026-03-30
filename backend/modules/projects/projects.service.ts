@@ -508,6 +508,11 @@ export class ProjectsService {
       previousMarkdown,
       projectId,
     });
+    await this.notificationsService.notifyProjectJournalMentions({
+      actorUserId: authContext.userId,
+      markdown,
+      projectId,
+    });
     return {
       journalExists: true,
       markdown,

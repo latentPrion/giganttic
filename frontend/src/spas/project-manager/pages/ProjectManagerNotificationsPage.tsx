@@ -58,8 +58,10 @@ const ROWS_PER_PAGE_OPTIONS = [10, 20, 50] as const;
 const EVENT_TYPE_LABELS: Record<NotificationEventCategory, string> = {
   attachments: "Attachments",
   comments: "Comments",
+  "issue-updates": "Issue updates",
   "issue-status": "Issue status",
   "journal-updates": "Journal updates",
+  mentions: "Mentions",
   "task-status": "Task status",
 };
 

@@ -19,6 +19,7 @@ export interface NotificationEventSnapshot {
   eventType: NotificationEventType;
   issueId?: number | null;
   message: string;
+  mentionedUserId?: number | null;
   projectId: number;
   targetUrl: string;
   taskId?: string | null;
@@ -62,6 +63,22 @@ export function buildIssueCommentNotification(args: {
   };
 }
 
+export function buildIssueCreatedNotification(args: {
+  actorUsername: string;
+  issueId: number;
+  issueName: string;
+  projectId: number;
+  projectName: string;
+}): NotificationEventSnapshot {
+  return {
+    eventType: "NOTIFICATION_EVENT_ISSUE_CREATED",
+    issueId: args.issueId,
+    message: `${args.actorUsername} created Issue "${args.issueName}" under ${args.projectName}.`,
+    projectId: args.projectId,
+    targetUrl: createIssueDetailsNotificationTarget(args.projectId, args.issueId),
+  };
+}
+
 export function buildTaskCommentNotification(args: {
   actorUsername: string;
   commentId: number;
@@ -75,6 +92,55 @@ export function buildTaskCommentNotification(args: {
     commentId: args.commentId,
     eventType: "NOTIFICATION_EVENT_TASK_COMMENT_CREATED",
     message: `${args.actorUsername} commented on Task "${taskLabel}" under ${args.projectName}.`,
+    projectId: args.projectId,
+    targetUrl: createTaskCommentNotificationTarget(
+      args.projectId,
+      args.taskId,
+      args.commentId,
+    ),
+    taskId: args.taskId,
+  };
+}
+
+export function buildIssueCommentMentionedNotification(args: {
+  actorUsername: string;
+  commentId: number;
+  issueId: number;
+  issueName: string;
+  mentionedUserId: number;
+  projectId: number;
+  projectName: string;
+}): NotificationEventSnapshot {
+  return {
+    commentId: args.commentId,
+    eventType: "NOTIFICATION_EVENT_ISSUE_COMMENT_MENTIONED",
+    issueId: args.issueId,
+    mentionedUserId: args.mentionedUserId,
+    message: `${args.actorUsername} mentioned you in a comment on Issue "${args.issueName}" under ${args.projectName}.`,
+    projectId: args.projectId,
+    targetUrl: createIssueCommentNotificationTarget(
+      args.projectId,
+      args.issueId,
+      args.commentId,
+    ),
+  };
+}
+
+export function buildTaskCommentMentionedNotification(args: {
+  actorUsername: string;
+  commentId: number;
+  mentionedUserId: number;
+  projectId: number;
+  projectName: string;
+  taskId: string;
+  taskTitle: string | null;
+}): NotificationEventSnapshot {
+  const taskLabel = getResolvedTaskLabel(args.taskTitle, args.taskId);
+  return {
+    commentId: args.commentId,
+    eventType: "NOTIFICATION_EVENT_TASK_COMMENT_MENTIONED",
+    mentionedUserId: args.mentionedUserId,
+    message: `${args.actorUsername} mentioned you in a comment on Task "${taskLabel}" under ${args.projectName}.`,
     projectId: args.projectId,
     targetUrl: createTaskCommentNotificationTarget(
       args.projectId,
@@ -139,6 +205,21 @@ export function buildProjectJournalUpdatedNotification(args: {
   };
 }
 
+export function buildProjectJournalMentionedNotification(args: {
+  actorUsername: string;
+  mentionedUserId: number;
+  projectId: number;
+  projectName: string;
+}): NotificationEventSnapshot {
+  return {
+    eventType: "NOTIFICATION_EVENT_PROJECT_JOURNAL_MENTIONED",
+    mentionedUserId: args.mentionedUserId,
+    message: `${args.actorUsername} mentioned you in the journal for Project "${args.projectName}".`,
+    projectId: args.projectId,
+    targetUrl: createProjectJournalNotificationTarget(args.projectId),
+  };
+}
+
 export function buildIssueJournalUpdatedNotification(args: {
   actorUsername: string;
   issueId: number;
@@ -155,6 +236,24 @@ export function buildIssueJournalUpdatedNotification(args: {
   };
 }
 
+export function buildIssueJournalMentionedNotification(args: {
+  actorUsername: string;
+  issueId: number;
+  issueName: string;
+  mentionedUserId: number;
+  projectId: number;
+  projectName: string;
+}): NotificationEventSnapshot {
+  return {
+    eventType: "NOTIFICATION_EVENT_ISSUE_JOURNAL_MENTIONED",
+    issueId: args.issueId,
+    mentionedUserId: args.mentionedUserId,
+    message: `${args.actorUsername} mentioned you in the journal for Issue "${args.issueName}" under ${args.projectName}.`,
+    projectId: args.projectId,
+    targetUrl: createIssueJournalNotificationTarget(args.projectId, args.issueId),
+  };
+}
+
 export function buildTaskJournalUpdatedNotification(args: {
   actorUsername: string;
   projectId: number;
@@ -166,6 +265,25 @@ export function buildTaskJournalUpdatedNotification(args: {
   return {
     eventType: "NOTIFICATION_EVENT_TASK_JOURNAL_UPDATED",
     message: `${args.actorUsername} updated the journal for Task "${taskLabel}" under ${args.projectName}.`,
+    projectId: args.projectId,
+    targetUrl: createTaskJournalNotificationTarget(args.projectId, args.taskId),
+    taskId: args.taskId,
+  };
+}
+
+export function buildTaskJournalMentionedNotification(args: {
+  actorUsername: string;
+  mentionedUserId: number;
+  projectId: number;
+  projectName: string;
+  taskId: string;
+  taskTitle: string | null;
+}): NotificationEventSnapshot {
+  const taskLabel = getResolvedTaskLabel(args.taskTitle, args.taskId);
+  return {
+    eventType: "NOTIFICATION_EVENT_TASK_JOURNAL_MENTIONED",
+    mentionedUserId: args.mentionedUserId,
+    message: `${args.actorUsername} mentioned you in the journal for Task "${taskLabel}" under ${args.projectName}.`,
     projectId: args.projectId,
     targetUrl: createTaskJournalNotificationTarget(args.projectId, args.taskId),
     taskId: args.taskId,
@@ -223,4 +341,3 @@ export function buildTaskAttachmentCreatedNotification(args: {
     taskId: args.taskId,
   };
 }
-

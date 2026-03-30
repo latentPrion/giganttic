@@ -13,6 +13,7 @@ import * as v5 from "./v5/index.js";
 import * as v6 from "./v6/index.js";
 import * as v7 from "./v7/index.js";
 import * as v8 from "./v8/index.js";
+import * as v9 from "./v9/index.js";
 
 const schemaModules = {
   v1,
@@ -23,6 +24,7 @@ const schemaModules = {
   v6,
   v7,
   v8,
+  v9,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -33,7 +35,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v8;
+] as typeof v9;
 
 export {
   availableSchemaVersions,
@@ -106,6 +108,11 @@ export const {
   managedTestDataRecords,
   managedTestDataRecordsInsertSchema,
   managedTestDataRecordsSelectSchema,
+  mentionContainerTypeCodes,
+  mentions,
+  mentionsInsertSchema,
+  mentionsRelations,
+  mentionsSelectSchema,
   organizationRoleCodes,
   organizationRoles,
   organizationRolesInsertSchema,
@@ -215,6 +222,8 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
+export type Mention = typeof mentions.$inferSelect;
+export type NewMention = typeof mentions.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 export type Team = typeof teams.$inferSelect;

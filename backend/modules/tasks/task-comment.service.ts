@@ -128,6 +128,13 @@ export class TaskCommentService {
       projectId,
       taskId,
     });
+    await this.notificationsService.notifyTaskCommentMentions({
+      actorUserId: authContext.userId,
+      body: payload.body,
+      commentId: created.id,
+      projectId,
+      taskId,
+    });
 
     const record = this.getCommentRecordOrThrow(projectId, taskId, created.id);
     return { comment: await this.buildCommentResponse(record) };
@@ -159,6 +166,13 @@ export class TaskCommentService {
       .set({ updatedAt: new Date() })
       .where(eq(taskComments.id, commentId))
       .run();
+    await this.notificationsService.notifyTaskCommentMentions({
+      actorUserId: authContext.userId,
+      body: payload.body,
+      commentId,
+      projectId,
+      taskId,
+    });
 
     const next = this.getCommentRecordOrThrow(projectId, taskId, commentId);
     return { comment: await this.buildCommentResponse(next) };

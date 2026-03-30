@@ -66,7 +66,7 @@ export function createIssueNotificationTarget(
     commentId: options.commentId ?? null,
     id: issueId,
     projectId,
-    tab: options.tab && options.tab !== "details" ? options.tab : null,
+    tab: options.tab ?? null,
   });
   return appendHash(`${ISSUE_ROUTE_PREFIX}?${query}`, options.hash ?? null);
 }
@@ -75,7 +75,9 @@ export function createIssueDetailsNotificationTarget(
   projectId: number,
   issueId: number,
 ): string {
-  return createIssueNotificationTarget(projectId, issueId);
+  return createIssueNotificationTarget(projectId, issueId, {
+    tab: "details",
+  });
 }
 
 export function createIssueCommentNotificationTarget(
@@ -121,7 +123,7 @@ export function createTaskNotificationTarget(
     commentId: options.commentId ?? null,
     id: taskId,
     projectId,
-    tab: options.tab && options.tab !== "details" ? options.tab : null,
+    tab: options.tab ?? null,
   });
   return appendHash(`${TASK_ROUTE_PREFIX}?${query}`, options.hash ?? null);
 }
@@ -130,7 +132,9 @@ export function createTaskDetailsNotificationTarget(
   projectId: number,
   taskId: string,
 ): string {
-  return createTaskNotificationTarget(projectId, taskId);
+  return createTaskNotificationTarget(projectId, taskId, {
+    tab: "details",
+  });
 }
 
 export function createTaskCommentNotificationTarget(

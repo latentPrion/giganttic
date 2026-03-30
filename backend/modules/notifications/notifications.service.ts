@@ -1,8 +1,10 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   issues,
+  mentionContainerTypeCodes,
+  mentions,
   notifications,
   projects,
   users,
@@ -19,18 +21,29 @@ import { DatabaseService } from "../database/database.service.js";
 import { ProjectChartsService } from "../project-charts/project-charts.service.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import {
+  buildIssueCommentMentionedNotification,
   buildIssueAttachmentCreatedNotification,
   buildIssueCommentNotification,
+  buildIssueCreatedNotification,
   buildIssueJournalUpdatedNotification,
+  buildIssueJournalMentionedNotification,
   buildIssueStatusChangedNotification,
   buildProjectAttachmentCreatedNotification,
   buildProjectJournalUpdatedNotification,
+  buildProjectJournalMentionedNotification,
+  buildTaskCommentMentionedNotification,
   buildTaskAttachmentCreatedNotification,
   buildTaskCommentNotification,
   buildTaskJournalUpdatedNotification,
+  buildTaskJournalMentionedNotification,
   buildTaskStatusChangedNotification,
   type NotificationEventSnapshot,
 } from "./notifications-message-builders.js";
+import {
+  createMentionContainerKey,
+  type MentionContainerDescriptor,
+} from "./notification-mention-containers.js";
+import { extractMentionUsernames } from "./notification-mentions.js";
 import { listProjectNotificationRecipientUserIds } from "./notifications-recipients.js";
 import {
   collectProjectChartTaskNotificationSnapshots,
@@ -45,6 +58,11 @@ interface ListNotificationsQuery {
   limit: number;
   offset: number;
   sort: NotificationListSort;
+}
+
+interface ResolvedMentionUser {
+  id: number;
+  username: string;
 }
 
 interface NotificationSummaryRow {
@@ -101,6 +119,15 @@ function createListWhereClause(
 
 function createNotificationOrder(sort: NotificationListSort) {
   return sort === "asc" ? asc(notifications.createdAt) : desc(notifications.createdAt);
+}
+
+function createMentionContainerWhereClause(
+  container: MentionContainerDescriptor,
+) {
+  return and(
+    eq(mentions.mentionContainerType, container.mentionContainerType),
+    eq(mentions.containerKey, createMentionContainerKey(container)),
+  );
 }
 
 @Injectable()
@@ -219,6 +246,61 @@ export class NotificationsService {
     );
   }
 
+  async notifyIssueCreated(args: {
+    actorUserId: number;
+    issueId: number;
+    projectId: number;
+  }): Promise<void> {
+    const names = this.getIssueContextNames(args.projectId, args.issueId);
+    await this.createFanoutNotificationEvent(
+      args.actorUserId,
+      buildIssueCreatedNotification({
+        actorUsername: this.getUsernameOrThrow(args.actorUserId),
+        issueId: args.issueId,
+        issueName: names.issueName,
+        projectId: args.projectId,
+        projectName: names.projectName,
+      }),
+    );
+  }
+
+  async notifyIssueCommentMentions(args: {
+    actorUserId: number;
+    body: string;
+    commentId: number;
+    issueId: number;
+    projectId: number;
+  }): Promise<void> {
+    const names = this.getIssueContextNames(args.projectId, args.issueId);
+    const mentionedUsers = this.collectFirstTimeMentionUsers(
+      args.actorUserId,
+      args.body,
+      {
+        commentId: args.commentId,
+        issueId: args.issueId,
+        mentionContainerType: mentionContainerTypeCodes.issueComment,
+        projectId: args.projectId,
+        taskId: null,
+      },
+    );
+
+    for (const mentionedUser of mentionedUsers) {
+      await this.createDirectNotificationEvent(
+        args.actorUserId,
+        buildIssueCommentMentionedNotification({
+          actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          commentId: args.commentId,
+          issueId: args.issueId,
+          issueName: names.issueName,
+          mentionedUserId: mentionedUser.id,
+          projectId: args.projectId,
+          projectName: names.projectName,
+        }),
+        mentionedUser.id,
+      );
+    }
+  }
+
   async notifyTaskCommentCreated(args: {
     actorUserId: number;
     commentId: number;
@@ -239,6 +321,44 @@ export class NotificationsService {
         taskTitle,
       }),
     );
+  }
+
+  async notifyTaskCommentMentions(args: {
+    actorUserId: number;
+    body: string;
+    commentId: number;
+    projectId: number;
+    taskId: string;
+  }): Promise<void> {
+    const projectName = this.getProjectNameOrThrow(args.projectId);
+    const taskTitle = this.getTaskTitle(args.projectId, args.taskId);
+    const mentionedUsers = this.collectFirstTimeMentionUsers(
+      args.actorUserId,
+      args.body,
+      {
+        commentId: args.commentId,
+        issueId: null,
+        mentionContainerType: mentionContainerTypeCodes.taskComment,
+        projectId: args.projectId,
+        taskId: args.taskId,
+      },
+    );
+
+    for (const mentionedUser of mentionedUsers) {
+      await this.createDirectNotificationEvent(
+        args.actorUserId,
+        buildTaskCommentMentionedNotification({
+          actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          commentId: args.commentId,
+          mentionedUserId: mentionedUser.id,
+          projectId: args.projectId,
+          projectName,
+          taskId: args.taskId,
+          taskTitle,
+        }),
+        mentionedUser.id,
+      );
+    }
   }
 
   async notifyIssueStatusChanged(args: {
@@ -318,6 +438,38 @@ export class NotificationsService {
     );
   }
 
+  async notifyProjectJournalMentions(args: {
+    actorUserId: number;
+    markdown: string;
+    projectId: number;
+  }): Promise<void> {
+    const projectName = this.getProjectNameOrThrow(args.projectId);
+    const mentionedUsers = this.collectFirstTimeMentionUsers(
+      args.actorUserId,
+      args.markdown,
+      {
+        commentId: null,
+        issueId: null,
+        mentionContainerType: mentionContainerTypeCodes.projectJournal,
+        projectId: args.projectId,
+        taskId: null,
+      },
+    );
+
+    for (const mentionedUser of mentionedUsers) {
+      await this.createDirectNotificationEvent(
+        args.actorUserId,
+        buildProjectJournalMentionedNotification({
+          actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          mentionedUserId: mentionedUser.id,
+          projectId: args.projectId,
+          projectName,
+        }),
+        mentionedUser.id,
+      );
+    }
+  }
+
   async notifyIssueJournalUpdated(args: {
     actorUserId: number;
     issueId: number;
@@ -340,6 +492,41 @@ export class NotificationsService {
         projectName: names.projectName,
       }),
     );
+  }
+
+  async notifyIssueJournalMentions(args: {
+    actorUserId: number;
+    issueId: number;
+    markdown: string;
+    projectId: number;
+  }): Promise<void> {
+    const names = this.getIssueContextNames(args.projectId, args.issueId);
+    const mentionedUsers = this.collectFirstTimeMentionUsers(
+      args.actorUserId,
+      args.markdown,
+      {
+        commentId: null,
+        issueId: args.issueId,
+        mentionContainerType: mentionContainerTypeCodes.issueJournal,
+        projectId: args.projectId,
+        taskId: null,
+      },
+    );
+
+    for (const mentionedUser of mentionedUsers) {
+      await this.createDirectNotificationEvent(
+        args.actorUserId,
+        buildIssueJournalMentionedNotification({
+          actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          issueId: args.issueId,
+          issueName: names.issueName,
+          mentionedUserId: mentionedUser.id,
+          projectId: args.projectId,
+          projectName: names.projectName,
+        }),
+        mentionedUser.id,
+      );
+    }
   }
 
   async notifyTaskJournalUpdated(args: {
@@ -365,12 +552,48 @@ export class NotificationsService {
     );
   }
 
+  async notifyTaskJournalMentions(args: {
+    actorUserId: number;
+    markdown: string;
+    projectId: number;
+    taskId: string;
+  }): Promise<void> {
+    const projectName = this.getProjectNameOrThrow(args.projectId);
+    const taskTitle = this.getTaskTitle(args.projectId, args.taskId);
+    const mentionedUsers = this.collectFirstTimeMentionUsers(
+      args.actorUserId,
+      args.markdown,
+      {
+        commentId: null,
+        issueId: null,
+        mentionContainerType: mentionContainerTypeCodes.taskJournal,
+        projectId: args.projectId,
+        taskId: args.taskId,
+      },
+    );
+
+    for (const mentionedUser of mentionedUsers) {
+      await this.createDirectNotificationEvent(
+        args.actorUserId,
+        buildTaskJournalMentionedNotification({
+          actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          mentionedUserId: mentionedUser.id,
+          projectId: args.projectId,
+          projectName,
+          taskId: args.taskId,
+          taskTitle,
+        }),
+        mentionedUser.id,
+      );
+    }
+  }
+
   async notifyProjectAttachmentCreated(args: {
     actorUserId: number;
     attachmentId: string;
     projectId: number;
   }): Promise<void> {
-    await this.createNotificationEvent(
+    await this.createFanoutNotificationEvent(
       args.actorUserId,
       buildProjectAttachmentCreatedNotification({
         actorUsername: this.getUsernameOrThrow(args.actorUserId),
@@ -388,7 +611,7 @@ export class NotificationsService {
     projectId: number;
   }): Promise<void> {
     const names = this.getIssueContextNames(args.projectId, args.issueId);
-    await this.createNotificationEvent(
+    await this.createFanoutNotificationEvent(
       args.actorUserId,
       buildIssueAttachmentCreatedNotification({
         actorUsername: this.getUsernameOrThrow(args.actorUserId),
@@ -407,7 +630,7 @@ export class NotificationsService {
     projectId: number;
     taskId: string;
   }): Promise<void> {
-    await this.createNotificationEvent(
+    await this.createFanoutNotificationEvent(
       args.actorUserId,
       buildTaskAttachmentCreatedNotification({
         actorUsername: this.getUsernameOrThrow(args.actorUserId),
@@ -448,6 +671,42 @@ export class NotificationsService {
     actorUserId: number,
     event: NotificationEventSnapshot,
   ): Promise<void> {
+    await this.createFanoutNotificationEvent(actorUserId, event);
+  }
+
+  private async createFanoutNotificationEvent(
+    actorUserId: number,
+    event: NotificationEventSnapshot,
+  ): Promise<void> {
+    const recipientUserIds = listProjectNotificationRecipientUserIds(
+      this.databaseService.db,
+      event.projectId,
+      actorUserId,
+    );
+    await this.createNotificationRecordForRecipients(
+      actorUserId,
+      event,
+      recipientUserIds,
+    );
+  }
+
+  private async createDirectNotificationEvent(
+    actorUserId: number,
+    event: NotificationEventSnapshot,
+    recipientUserId: number,
+  ): Promise<void> {
+    await this.createNotificationRecordForRecipients(
+      actorUserId,
+      event,
+      [recipientUserId],
+    );
+  }
+
+  private async createNotificationRecordForRecipients(
+    actorUserId: number,
+    event: NotificationEventSnapshot,
+    recipientUserIds: readonly number[],
+  ): Promise<void> {
     const [created] = this.databaseService.db.insert(notifications)
       .values({
         actorUserId,
@@ -456,6 +715,7 @@ export class NotificationsService {
         eventType: event.eventType,
         issueId: event.issueId ?? null,
         message: event.message,
+        mentionedUserId: event.mentionedUserId ?? null,
         projectId: event.projectId,
         targetUrl: event.targetUrl,
         taskId: event.taskId ?? null,
@@ -467,23 +727,120 @@ export class NotificationsService {
       return;
     }
 
-    const recipientUserIds = listProjectNotificationRecipientUserIds(
-      this.databaseService.db,
-      event.projectId,
-      actorUserId,
-    );
-    if (recipientUserIds.length === 0) {
+    const distinctRecipientUserIds = [...new Set(
+      recipientUserIds.filter((userId) => userId !== actorUserId),
+    )];
+    if (distinctRecipientUserIds.length === 0) {
       return;
     }
 
     this.databaseService.db.insert(usersNotifications)
       .values(
-        recipientUserIds.map((userId) => ({
+        distinctRecipientUserIds.map((userId) => ({
           notificationId: created.id,
           userId,
         })),
       )
       .run();
+  }
+
+  private collectFirstTimeMentionUsers(
+    actorUserId: number,
+    body: string,
+    container: MentionContainerDescriptor,
+  ): ResolvedMentionUser[] {
+    const mentionedUsernames = extractMentionUsernames(body);
+    if (mentionedUsernames.length === 0) {
+      return [];
+    }
+
+    const allowedRecipientUserIds = new Set(
+      listProjectNotificationRecipientUserIds(
+        this.databaseService.db,
+        container.projectId,
+        actorUserId,
+      ),
+    );
+    if (allowedRecipientUserIds.size === 0) {
+      return [];
+    }
+
+    const resolvedUsers = this.resolveMentionUsersByUsername(mentionedUsernames);
+    const eligibleUsers = resolvedUsers.filter((user) =>
+      allowedRecipientUserIds.has(user.id)
+    );
+    if (eligibleUsers.length === 0) {
+      return [];
+    }
+
+    const existingMentionedUserIds = new Set(
+      this.databaseService.db
+        .select({ mentionedUserId: mentions.mentionedUserId })
+        .from(mentions)
+        .where(and(
+          createMentionContainerWhereClause(container),
+          inArray(
+            mentions.mentionedUserId,
+            eligibleUsers.map((user) => user.id),
+          ),
+        ))
+        .all()
+        .map((row) => row.mentionedUserId),
+    );
+    const firstTimeMentionUsers = eligibleUsers.filter((user) =>
+      !existingMentionedUserIds.has(user.id)
+    );
+
+    if (firstTimeMentionUsers.length === 0) {
+      return [];
+    }
+
+    this.databaseService.db.insert(mentions)
+      .values(
+        firstTimeMentionUsers.map((user) => ({
+          commentId: container.commentId,
+          containerKey: createMentionContainerKey(container),
+          issueId: container.issueId,
+          mentionContainerType: container.mentionContainerType,
+          mentionedUserId: user.id,
+          projectId: container.projectId,
+          speakerUserId: actorUserId,
+          taskId: container.taskId,
+        })),
+      )
+      .onConflictDoNothing()
+      .run();
+
+    return firstTimeMentionUsers;
+  }
+
+  private resolveMentionUsersByUsername(
+    mentionedUsernames: readonly string[],
+  ): ResolvedMentionUser[] {
+    if (mentionedUsernames.length === 0) {
+      return [];
+    }
+
+    const rows = this.databaseService.db
+      .select({
+        id: users.id,
+        username: users.username,
+      })
+      .from(users)
+      .where(and(
+        inArray(users.username, [...new Set(mentionedUsernames)]),
+        eq(users.isActive, true),
+        isNull(users.deletedAt),
+      ))
+      .all();
+    const userByUsername = new Map(
+      rows.map((row) => [row.username, row] as const),
+    );
+
+    return mentionedUsernames.flatMap((username) => {
+      const resolvedUser = userByUsername.get(username);
+      return resolvedUser ? [resolvedUser] : [];
+    });
   }
 
   private getProjectNameOrThrow(projectId: number): string {
