@@ -17,21 +17,8 @@ export {
   TASK_JOURNAL_SECTION_ANCHOR,
 };
 
-type ProjectDetailTab = "attachments" | "details";
-
 function normalizeAnchor(hash: string | undefined | null): string {
   return (hash ?? "").trim().replace(/^#/, "");
-}
-
-export function inferProjectTabFromAnchor(hash: string | undefined | null): ProjectDetailTab | null {
-  const normalized = normalizeAnchor(hash);
-  if (normalized === PROJECT_JOURNAL_SECTION_ANCHOR) {
-    return "details";
-  }
-  if (normalized === PROJECT_ATTACHMENTS_SECTION_ANCHOR) {
-    return "attachments";
-  }
-  return null;
 }
 
 export function inferIssueTabFromAnchor(hash: string | undefined | null): IssueDetailTab | null {

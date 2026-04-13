@@ -11,6 +11,12 @@ export const ISSUE_JOURNAL_SECTION_ANCHOR = "issue-journal";
 export const ISSUE_ATTACHMENTS_SECTION_ANCHOR = "issue-attachments";
 export const TASK_JOURNAL_SECTION_ANCHOR = "task-journal";
 export const TASK_ATTACHMENTS_SECTION_ANCHOR = "task-attachments";
+export const PROJECT_ATTACHMENT_ID_QUERY_KEY = "attachmentId";
+type ProjectNotificationTab = "attachments" | "details";
+interface ProjectNotificationTargetOptions {
+  attachmentId?: string | null;
+  tab?: ProjectNotificationTab;
+}
 
 function createQueryString(
   values: Record<string, number | string | null | undefined>,
@@ -37,21 +43,29 @@ export function createNotificationsRoute(): string {
 
 export function createProjectNotificationTarget(
   projectId: number,
-  options: { hash?: string | null } = {},
+  options: ProjectNotificationTargetOptions = {},
 ): string {
-  const query = createQueryString({ projectId });
-  return appendHash(`${PROJECT_ROUTE_PREFIX}?${query}`, options.hash ?? null);
+  const tab = options.attachmentId ? "attachments" : (options.tab ?? null);
+  const query = createQueryString({
+    projectId,
+    tab,
+    [PROJECT_ATTACHMENT_ID_QUERY_KEY]: options.attachmentId ?? null,
+  });
+  return `${PROJECT_ROUTE_PREFIX}?${query}`;
 }
 
 export function createProjectJournalNotificationTarget(projectId: number): string {
-  return createProjectNotificationTarget(projectId, {
-    hash: PROJECT_JOURNAL_SECTION_ANCHOR,
-  });
+  const query = createQueryString({ projectId });
+  return appendHash(`${PROJECT_ROUTE_PREFIX}?${query}`, PROJECT_JOURNAL_SECTION_ANCHOR);
 }
 
-export function createProjectAttachmentsNotificationTarget(projectId: number): string {
+export function createProjectAttachmentsNotificationTarget(
+  projectId: number,
+  options: { attachmentId?: string | null } = {},
+): string {
   return createProjectNotificationTarget(projectId, {
-    hash: PROJECT_ATTACHMENTS_SECTION_ANCHOR,
+    attachmentId: options.attachmentId ?? null,
+    tab: "attachments",
   });
 }
 

@@ -399,6 +399,52 @@ describe("ProjectManagerProjectPage", () => {
     expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
   });
 
+  it("opens the attachments tab from the query tab deep-link", async () => {
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+      { initialEntries: ["/pm/project?projectId=42&tab=attachments"] },
+    );
+
+    expect(await screen.findByText("Project attachments")).toBeVisible();
+  });
+
+  it("falls back to details for unknown project tab query values", async () => {
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+      { initialEntries: ["/pm/project?projectId=42&tab=unknown"] },
+    );
+
+    expect(await screen.findByText("Project Journal")).toBeVisible();
+  });
+
+  it("does not re-force attachments when the user switches local tabs after deep-link load", async () => {
+    const user = userEvent.setup();
+
+    renderWithTheme(
+      <ProjectManagerProjectPage
+        currentUserId={DEFAULT_CURRENT_USER_ID}
+        projectId={42}
+        token={DEFAULT_TOKEN}
+      />,
+      { initialEntries: ["/pm/project?projectId=42&tab=attachments"] },
+    );
+
+    expect(await screen.findByText("Project attachments")).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "Teams" }));
+
+    expect(await screen.findByText("Team 7")).toBeVisible();
+    expect(screen.queryByText("Project attachments")).not.toBeInTheDocument();
+  });
+
   it("switches between the local Details, Teams, and Organizations tabs", async () => {
     const user = userEvent.setup();
 

@@ -81,6 +81,11 @@ export type IssueDetailTab = DiscussionDetailTab;
 export type TaskDetailTab = DiscussionDetailTab;
 
 const DEFAULT_DISCUSSION_TAB: DiscussionDetailTab = "details";
+export const PROJECT_DETAIL_TAB_VALUES = ["details", "attachments"] as const;
+export type ProjectDetailTab = (typeof PROJECT_DETAIL_TAB_VALUES)[number];
+export const PROJECT_TAB_QUERY_KEY = "tab";
+export const PROJECT_ATTACHMENT_ID_QUERY_KEY = "attachmentId";
+const DEFAULT_PROJECT_TAB: ProjectDetailTab = "details";
 
 function parseDiscussionTabFromSearchParameters(
   searchParameters: URLSearchParams,
@@ -124,4 +129,30 @@ export function parseTaskCommentIdFromSearchParameters(
   searchParameters: URLSearchParams,
 ): number | null {
   return parsePositiveIntegerSearchParameter(searchParameters, "commentId");
+}
+
+export function parseProjectTabFromSearchParameters(
+  searchParameters: URLSearchParams,
+): ProjectDetailTab {
+  const raw = searchParameters.get(PROJECT_TAB_QUERY_KEY);
+
+  if (!raw) {
+    return DEFAULT_PROJECT_TAB;
+  }
+
+  const normalized = raw.toLowerCase();
+  if ((PROJECT_DETAIL_TAB_VALUES as readonly string[]).includes(normalized)) {
+    return normalized as ProjectDetailTab;
+  }
+
+  return DEFAULT_PROJECT_TAB;
+}
+
+export function parseProjectAttachmentIdFromSearchParameters(
+  searchParameters: URLSearchParams,
+): string | null {
+  return parseNonEmptyTrimmedStringSearchParameter(
+    searchParameters,
+    PROJECT_ATTACHMENT_ID_QUERY_KEY,
+  );
 }

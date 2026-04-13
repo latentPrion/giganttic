@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseProjectAttachmentIdFromSearchParameters,
+  parseProjectTabFromSearchParameters,
   parseTaskCommentIdFromSearchParameters,
   parseTaskIdFromSearchParameters,
   parseTaskTabFromSearchParameters,
@@ -24,5 +26,23 @@ describe("route query contracts", () => {
 
     expect(parseTaskCommentIdFromSearchParameters(parameters)).toBe(91);
     expect(parseTaskTabFromSearchParameters(parameters)).toBe("comments");
+  });
+
+  it("parses project detail tabs and falls back to details for unknown values", () => {
+    expect(parseProjectTabFromSearchParameters(new URLSearchParams("tab=attachments"))).toBe(
+      "attachments",
+    );
+    expect(parseProjectTabFromSearchParameters(new URLSearchParams("tab=unknown"))).toBe(
+      "details",
+    );
+  });
+
+  it("parses project attachment ids only when the value is non-empty and trimmed", () => {
+    expect(
+      parseProjectAttachmentIdFromSearchParameters(new URLSearchParams("attachmentId=file-1")),
+    ).toBe("file-1");
+    expect(
+      parseProjectAttachmentIdFromSearchParameters(new URLSearchParams("attachmentId=%20file%20")),
+    ).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import {
 } from "../../../../../common/routes/app-route-paths.js";
 import type {
   IssueDetailTab,
+  ProjectDetailTab,
   TaskDetailTab,
 } from "../contracts/route-query.contracts.js";
 
@@ -28,8 +29,38 @@ export const PROJECT_ROUTE_SECTION_VALUES = [
 
 export type ProjectRouteSection = typeof PROJECT_ROUTE_SECTION_VALUES[number];
 
-export function createProjectDetailRoute(projectId: number): string {
-  return `${PROJECT_MANAGER_ROUTE_PATH}?projectId=${projectId}`;
+interface CreateProjectDetailRouteOptions {
+  attachmentId?: string | null;
+  tab?: ProjectDetailTab;
+}
+
+function resolveProjectDetailRouteTab(
+  options: CreateProjectDetailRouteOptions,
+): ProjectDetailTab {
+  if (options.attachmentId) {
+    return "attachments";
+  }
+
+  return options.tab ?? "details";
+}
+
+export function createProjectDetailRoute(
+  projectId: number,
+  options: CreateProjectDetailRouteOptions = {},
+): string {
+  const parameters = new URLSearchParams();
+  parameters.set("projectId", String(projectId));
+
+  const tab = resolveProjectDetailRouteTab(options);
+  if (tab !== "details") {
+    parameters.set("tab", tab);
+  }
+
+  if (options.attachmentId) {
+    parameters.set("attachmentId", options.attachmentId);
+  }
+
+  return `${PROJECT_MANAGER_ROUTE_PATH}?${parameters.toString()}`;
 }
 
 export function createProjectManagerTeamRoute(teamId: number): string {

@@ -42,7 +42,7 @@ describe("ProjectManagerNotificationsPage", () => {
           id: 11,
           message: "alice added a project attachment under Project 4",
           noticedTimestamp: null,
-          targetUrl: "/pm/project?projectId=4#project-attachments",
+          targetUrl: "/pm/project?projectId=4&tab=attachments",
         },
       ],
       offset: 0,
@@ -151,6 +151,6 @@ describe("ProjectManagerNotificationsPage", () => {
       name: /alice added a project attachment/i,
     }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=4#project-attachments");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=4&tab=attachments");
   });
 });

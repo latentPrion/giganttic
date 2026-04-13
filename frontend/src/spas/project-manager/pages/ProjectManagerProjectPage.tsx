@@ -57,10 +57,10 @@ import { ProjectMarkdownRender, PROJECT_MARKDOWN_HELP_TEXT } from "../components
 import { useDiscussionItemCount } from "../hooks/use-discussion-item-count.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
 import {
-  inferProjectTabFromAnchor,
   PROJECT_ATTACHMENTS_SECTION_ANCHOR,
   PROJECT_JOURNAL_SECTION_ANCHOR,
 } from "../lib/detail-section-anchor-routing.js";
+import { parseProjectTabFromSearchParameters } from "../contracts/route-query.contracts.js";
 import {
   subscribeProjectManagerProjectAttachmentStateEvent,
 } from "../lib/project-attachment-state-events.js";
@@ -104,6 +104,16 @@ const TEAMS_TAB_LABEL = "Teams";
 const TEAM_SOURCE_LABEL = "Team";
 
 type ProjectDetailsTabValue = "attachments" | "details" | "organizations" | "teams";
+
+function resolveProjectRouteTabOverride(
+  search: string,
+): "attachments" | "details" | null {
+  const parameters = new URLSearchParams(search);
+  if (!parameters.has("tab")) {
+    return null;
+  }
+  return parseProjectTabFromSearchParameters(parameters);
+}
 
 function buildErrorMessage(error: unknown, fallback: string): string {
   return getApiErrorMessage(error, fallback);
@@ -269,11 +279,13 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
   );
 
   useEffect(() => {
-    const inferredTab = inferProjectTabFromAnchor(location.hash);
-    if (inferredTab && inferredTab !== activeTab) {
-      setActiveTab(inferredTab);
+    const routeTab = resolveProjectRouteTabOverride(location.search);
+    if (routeTab === null) {
+      return;
     }
-  }, [activeTab, location.hash]);
+
+    setActiveTab((currentTab) => (currentTab === routeTab ? currentTab : routeTab));
+  }, [location.search]);
   const allowProjectDelete = canDeleteProject(
     props.currentUserId,
     props.currentUserRoles,

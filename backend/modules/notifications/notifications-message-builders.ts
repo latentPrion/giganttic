@@ -301,7 +301,9 @@ export function buildProjectAttachmentCreatedNotification(args: {
     eventType: "NOTIFICATION_EVENT_PROJECT_ATTACHMENT_CREATED",
     message: `${args.actorUsername} added an attachment to Project "${args.projectName}".`,
     projectId: args.projectId,
-    targetUrl: createProjectAttachmentsNotificationTarget(args.projectId),
+    targetUrl: createProjectAttachmentsNotificationTarget(args.projectId, {
+      attachmentId: args.attachmentId,
+    }),
   };
 }
 
