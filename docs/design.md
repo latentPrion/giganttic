@@ -23,11 +23,11 @@ The repository currently contains:
 - generated Zod schemas derived from the active DB schema version
 - generated full-schema SQLite DDL for the active DB schema version
 - backend auth/session APIs for registration, login, session inspection, and
-  session revocation
+session revocation
 - a frontend header/navbar shell with login, registration, current-session
-  lookup, and logout controls
+lookup, and logout controls
 - automated tests covering schema generation, SQLite DDL application, the root
-  `db` facade, the auth/session API, and the frontend auth/session shell
+`db` facade, the auth/session API, and the frontend auth/session shell
 
 ### Not Yet Implemented
 
@@ -87,7 +87,7 @@ The repository uses:
 - `db/<version>/schema.ts` as the canonical schema definition
 - `db/<version>/generated-zod/` for version-specific generated Zod artifacts
 - `db/<version>/generated-sql-ddl/schema.sql` for full-schema generated SQLite
-  DDL
+DDL
 - `db/index.ts` as the schema-version-agnostic facade for the active schema
 
 The active schema version is selected through `db/config.json`.
@@ -119,7 +119,7 @@ Important rules:
 - the raw bearer token is returned only to the client
 - only a hash of the session token is stored in `Users_Sessions`
 - sessions have `startTimestamp`, `expirationTimestamp`, `ipAddress`, optional
-  `location`, and optional future-facing OAuth columns
+`location`, and optional future-facing OAuth columns
 - revoked or expired sessions are rejected by the auth guard
 - admins may manage sessions for other users
 - non-admins may query and revoke only their own sessions
@@ -147,12 +147,12 @@ The seeded capability fixtures are:
 - `testnoroleuser`: no scoped or system roles
 - `testorgorgmanageruser`: seeded with `GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER`
 - `testorgprojectmanageruser`: seeded with
-  `GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
+`GGTC_ORGANIZATIONROLE_PROJECT_MANAGER`
 - `testorgteammanageruser`: seeded with `GGTC_ORGANIZATIONROLE_TEAM_MANAGER`
 - `testprojectprojectmanageruser`: seeded with
-  `GGTC_PROJECTROLE_PROJECT_MANAGER`
+`GGTC_PROJECTROLE_PROJECT_MANAGER`
 - `testteamprojectmanageruser`: seeded with
-  `GGTC_TEAMROLE_PROJECT_MANAGER`
+`GGTC_TEAMROLE_PROJECT_MANAGER`
 - `testteamteammanageruser`: seeded with `GGTC_TEAMROLE_TEAM_MANAGER`
 
 Backend bootstrap also seeds deterministic fixture entities used by those
@@ -160,9 +160,9 @@ accounts:
 
 - organizations for the org-scoped role fixtures
 - teams for the org-team-manager, team-project-manager, and team-team-manager
-  fixtures
+fixtures
 - projects for the org-project-manager, team-project-manager, and
-  project-project-manager fixtures
+project-project-manager fixtures
 
 ## Current Module Layout
 
@@ -212,36 +212,36 @@ Current responsibilities:
 - render the application shell header/navbar
 - host session-aware login, registration, current-session lookup, and logout UI
 - host the normal user lobby SPA for the current user's associated projects,
-  teams, and organizations
+teams, and organizations
 - host authenticated project-manager routes at `/pm/project`,
-  `/pm/project/gantt`, `/pm/project/issues`, and `/pm/project/issue`
+`/pm/project/gantt`, `/pm/project/issues`, and `/pm/project/issue`
 - render reusable entity list items in the user lobby, with view-specific action
-  affordances controlled by parent-selected render modes
+affordances controlled by parent-selected render modes
 - provide reusable project, team, and organization create, edit, and summary
-  modal workflows in the user lobby
+modal workflows in the user lobby
 - validate auth REST payloads at the transport boundary with Zod before data
-  enters frontend state
+enters frontend state
 
 Planned future responsibilities:
 
 - add a separate admin SPA for broad administrative discovery and management of
-  entities outside the current user's normal associations
+entities outside the current user's normal associations
 - expand the project-manager SPA beyond the initial gantt route
 
 Current lobby interaction model:
 
 - entity rows are reusable JSX list-item components
 - parent views choose the row render mode, such as main listing vs narrower
-  future views
+future views
 - clicking a project row navigates to the project-manager project route
 - team and organization summaries are opened from dedicated `View` action
-  buttons until their entity routes are defined
+buttons until their entity routes are defined
 - project, team, and organization create/edit actions are reusable button +
-  modal flows
+modal flows
 - delete actions for project, team, and organization rows are reusable button
-  components in the main listing view
+components in the main listing view
 - user list-item/button scaffolding exists, but modal-backed user CRUD is still
-  deferred until matching backend routes exist
+deferred until matching backend routes exist
 - render future project-management views
 - communicate with the backend REST API
 
@@ -253,23 +253,23 @@ Current project-manager SPA interaction model:
 - `/pm/project/gantt?projectId=...` shows the selected project's gantt chart
 - the gantt view loads XML from `charts/<projectId>.xml`
 - `/pm/project/issues?projectId=...` is authenticated-only and lists all
-  issues for the selected project
+issues for the selected project
 - `/pm/project/issue?projectId=...&id=...` is authenticated-only and shows a
-  single issue detail view
+single issue detail view
 - PM issue routes use reusable `IssueListItem` rows together with reusable
-  create, edit, delete, and open-detail issue buttons
+create, edit, delete, and open-detail issue buttons
 - clicking an issue row navigates to the issue detail route
 - issue summary modals are opened from the reusable `View` button
 - all project-scoped PM pages show shared route-based navigation among detail,
-  gantt, and issues
+gantt, and issues
 - the issue detail page renders a summary-preview row above a detailed issue
-  card so edits can be previewed against the row presentation
+card so edits can be previewed against the row presentation
 - DHTMLX Gantt is loaded from the `dhtmlx-gantt/` git submodule rather than an
-  npm package
+npm package
 - a hideable bottom `GanttChartControlPanel` hosts a tabset for `Both`, `Grid`,
-  and `Chart` display modes
+and `Chart` display modes
 - GGTC task XML extensions (status, closed reason) and save-time enforcement vs
-  load/listener enrichment: [gantt-chart-ggtc-extensions.md](./gantt-chart-ggtc-extensions.md)
+load/listener enrichment: [gantt-chart-ggtc-extensions.md](./gantt-chart-ggtc-extensions.md)
 
 ### Temporal
 
@@ -303,4 +303,4 @@ Still planned but not yet implemented:
 - Keep backend modules self-contained and injectable.
 - Keep REST inputs and outputs runtime-validated with Zod.
 - Keep future frontend and workflow integrations aligned with the same typed
-  contracts where practical.
+contracts where practical.
