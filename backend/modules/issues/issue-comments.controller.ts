@@ -173,15 +173,16 @@ export class IssueCommentsController {
       params,
     );
 
-    const buffer = requireUploadedBuffer(file);
-    const summary = await this.attachmentService.createAttachmentAndLinkToComment({
-      buffer,
-      commentId,
-      issueId,
-      originalFilename: file!.originalname,
-      projectId,
-      uploadedByUserId: request.authContext!.userId,
-    });
+    const summary = (
+      await this.issueCommentService.uploadCommentAttachment(
+        request.authContext!,
+        projectId,
+        issueId,
+        commentId,
+        requireUploadedBuffer(file),
+        file!.originalname,
+      )
+    ).attachment;
 
     return uploadIssueAttachmentResponseSchema.parse({ attachment: summary });
   }

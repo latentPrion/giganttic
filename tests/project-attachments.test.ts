@@ -160,4 +160,97 @@ describe("project attachments api", () => {
     });
     expect(memberDeleteResponse.statusCode).toBe(403);
   });
+
+  it("accepts otherwise rejected project attachment uploads for an effective project manager and rejects them for other users", async () => {
+    const owner = await harness.registerUser("project-attachment-bypass-owner");
+    const member = await harness.registerUser("project-attachment-bypass-member");
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      (
+        await harness.app.inject({
+          headers: harness.createAuthHeaders(owner.accessToken),
+          method: "POST",
+          payload: { name: "Project attachment bypass" },
+          url: "/stc-proj-mgmt/api/projects",
+        })
+      ).payload,
+    ).project.id;
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(owner.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [
+              "GGTC_PROJECTROLE_PROJECT_MANAGER",
+              "GGTC_PROJECTROLE_PROJECT_OWNER",
+            ],
+            userId: owner.user.id,
+          },
+          {
+            roleCodes: [],
+            userId: member.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const ownerBadExtension = await uploadProjectAttachment(
+      owner.accessToken,
+      projectId,
+      createUploadPayload("project-any.exe", Buffer.from("MZ fake exe"), "application/octet-stream"),
+    );
+    const ownerBadMagic = await uploadProjectAttachment(
+      owner.accessToken,
+      projectId,
+      createUploadPayload("project-fake.png", Buffer.from("not a real png"), "image/png"),
+    );
+    const memberBadExtension = await uploadProjectAttachment(
+      member.accessToken,
+      projectId,
+      createUploadPayload("member-any.exe", Buffer.from("MZ fake exe"), "application/octet-stream"),
+    );
+    const memberBadMagic = await uploadProjectAttachment(
+      member.accessToken,
+      projectId,
+      createUploadPayload("member-fake.png", Buffer.from("not a real png"), "image/png"),
+    );
+
+    expect(ownerBadExtension.statusCode).toBe(201);
+    expect(ownerBadMagic.statusCode).toBe(201);
+    expect(memberBadExtension.statusCode).toBe(403);
+    expect(memberBadMagic.statusCode).toBe(403);
+  });
 });
+
+function uploadProjectAttachment(
+  accessToken: string,
+  projectId: number,
+  payload: Buffer,
+) {
+  return harness.app.inject({
+    headers: {
+      ...harness.createAuthHeaders(accessToken),
+      "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+    },
+    method: "POST",
+    payload,
+    url: `/stc-proj-mgmt/api/projects/${projectId}/attachments`,
+  });
+}
+
+function createUploadPayload(
+  filename: string,
+  content: Buffer,
+  contentType: string,
+): Buffer {
+  return createMultipartFileBuffer({
+    boundary: MULTIPART_BOUNDARY,
+    content,
+    contentType,
+    fieldName: "file",
+    filename,
+  });
+}

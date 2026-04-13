@@ -17,7 +17,11 @@ import { DatabaseService } from "../database/database.service.js";
 import { DiscussionCommentBodyStorageService } from "../discussion/discussion-comment-body-storage.service.js";
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { assertProjectAccessibleWithScopedPolicy } from "../scoped-access/scoped-access.policy.js";
-import { AttachmentService, toAttachmentSummary } from "./attachment.service.js";
+import {
+  AttachmentService,
+  type AttachmentSummary,
+  toAttachmentSummary,
+} from "./attachment.service.js";
 import type {
   CreateIssueCommentRequest,
   IssueCommentResponse,
@@ -243,6 +247,33 @@ export class IssueCommentService {
     );
 
     return { deletedAttachmentId };
+  }
+
+  async uploadCommentAttachment(
+    authContext: AuthContext,
+    projectId: number,
+    issueId: number,
+    commentId: number,
+    buffer: Buffer,
+    originalFilename: string,
+  ): Promise<{ attachment: AttachmentSummary }> {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+    this.assertIssueInProject(projectId, issueId);
+
+    const record = this.getCommentRecordOrThrow(issueId, commentId);
+    this.assertCanEditComment(authContext, projectId, record);
+
+    const attachment = await this.attachmentService.createAttachmentAndLinkToComment({
+      buffer,
+      commentId,
+      issueId,
+      originalFilename,
+      projectId,
+      uploadedByUserId: authContext.userId,
+    });
+
+    return { attachment };
   }
 
   private async buildCommentResponse(

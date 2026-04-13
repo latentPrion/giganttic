@@ -1,7 +1,10 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { IssuePriorityCode } from "../db/index.js";
+import {
+  IssuePriorityCode,
+  projectsTeams,
+} from "../db/index.js";
 import { createCrudTestHarness } from "./crud-test-helpers.js";
 import { createMultipartFileBuffer } from "./multipart-form.helpers.js";
 
@@ -193,11 +196,27 @@ describe("issue comments and attachments api", () => {
   });
 
   it("rejects disallowed extensions for uploads", async () => {
+    const manager = await harness.registerUser("bad-ext-manager");
     const user = await harness.registerUser("bad-ext");
     const { issueId, projectId } = await createProjectWithIssue(
       harness,
-      user.accessToken,
+      manager.accessToken,
       "ext-test",
+    );
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: manager.user.id,
+        },
+        {
+          roleCodes: [],
+          userId: user.user.id,
+        },
+      ],
+      manager.accessToken,
     );
 
     const payload = createMultipartFileBuffer({
@@ -222,11 +241,27 @@ describe("issue comments and attachments api", () => {
   });
 
   it("rejects content that does not match extension magic bytes", async () => {
+    const manager = await harness.registerUser("bad-magic-manager");
     const user = await harness.registerUser("bad-magic");
     const { issueId, projectId } = await createProjectWithIssue(
       harness,
-      user.accessToken,
+      manager.accessToken,
       "magic-test",
+    );
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: manager.user.id,
+        },
+        {
+          roleCodes: [],
+          userId: user.user.id,
+        },
+      ],
+      manager.accessToken,
     );
 
     const payload = createMultipartFileBuffer({
@@ -248,6 +283,149 @@ describe("issue comments and attachments api", () => {
     });
 
     expect(response.statusCode).toBe(400);
+  });
+
+  it("accepts otherwise rejected uploads for a direct effective project manager and rejects them for other users", async () => {
+    const manager = await harness.registerUser("bypass-direct-manager");
+    const member = await harness.registerUser("bypass-direct-member");
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      manager.accessToken,
+      "bypass-direct-project",
+    );
+
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: manager.user.id,
+        },
+        {
+          roleCodes: [],
+          userId: member.user.id,
+        },
+      ],
+      manager.accessToken,
+    );
+
+    await expectIssueFileTypeBypass(harness, manager.accessToken, projectId, issueId, "direct-manager");
+    await expectIssueFileTypeRejection(harness, member.accessToken, projectId, issueId, "direct-member");
+  });
+
+  it("accepts otherwise rejected uploads for an effective team manager and rejects them for other users", async () => {
+    const projectOwner = await harness.registerUser("bypass-team-owner");
+    const teamCreator = await harness.registerUser("bypass-team-creator");
+    const teamManager = await harness.registerUser("bypass-team-manager");
+    const teamMember = await harness.registerUser("bypass-team-member");
+    const teamId = await createTeam(harness, teamCreator.accessToken, "Bypass Team");
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      projectOwner.accessToken,
+      "bypass-team-project",
+    );
+
+    await replaceTeamMembers(
+      harness,
+      teamId,
+      [
+        {
+          roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+          userId: teamManager.user.id,
+        },
+        {
+          roleCodes: ["GGTC_TEAMROLE_TEAM_MANAGER"],
+          userId: teamCreator.user.id,
+        },
+        {
+          roleCodes: [],
+          userId: teamMember.user.id,
+        },
+      ],
+      teamCreator.accessToken,
+    );
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: projectOwner.user.id,
+        },
+      ],
+      projectOwner.accessToken,
+    );
+    harness.databaseService.db.insert(projectsTeams).values({
+      projectId,
+      teamId,
+    }).run();
+
+    await expectIssueFileTypeBypass(harness, teamManager.accessToken, projectId, issueId, "team-manager");
+    await expectIssueFileTypeRejection(harness, teamMember.accessToken, projectId, issueId, "team-member");
+  });
+
+  it("accepts otherwise rejected uploads for an effective organization manager and rejects them for other users", async () => {
+    const creator = await harness.registerUser("bypass-org-creator");
+    const organizationManager = await harness.registerUser("bypass-org-manager");
+    const organizationMember = await harness.registerUser("bypass-org-member");
+    const projectOwner = await harness.registerUser("bypass-org-owner");
+    const organizationId = await createOrganization(
+      harness,
+      creator.accessToken,
+      "Bypass Org",
+    );
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      projectOwner.accessToken,
+      "bypass-org-project",
+    );
+
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: projectOwner.user.id,
+        },
+      ],
+      projectOwner.accessToken,
+    );
+    await addOrganizationUsers(
+      harness,
+      organizationId,
+      [creator.user.id, organizationManager.user.id, organizationMember.user.id],
+      creator.accessToken,
+    );
+    await associateOrganizationProject(
+      harness,
+      organizationId,
+      projectId,
+      creator.accessToken,
+    );
+    await grantOrganizationRole(
+      harness,
+      organizationId,
+      organizationManager.user.id,
+      "GGTC_ORGANIZATIONROLE_ORGANIZATION_MANAGER",
+      creator.accessToken,
+    );
+
+    await expectIssueFileTypeBypass(
+      harness,
+      organizationManager.accessToken,
+      projectId,
+      issueId,
+      "org-manager",
+    );
+    await expectIssueFileTypeRejection(
+      harness,
+      organizationMember.accessToken,
+      projectId,
+      issueId,
+      "org-member",
+    );
   });
 
   it("uploads issue attachment, lists, and downloads with auth", async () => {
@@ -808,6 +986,52 @@ describe("issue comments and attachments api", () => {
     expect(updatedComment!.attachments).toEqual([]);
   });
 
+  it("forbids a non-author non-project-manager member from uploading issue comment attachments", async () => {
+    const pmUser = await harness.registerUser("comment-attachment-upload-pm");
+    const authorUser = await harness.registerUser("comment-attachment-upload-author");
+    const nonAuthorUser = await harness.registerUser("comment-attachment-upload-non-author");
+
+    const { issueId, projectId } = await createProjectWithIssue(
+      harness,
+      pmUser.accessToken,
+      "comment-attachment-upload-project",
+    );
+
+    await replaceProjectMembers(
+      harness,
+      projectId,
+      [
+        {
+          roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+          userId: pmUser.user.id,
+        },
+        { roleCodes: [], userId: authorUser.user.id },
+        { roleCodes: [], userId: nonAuthorUser.user.id },
+      ],
+      pmUser.accessToken,
+    );
+
+    const commentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(authorUser.accessToken),
+      method: "POST",
+      payload: { body: "Issue comment attachment upload control" },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments`,
+    });
+    expect(commentResponse.statusCode).toBe(201);
+    const commentId = harness.parseJson<{ comment: { id: number } }>(
+      commentResponse.payload,
+    ).comment.id;
+
+    const uploadResponse = await harness.app.inject({
+      headers: buildIssueMultipartHeaders(harness, nonAuthorUser.accessToken),
+      method: "POST",
+      payload: createPngPayload("non-author-comment-upload.png"),
+      url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/comments/${commentId}/attachments`,
+    });
+
+    expect(uploadResponse.statusCode).toBe(403);
+  });
+
   it("deletes comment attachments for effective project managers (non-author)", async () => {
     const pmUser = await harness.registerUser("comment-attachment-delete-pm-manager");
     const authorUser = await harness.registerUser("comment-attachment-delete-pm-author");
@@ -983,4 +1207,235 @@ async function createProjectWithIssue(
   ).issue.id;
 
   return { issueId, projectId };
+}
+
+async function createOrganization(
+  h: {
+    app: NestFastifyApplication;
+    createAuthHeaders: (accessToken: string) => Record<string, string>;
+    parseJson: <T>(payload: string) => T;
+  },
+  accessToken: string,
+  name: string,
+): Promise<number> {
+  const response = await h.app.inject({
+    headers: h.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { name },
+    url: "/stc-proj-mgmt/api/organizations",
+  });
+
+  expect(response.statusCode).toBe(201);
+  return h.parseJson<{ organization: { id: number } }>(response.payload).organization.id;
+}
+
+async function createTeam(
+  h: {
+    app: NestFastifyApplication;
+    createAuthHeaders: (accessToken: string) => Record<string, string>;
+    parseJson: <T>(payload: string) => T;
+  },
+  accessToken: string,
+  name: string,
+): Promise<number> {
+  const response = await h.app.inject({
+    headers: h.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { name },
+    url: "/stc-proj-mgmt/api/teams",
+  });
+
+  expect(response.statusCode).toBe(201);
+  return h.parseJson<{ team: { id: number } }>(response.payload).team.id;
+}
+
+function createDisallowedExtensionPayload(filename: string): Buffer {
+  return createMultipartFileBuffer({
+    boundary: MULTIPART_BOUNDARY,
+    content: Buffer.from("MZ fake exe"),
+    contentType: "application/octet-stream",
+    fieldName: "file",
+    filename,
+  });
+}
+
+function createMagicMismatchPayload(filename: string): Buffer {
+  return createMultipartFileBuffer({
+    boundary: MULTIPART_BOUNDARY,
+    content: Buffer.from("not a real png"),
+    contentType: "image/png",
+    fieldName: "file",
+    filename,
+  });
+}
+
+function createPngPayload(filename: string): Buffer {
+  return createMultipartFileBuffer({
+    boundary: MULTIPART_BOUNDARY,
+    content: MINIMAL_PNG_BUFFER,
+    contentType: "image/png",
+    fieldName: "file",
+    filename,
+  });
+}
+
+function buildIssueMultipartHeaders(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  accessToken: string,
+): Record<string, string> {
+  return {
+    ...currentHarness.createAuthHeaders(accessToken),
+    "content-type": `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
+  };
+}
+
+async function expectIssueAttachmentUploadStatus(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  accessToken: string,
+  projectId: number,
+  issueId: number,
+  payload: Buffer,
+  expectedStatusCode: number,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: buildIssueMultipartHeaders(currentHarness, accessToken),
+    method: "POST",
+    payload,
+    url: `/stc-proj-mgmt/api/projects/${projectId}/issues/${issueId}/attachments`,
+  });
+
+  expect(response.statusCode).toBe(expectedStatusCode);
+}
+
+async function expectIssueFileTypeBypass(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  accessToken: string,
+  projectId: number,
+  issueId: number,
+  fileLabel: string,
+): Promise<void> {
+  await expectIssueAttachmentUploadStatus(
+    currentHarness,
+    accessToken,
+    projectId,
+    issueId,
+    createDisallowedExtensionPayload(`${fileLabel}-any.exe`),
+    201,
+  );
+  await expectIssueAttachmentUploadStatus(
+    currentHarness,
+    accessToken,
+    projectId,
+    issueId,
+    createMagicMismatchPayload(`${fileLabel}-fake.png`),
+    201,
+  );
+}
+
+async function expectIssueFileTypeRejection(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  accessToken: string,
+  projectId: number,
+  issueId: number,
+  fileLabel: string,
+): Promise<void> {
+  await expectIssueAttachmentUploadStatus(
+    currentHarness,
+    accessToken,
+    projectId,
+    issueId,
+    createDisallowedExtensionPayload(`${fileLabel}-any.exe`),
+    400,
+  );
+  await expectIssueAttachmentUploadStatus(
+    currentHarness,
+    accessToken,
+    projectId,
+    issueId,
+    createMagicMismatchPayload(`${fileLabel}-fake.png`),
+    400,
+  );
+}
+
+async function replaceProjectMembers(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  projectId: number,
+  members: Array<{ roleCodes: string[]; userId: number }>,
+  accessToken: string,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: currentHarness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: { members },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+  });
+
+  expect(response.statusCode).toBe(200);
+}
+
+async function replaceTeamMembers(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  teamId: number,
+  members: Array<{ roleCodes: string[]; userId: number }>,
+  accessToken: string,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: currentHarness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: { members },
+    url: `/stc-proj-mgmt/api/teams/${teamId}/members`,
+  });
+
+  expect(response.statusCode).toBe(200);
+}
+
+async function addOrganizationUsers(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  organizationId: number,
+  userIds: number[],
+  accessToken: string,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: currentHarness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: {
+      members: userIds.map((userId) => ({ userId })),
+    },
+    url: `/stc-proj-mgmt/api/organizations/${organizationId}/users`,
+  });
+
+  expect(response.statusCode).toBe(200);
+}
+
+async function associateOrganizationProject(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  organizationId: number,
+  projectId: number,
+  accessToken: string,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: currentHarness.createAuthHeaders(accessToken),
+    method: "PUT",
+    payload: { projects: [{ projectId }] },
+    url: `/stc-proj-mgmt/api/organizations/${organizationId}/projects`,
+  });
+
+  expect(response.statusCode).toBe(200);
+}
+
+async function grantOrganizationRole(
+  currentHarness: ReturnType<typeof createCrudTestHarness>,
+  organizationId: number,
+  userId: number,
+  roleCode: string,
+  accessToken: string,
+): Promise<void> {
+  const response = await currentHarness.app.inject({
+    headers: currentHarness.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { roleCode, userId },
+    url: `/stc-proj-mgmt/api/organizations/${organizationId}/roles/grant`,
+  });
+
+  expect(response.statusCode).toBe(200);
 }

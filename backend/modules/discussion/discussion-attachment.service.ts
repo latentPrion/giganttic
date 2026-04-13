@@ -26,6 +26,7 @@ import {
 } from "../../../db/index.js";
 import type { BackendConfig } from "../../config/backend-config.js";
 import { BACKEND_CONFIG } from "../../config/backend-config.js";
+import { hasProjectUploadFileTypeBypassRole } from "../access-control/access-control.utils.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
   assertBufferMatchesExtensionMagic,
@@ -55,6 +56,10 @@ type AttachmentLinkInput =
     projectId: number;
     taskId: string;
   };
+
+type AttachmentValidationOptions = {
+  bypassFileTypeValidation: boolean;
+};
 
 export function toAttachmentSummary(row: AttachmentRow): AttachmentSummary {
   return {
@@ -222,6 +227,10 @@ export class DiscussionAttachmentService {
       buffer: input.buffer,
       link: { issueId: input.issueId, kind: "issue" },
       originalFilename: input.originalFilename,
+      validationOptions: this.buildAttachmentValidationOptions(
+        input.projectId,
+        input.uploadedByUserId,
+      ),
       uploadedByUserId: input.uploadedByUserId,
     });
   }
@@ -239,6 +248,10 @@ export class DiscussionAttachmentService {
       buffer: input.buffer,
       link: { kind: "project", projectId: input.projectId },
       originalFilename: input.originalFilename,
+      validationOptions: this.buildAttachmentValidationOptions(
+        input.projectId,
+        input.uploadedByUserId,
+      ),
       uploadedByUserId: input.uploadedByUserId,
     });
   }
@@ -262,6 +275,10 @@ export class DiscussionAttachmentService {
         kind: "issue-comment",
       },
       originalFilename: input.originalFilename,
+      validationOptions: this.buildAttachmentValidationOptions(
+        input.projectId,
+        input.uploadedByUserId,
+      ),
       uploadedByUserId: input.uploadedByUserId,
     });
   }
@@ -283,6 +300,10 @@ export class DiscussionAttachmentService {
         taskId: input.taskId,
       },
       originalFilename: input.originalFilename,
+      validationOptions: this.buildAttachmentValidationOptions(
+        input.projectId,
+        input.uploadedByUserId,
+      ),
       uploadedByUserId: input.uploadedByUserId,
     });
   }
@@ -311,6 +332,10 @@ export class DiscussionAttachmentService {
         taskId: input.taskId,
       },
       originalFilename: input.originalFilename,
+      validationOptions: this.buildAttachmentValidationOptions(
+        input.projectId,
+        input.uploadedByUserId,
+      ),
       uploadedByUserId: input.uploadedByUserId,
     });
   }
@@ -937,14 +962,18 @@ export class DiscussionAttachmentService {
     buffer: Buffer;
     link: AttachmentLinkInput;
     originalFilename: string;
+    validationOptions: AttachmentValidationOptions;
     uploadedByUserId: number;
   }): Promise<AttachmentSummary> {
     await this.ensureUntrustedDirectoriesExist();
 
     const safeFilename = path.basename(input.originalFilename);
     const extension = normalizeFilenameExtension(safeFilename);
-    this.assertPermittedExtension(extension);
-    this.assertBufferUploadable(input.buffer, extension);
+    this.assertBufferUploadable(
+      input.buffer,
+      extension,
+      input.validationOptions,
+    );
 
     const attachmentId = randomUUID();
     const contentHash = createHash("sha256").update(input.buffer).digest("hex");
@@ -978,6 +1007,19 @@ export class DiscussionAttachmentService {
     }
 
     return toAttachmentSummary(row);
+  }
+
+  private buildAttachmentValidationOptions(
+    projectId: number,
+    uploadedByUserId: number,
+  ): AttachmentValidationOptions {
+    return {
+      bypassFileTypeValidation: hasProjectUploadFileTypeBypassRole(
+        this.databaseService.db,
+        projectId,
+        uploadedByUserId,
+      ),
+    };
   }
 
   private insertAttachmentLink(
@@ -1037,7 +1079,11 @@ export class DiscussionAttachmentService {
     }
   }
 
-  private assertBufferUploadable(buffer: Buffer, extension: string): void {
+  private assertBufferUploadable(
+    buffer: Buffer,
+    extension: string,
+    validationOptions: AttachmentValidationOptions,
+  ): void {
     if (buffer.length === 0) {
       throw new BadRequestException(EMPTY_ATTACHMENT_NOTIFICATION);
     }
@@ -1047,6 +1093,12 @@ export class DiscussionAttachmentService {
         `Attachment exceeds ${this.config.maxAttachmentUploadBytes} bytes`,
       );
     }
+
+    if (validationOptions.bypassFileTypeValidation) {
+      return;
+    }
+
+    this.assertPermittedExtension(extension);
 
     if (!assertBufferMatchesExtensionMagic(extension, buffer)) {
       throw new BadRequestException(MAGIC_BYTES_MISMATCH_MESSAGE);

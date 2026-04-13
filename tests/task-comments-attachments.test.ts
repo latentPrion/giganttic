@@ -307,6 +307,46 @@ describe("task comments and attachments api", () => {
     });
     expect(memberDeleteResponse.statusCode).toBe(403);
   });
+
+  it("accepts otherwise rejected task attachment uploads for an effective project manager and rejects them for other users", async () => {
+    const owner = await harness.registerUser("task-attachment-bypass-owner");
+    const member = await harness.registerUser("task-attachment-bypass-member");
+    const { projectId } = await createProjectWithDefaultTask(
+      owner.accessToken,
+      "Task attachment bypass",
+    );
+    await replaceProjectMembers(projectId, owner.user.id, member.user.id, owner.accessToken);
+
+    const ownerBadExtension = await harness.app.inject({
+      headers: buildMultipartHeaders(owner.accessToken),
+      method: "POST",
+      payload: createUploadPayload("task-any.exe", Buffer.from("MZ fake exe"), "application/octet-stream"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    const ownerBadMagic = await harness.app.inject({
+      headers: buildMultipartHeaders(owner.accessToken),
+      method: "POST",
+      payload: createUploadPayload("task-fake.png", Buffer.from("not a real png"), "image/png"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    const memberBadExtension = await harness.app.inject({
+      headers: buildMultipartHeaders(member.accessToken),
+      method: "POST",
+      payload: createUploadPayload("task-member-any.exe", Buffer.from("MZ fake exe"), "application/octet-stream"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID),
+    });
+    const memberBadMagic = await harness.app.inject({
+      headers: buildMultipartHeaders(member.accessToken),
+      method: "POST",
+      payload: createUploadPayload("task-member-fake.png", Buffer.from("not a real png"), "image/png"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID),
+    });
+
+    expect(ownerBadExtension.statusCode).toBe(201);
+    expect(ownerBadMagic.statusCode).toBe(201);
+    expect(memberBadExtension.statusCode).toBe(403);
+    expect(memberBadMagic.statusCode).toBe(403);
+  });
 });
 
 async function createProjectWithDefaultTask(accessToken: string, name: string) {
@@ -366,10 +406,18 @@ function buildMultipartHeaders(accessToken: string): Record<string, string> {
 }
 
 function createPngUploadPayload(filename: string): Buffer {
+  return createUploadPayload(filename, MINIMAL_PNG_BUFFER, "image/png");
+}
+
+function createUploadPayload(
+  filename: string,
+  content: Buffer,
+  contentType: string,
+): Buffer {
   return createMultipartFileBuffer({
     boundary: MULTIPART_BOUNDARY,
-    content: MINIMAL_PNG_BUFFER,
-    contentType: "image/png",
+    content,
+    contentType,
     fieldName: "file",
     filename,
   });

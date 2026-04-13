@@ -472,6 +472,40 @@ export function hasEffectiveProjectManagerRole(
   return listEffectiveProjectManagerUserIds(database, projectId).includes(userId);
 }
 
+function hasEffectiveLinkedTeamManagerRoleForProject(
+  database: AppDatabase,
+  projectId: number,
+  userId: number,
+): boolean {
+  return listTeamIdsForProject(database, projectId).some((teamId) =>
+    hasEffectiveTeamManagerRole(database, teamId, userId)
+  );
+}
+
+function hasAssociatedOrganizationManagerRoleForProject(
+  database: AppDatabase,
+  projectId: number,
+  userId: number,
+): boolean {
+  return listOrganizationIdsForProject(database, projectId).some((organizationId) =>
+    hasOrganizationManagerRole(database, organizationId, userId)
+  );
+}
+
+export function hasProjectUploadFileTypeBypassRole(
+  database: AppDatabase,
+  projectId: number,
+  userId: number,
+): boolean {
+  return hasEffectiveProjectManagerRole(database, projectId, userId)
+    || hasEffectiveLinkedTeamManagerRoleForProject(database, projectId, userId)
+    || hasAssociatedOrganizationManagerRoleForProject(
+      database,
+      projectId,
+      userId,
+    );
+}
+
 export function hasDirectTeamManagerRole(
   database: AppDatabase,
   teamId: number,
