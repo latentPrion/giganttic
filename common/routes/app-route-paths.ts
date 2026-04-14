@@ -1,6 +1,33 @@
+/**
+ * Route path constants for `react-router` `<Route path>` and in-app `navigate` / `<Link to>`.
+ *
+ * **Browser router basename (`main.tsx`)**
+ * - PM paths here are **full site pathnames** (e.g. `/pm/project`). The app uses `BrowserRouter`
+ *   `basename="/"` so the matcher sees that full pathname. If you set `basename` to the deploy
+ *   prefix (e.g. `/pm`), paths would be stripped and would **not** match these `/pm/...` patterns.
+ *
+ * **`VITE_APP_BASE_PATH` / `buildAppRelativeUrl` (see `frontend/src/common/routing/public-app-url.ts`)**
+ * - That env drives Vite `base` and **non-router** URLs (assets, scoped-login links, emails). It is
+ *   not the React Router basename. Do not pass PM route strings through `buildAppRelativeUrl` unless
+ *   you intend to prepend `appBasePath` again.
+ *
+ * **Reverse proxy / hosting**
+ * - The browser’s `location.pathname` for PM screens must be `/pm/...` as defined here. If nginx
+ *   (or similar) mounts the SPA under an extra prefix, either rewrite the URL before the SPA or
+ *   change these constants and the server config together; env alone cannot retarget them.
+ *
+ * **`PROJECT_MANAGER_ROUTE_ROOT`**
+ * - Prefer the exported `PROJECT_MANAGER_*_ROUTE_PATH` constants for links and routes. Avoid
+ *   hand-building path strings from this segment so paths stay consistent.
+ */
+
 const ROOT_ROUTE_PATH = "/";
 const AUTH_ROUTE_ROOT = "/auth";
-const PROJECT_MANAGER_ROUTE_ROOT = "/pm";
+/**
+ * First path segment for PM SPA URLs. Prefer `PROJECT_MANAGER_*_ROUTE_PATH` instead of concatenating
+ * this value manually.
+ */
+export const PROJECT_MANAGER_ROUTE_ROOT = "/pm";
 const USER_ROUTE_ROOT = "/user";
 
 export const HOME_ROUTE_PATH = ROOT_ROUTE_PATH;
@@ -26,4 +53,3 @@ export const PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_R
 
 /** Common typo for `PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH` (`mgr-upload` vs `mgr-uploads`). */
 export const PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}/mgr-upload`;
-

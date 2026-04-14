@@ -1,3 +1,5 @@
+/** Deployment-relative URL helpers. Canonical routing notes: `common/routes/app-route-paths.ts`. */
+
 import { SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH } from "../../../../common/routes/app-route-paths.js";
 import { frontendConfig } from "../../config/frontend-config.js";
 

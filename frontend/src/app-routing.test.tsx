@@ -3,141 +3,28 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./app-routing-test-vi-mocks.js";
 import { authApi } from "./common/session/api/auth-api.js";
 import { authTokenStorage } from "./common/session/storage/auth-token-storage.js";
 import { lobbyApi } from "./lobby/api/lobby-api.js";
 import { ganttApi } from "./spas/project-manager/api/gantt-api.js";
 import { issuesApi } from "./spas/project-manager/api/issues-api.js";
+import {
+  createAuthenticatedResponse,
+  createLoginResponse,
+} from "./app-routing-test-auth-helpers.js";
+import {
+  ROUTING_TEST_CHART_XML,
+  listMgrUploadsFilesMock,
+} from "./app-routing-test-vi-mocks.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
-
-const { ROUTING_TEST_CHART_XML } = vi.hoisted(() => ({
-  ROUTING_TEST_CHART_XML:
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><data><task id=\"1001\"><![CDATA[Test chart]]></task></data>",
-}));
-
-vi.mock("./spas/project-manager/lib/dhtmlx-gantt-adapter.js", () => ({
-  getDhtmlxGantt: () => ({
-    attachEvent: vi.fn(() => 1),
-    clearAll: vi.fn(),
-    config: {
-      columns: [],
-      date_format: "",
-      grid_width: 0,
-      keep_grid_width: false,
-      layout: null,
-      show_chart: true,
-      show_grid: true,
-    },
-    destructor: vi.fn(),
-    detachEvent: vi.fn(),
-    getSelectedId: vi.fn(() => null),
-    init: vi.fn(),
-    parse: vi.fn(),
-    render: vi.fn(),
-    resetLayout: vi.fn(),
-    serialize: vi.fn(() => ROUTING_TEST_CHART_XML),
-    setSizes: vi.fn(),
-  }),
-}));
-
-vi.mock("./common/session/api/auth-api.js", () => ({
-  authApi: {
-    getCurrentSession: vi.fn(),
-    login: vi.fn(),
-    loginWithScopedAccessToken: vi.fn(),
-    register: vi.fn(),
-    revokeCurrentSession: vi.fn(),
-    revokeSessions: vi.fn(),
-  },
-}));
-
-vi.mock("./common/session/storage/auth-token-storage.js", () => ({
-  authTokenStorage: {
-    clear: vi.fn(),
-    read: vi.fn(),
-    write: vi.fn(),
-  },
-}));
-
-vi.mock("./lobby/api/lobby-api.js", () => ({
-  lobbyApi: {
-    createOrganization: vi.fn(),
-    createProject: vi.fn(),
-    createTeam: vi.fn(),
-    deleteOrganization: vi.fn(),
-    deleteProject: vi.fn(),
-    deleteTeam: vi.fn(),
-    getOrganization: vi.fn(),
-    getProject: vi.fn(),
-    getTeam: vi.fn(),
-    getUser: vi.fn(),
-    listOrganizations: vi.fn(),
-    listProjects: vi.fn(),
-    listTeams: vi.fn(),
-    associateProjectOrganization: vi.fn(),
-    associateProjectTeam: vi.fn(),
-    replaceOrganizationUsers: vi.fn(),
-    replaceTeamMembers: vi.fn(),
-    updateOrganization: vi.fn(),
-    updateProject: vi.fn(),
-    updateTeam: vi.fn(),
-  },
-}));
-
-vi.mock("./spas/project-manager/api/issues-api.js", () => ({
-  issuesApi: {
-    createIssue: vi.fn(),
-    deleteIssue: vi.fn(),
-    getIssue: vi.fn(),
-    listIssues: vi.fn(),
-    updateIssue: vi.fn(),
-  },
-}));
-
-vi.mock("./spas/project-manager/api/gantt-api.js", () => ({
-  ganttApi: {
-    getProjectChart: vi.fn(),
-    getProjectChartExportCapabilities: vi.fn(),
-    getProjectChartOrNull: vi.fn(),
-    putProjectChart: vi.fn(),
-  },
-}));
 
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
 const lobbyApiMock = vi.mocked(lobbyApi);
 const ganttApiMock = vi.mocked(ganttApi);
 const issuesApiMock = vi.mocked(issuesApi);
-
-function createAuthenticatedResponse() {
-  return {
-    session: {
-      expirationTimestamp: "2026-03-08T00:00:00.000Z",
-      id: "session-1",
-      ipAddress: "127.0.0.1",
-      isScopedAccessSession: false,
-      location: null,
-      revokedAt: null,
-      startTimestamp: "2026-03-07T00:00:00.000Z",
-      userId: 101,
-    },
-    user: {
-      email: "demo@example.com",
-      id: 101,
-      roles: ["GGTC_SYSTEMROLE_ADMIN"],
-      username: "demo-user",
-    },
-  };
-}
-
-function createLoginResponse() {
-  return {
-    accessToken: "scoped-login-token",
-    ...createAuthenticatedResponse(),
-    tokenType: "Bearer" as const,
-  };
-}
 
 describe("app routing", () => {
   beforeEach(() => {
@@ -268,6 +155,8 @@ describe("app routing", () => {
         username: "demo-user",
       },
     });
+    listMgrUploadsFilesMock.mockReset();
+    listMgrUploadsFilesMock.mockResolvedValue({ files: [] });
   });
 
   afterEach(() => {
@@ -414,7 +303,13 @@ describe("app routing", () => {
     expect(await screen.findByText("Detailed Project View")).toBeVisible();
   });
 
-  it("renders PM routes correctly when the app is mounted under a /pm basename", async () => {
+  /*
+   * MemoryRouter-only quirk: route paths in code are full site paths (`/pm/project`, …). If the test
+   * router uses `basename="/pm"`, React Router strips one `/pm` from the location, so the remaining
+   * segment must still be `/pm/project` — hence the doubled `/pm/pm/...` in `initialEntries`. Production
+   * uses `BrowserRouter basename="/"` in main.tsx, so real URLs stay `/pm/project` once.
+   */
+  it("renders PM routes when MemoryRouter basename is /pm (doubled /pm path in initialEntries)", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 

@@ -71,7 +71,12 @@ describe("NotificationBell", () => {
     expect(within(menu).getByRole("link", { name: "View all notifications" })).toBeVisible();
   });
 
-  it("renders notification links correctly when mounted under a /pm basename", async () => {
+  /*
+   * Same MemoryRouter quirk as app-routing tests: `basename="/pm"` strips one `/pm`, but `to` values
+   * are full `/pm/notifications`, so the memory location must use `/pm/pm/...` to land on the route.
+   * Production uses `BrowserRouter basename="/"`; hrefs are then `/pm/notifications` once.
+   */
+  it("resolves View all notifications href when MemoryRouter basename is /pm", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(<NotificationBell token="token-1" />, {

@@ -24,6 +24,9 @@ import { mgrUploadsApi } from "../api/mgr-uploads-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { buildMgrUploadPublicFileUrl } from "../lib/build-mgr-upload-public-file-url.js";
 
+/** Stable selector for routing/integration tests (`app-routing-mgr-uploads-route.test.tsx`). */
+export const PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID = "project-manager-mgr-uploads-page";
+
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Shared instance uploads";
 const FORBIDDEN_MESSAGE =
@@ -253,7 +256,11 @@ export function ProjectManagerMgrUploadsPage(
   }
 
   return (
-    <Stack spacing={2} sx={{ p: 2 }}>
+    <Stack
+      data-testid={PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID}
+      spacing={2}
+      sx={{ p: 2 }}
+    >
       <Box>
         <Typography color="text.secondary" variant="overline">
           {PAGE_OVERLINE}
