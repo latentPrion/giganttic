@@ -30,6 +30,12 @@ from fireflies_api_common import (
     fetch_transcript_payload,
     require_token,
 )
+from fireflies_audio_upload import (
+    DEFAULT_EXISTING_LOOKBACK_DAYS,
+    DEFAULT_POLL_INTERVAL_SECONDS,
+    DEFAULT_POLL_TIMEOUT_SECONDS,
+    run_upload_url_flow,
+)
 
 DEFAULT_OUTPUT_DIRECTORY = Path("pm/downloads")
 USER_AGENT = "giganttic-fireflies-cli/0.1"
@@ -163,6 +169,88 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
             "Comma-separated asset selection to download. "
             f"Supported values: {', '.join(DOWNLOAD_ASSET_CHOICES)}."
         ),
+    )
+
+    upload_url_parser = subparsers.add_parser(
+        "upload-url",
+        help=(
+            "Queue transcription via uploadAudio from a public HTTPS URL, optionally wait, then "
+            "save JSON and/or render SRT/PDF."
+        ),
+    )
+    upload_url_parser.add_argument(
+        "--url",
+        required=True,
+        help="Direct https:// link to an audio/video file (mp3, mp4, wav, m4a, ogg).",
+    )
+    upload_url_parser.add_argument(
+        "--title",
+        default="",
+        help="Meeting title; deterministic marker suffix is appended for idempotent retries.",
+    )
+    upload_url_parser.add_argument(
+        "--speaker-map-json",
+        default="[]",
+        help=(
+            "JSON array or object mapping diarization speaker ids to names, e.g. "
+            '[{"speaker":0,"name":"Alice"}] or {"0":"Alice"}. Also sent as upload attendees.'
+        ),
+    )
+    upload_url_parser.add_argument(
+        "--language",
+        dest="custom_language",
+        default=None,
+        help="Optional custom_language code for transcription.",
+    )
+    upload_url_parser.add_argument(
+        "--webhook-url",
+        default=None,
+        help="Optional webhook URL for processing notifications.",
+    )
+    upload_url_parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Return after upload is queued; do not poll for transcript completion.",
+    )
+    upload_url_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=DEFAULT_POLL_INTERVAL_SECONDS,
+        help=f"Seconds between polls while waiting. Default: {DEFAULT_POLL_INTERVAL_SECONDS}.",
+    )
+    upload_url_parser.add_argument(
+        "--poll-timeout",
+        type=float,
+        default=DEFAULT_POLL_TIMEOUT_SECONDS,
+        help=f"Maximum seconds to wait for sentences. Default: {DEFAULT_POLL_TIMEOUT_SECONDS}.",
+    )
+    upload_url_parser.add_argument(
+        "--existing-lookback-days",
+        type=int,
+        default=DEFAULT_EXISTING_LOOKBACK_DAYS,
+        help=(
+            "Before upload, search this many days for an existing marker match and reuse it. "
+            f"Default: {DEFAULT_EXISTING_LOOKBACK_DAYS}."
+        ),
+    )
+    upload_url_parser.add_argument(
+        "--idempotency-key",
+        default=None,
+        help=(
+            "Optional stable key for marker generation. Reusing the same key prevents duplicate "
+            "uploads on retries."
+        ),
+    )
+    upload_url_parser.add_argument(
+        "--save-dir",
+        default=None,
+        help="Directory for transcript JSON and optional --render output.",
+    )
+    upload_url_parser.add_argument(
+        "--render",
+        choices=["srt", "pdf"],
+        default=None,
+        help="After transcription, write SRT or PDF (same as fireflies_transcript_to_text.py).",
     )
 
     return parser.parse_args(argv)
@@ -647,6 +735,26 @@ def main() -> int:
     arguments = parse_arguments()
     validate_date_filters(arguments)
     token = require_token(arguments.token)
+
+    if arguments.command == "upload-url":
+        save_directory = Path(arguments.save_dir) if arguments.save_dir else None
+        run_upload_url_flow(
+            token=token,
+            audio_url=arguments.url,
+            title=arguments.title,
+            speaker_map_json=arguments.speaker_map_json,
+            custom_language=arguments.custom_language,
+            webhook_url=arguments.webhook_url,
+            wait_for_transcript=not arguments.no_wait,
+            poll_interval_seconds=arguments.poll_interval,
+            poll_timeout_seconds=arguments.poll_timeout,
+            existing_lookback_days=arguments.existing_lookback_days,
+            idempotency_key=arguments.idempotency_key,
+            output_directory=save_directory,
+            render_format=arguments.render,
+        )
+        return 0
+
     payload = build_graphql_payload(arguments)
     response = execute_graphql_query(token, payload)
     records = parse_transcripts_response(response)

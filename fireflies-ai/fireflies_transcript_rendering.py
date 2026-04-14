@@ -44,6 +44,16 @@ def create_speaker_map(api_transcript_payload: dict[str, Any]) -> dict[int, str]
     return speaker_map
 
 
+def merge_speaker_name_overrides(
+    api_speaker_map: dict[int, str],
+    user_overrides: dict[int, str],
+) -> dict[int, str]:
+    """Apply user-provided speaker id → name overrides on top of API speaker metadata."""
+    merged = dict(api_speaker_map)
+    merged.update(user_overrides)
+    return merged
+
+
 def create_optional_int(value: Any) -> int | None:
     if value is None:
         return None

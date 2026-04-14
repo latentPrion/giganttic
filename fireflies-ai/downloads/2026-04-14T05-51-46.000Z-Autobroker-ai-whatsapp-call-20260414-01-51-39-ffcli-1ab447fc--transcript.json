@@ -1,0 +1,14 @@
+{
+  "id": "01KP58QF78G6E4WG9X8246F5ZX",
+  "title": "Autobroker-ai-whatsapp-call-20260414-01 51 39[ffcli 1ab447fc]",
+  "transcript_url": "https://app.fireflies.ai/view/01KP58QF78G6E4WG9X8246F5ZX",
+  "duration": 21.530000686645508,
+  "date": 1776145800000,
+  "participants": [],
+  "sentences": null,
+  "speakers": [],
+  "summary": {
+    "keywords": [],
+    "action_items": "\n**Unassigned**\nResearch and confirm the identity and details of the $199/month iMessage API company, including whether it uses the Blue Bubbles open-source framework (04:50)\nContinue discussions with the Assistable team to align strategy for integrating AI with the cell phone hardware solution (07:00)\n\n**Matthew and Mike (Backend Developers)**\nPrioritize backend development for dealer inventory management, including price adjustments and implementation of pricing rules (08:40)\n\n**Designer (Name not specified)**\nDevelop a Vehicle Detail Page (VDP) prototype incorporating real-time pricing and user-friendly mobile interfaces, leveraging Toyota fleet management design experience (15:15)\n\n**Project Manager**\nSchedule regular short catch-up calls to track development progress and reduce reliance on formal scope documents (18:30)\n\n**Project Lead**\nRequest FTP credentials and access details for Chrome VIN description database and dealer inventory batch API from Dustin, clarifying data transfer and storage requirements (19:50)\nObtain documentation for iDocSend API integration and validate feasibility of using third-party messaging APIs while maintaining data ownership (17:00)\n"
+  }
+}

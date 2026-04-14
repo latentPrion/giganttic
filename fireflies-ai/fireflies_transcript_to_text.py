@@ -10,15 +10,17 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from fireflies_api_common import ENVIRONMENT_TOKEN_KEY, fetch_transcript_payload, require_token
+from fireflies_speaker_map_json import parse_speaker_map_json
 from fireflies_transcript_rendering import (
     create_speaker_map,
     create_srt_content,
     create_timestamped_text,
     extract_transcript_identifier,
     load_transcript_file,
+    merge_speaker_name_overrides,
 )
 
 
@@ -64,6 +66,13 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=SUPPORTED_FORMATS,
         default=DEFAULT_FORMAT,
         help=f"Output format. Default: {DEFAULT_FORMAT}.",
+    )
+    parser.add_argument(
+        "--speaker-map-json",
+        help=(
+            "Optional JSON mapping diarization speaker ids to display names (inline JSON or path "
+            "to a .json file). Overrides Fireflies speaker labels for SRT/PDF output."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -160,6 +169,23 @@ def write_rendered_output(output_path: Path, rendered_content: str, selected_for
     write_output_file(output_path, rendered_content)
 
 
+def load_speaker_map_json_argument(raw_value: str) -> dict[int, str]:
+    candidate_path = Path(raw_value)
+    if candidate_path.is_file():
+        return parse_speaker_map_json(candidate_path.read_text(encoding="utf-8"))
+    return parse_speaker_map_json(raw_value)
+
+
+def render_transcript_payload_to_file(
+    transcript_payload: dict[str, Any],
+    speaker_map: dict[int, str],
+    output_path: Path,
+    selected_format: str,
+) -> None:
+    rendered_content = create_rendered_content(transcript_payload, speaker_map, selected_format)
+    write_rendered_output(output_path, rendered_content, selected_format)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     token = require_token(arguments.token)
@@ -170,6 +196,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     transcript_identifier = extract_transcript_identifier(local_transcript_payload)
     api_transcript_payload = fetch_transcript_payload(token, transcript_identifier)
     speaker_map = create_speaker_map(api_transcript_payload)
+    if arguments.speaker_map_json:
+        overrides = load_speaker_map_json_argument(arguments.speaker_map_json)
+        speaker_map = merge_speaker_name_overrides(speaker_map, overrides)
     rendered_content = create_rendered_content(api_transcript_payload, speaker_map, arguments.format)
 
     write_rendered_output(output_path, rendered_content, arguments.format)

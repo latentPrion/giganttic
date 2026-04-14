@@ -13,6 +13,7 @@ from fireflies_transcript_rendering import (
     create_speaker_map,
     create_srt_content,
     format_srt_timestamp,
+    merge_speaker_name_overrides,
 )
 
 
@@ -55,6 +56,12 @@ class FirefliesTranscriptToTextTests(unittest.TestCase):
 
         self.assertIn("Alice: Hello there.", srt_content)
         self.assertIn("Speaker1: General Kenobi.", srt_content)
+
+    def test_merge_speaker_name_overrides_replace_ids(self) -> None:
+        base = create_speaker_map(SAMPLE_TRANSCRIPT_PAYLOAD)
+        merged = merge_speaker_name_overrides(base, {1: "Bob"})
+        srt_content = create_srt_content(SAMPLE_TRANSCRIPT_PAYLOAD, merged)
+        self.assertIn("Bob: General Kenobi.", srt_content)
         self.assertIn("00:00:00,080 --> 00:00:01,200", srt_content)
 
     def test_srt_rendering_uses_default_final_duration(self) -> None:

@@ -45,6 +45,17 @@ query Transcripts(
 }
 """.strip()
 
+UPLOAD_AUDIO_MUTATION = """
+mutation UploadAudio($input: AudioUploadInput) {
+  uploadAudio(input: $input) {
+    success
+    title
+    message
+  }
+}
+""".strip()
+
+
 TRANSCRIPT_DETAIL_QUERY = """
 query TranscriptDetail($id: String!) {
   transcript(id: $id) {
@@ -154,6 +165,21 @@ def create_transcript_detail_payload(transcript_identifier: str) -> dict[str, An
             "id": transcript_identifier,
         },
     }
+
+
+def create_upload_audio_payload(input_data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "query": UPLOAD_AUDIO_MUTATION,
+        "variables": {"input": input_data},
+    }
+
+
+def upload_audio(token: str, input_data: dict[str, Any]) -> dict[str, Any]:
+    response = execute_graphql_query(token, create_upload_audio_payload(input_data))
+    upload_payload = response.get("data", {}).get("uploadAudio")
+    if not isinstance(upload_payload, dict):
+        raise SystemExit("Fireflies uploadAudio mutation returned no payload.")
+    return upload_payload
 
 
 def fetch_transcript_payload(token: str, transcript_identifier: str) -> dict[str, Any]:

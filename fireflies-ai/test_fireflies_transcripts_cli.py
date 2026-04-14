@@ -42,6 +42,23 @@ class FirefliesTranscriptsCliTests(unittest.TestCase):
         self.assertEqual(arguments.page, 1)
         self.assertFalse(arguments.detail)
 
+    def test_parse_arguments_upload_url_includes_required_url(self) -> None:
+        arguments = cli.parse_arguments(
+            [
+                "upload-url",
+                "--url",
+                "https://example.com/recording.mp3",
+                "--title",
+                "Team sync",
+            ]
+        )
+        self.assertEqual(arguments.command, "upload-url")
+        self.assertEqual(arguments.url, "https://example.com/recording.mp3")
+        self.assertEqual(arguments.title, "Team sync")
+        self.assertFalse(arguments.no_wait)
+        self.assertEqual(arguments.existing_lookback_days, 2)
+        self.assertIsNone(arguments.idempotency_key)
+
     def test_create_effective_skip_uses_page_number(self) -> None:
         arguments = cli.parse_arguments(["--limit", "25", "--page", "3", "list"])
         cli.validate_date_filters(arguments)
