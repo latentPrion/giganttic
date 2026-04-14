@@ -197,7 +197,11 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
-          <ProjectManagerProjectNavigation currentSection="tasks" projectId={props.projectId} />
+          <ProjectManagerProjectNavigation
+            authToken={props.token}
+            currentSection="tasks"
+            projectId={props.projectId}
+          />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>

@@ -134,6 +134,7 @@ describe("db version selection pipeline", () => {
     const config = buildBackendConfig({
       dbPath,
       port: 0,
+      sharedInstanceUploadsDir: path.join(path.dirname(dbPath), "shared-instance-uploads"),
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],

@@ -586,6 +586,38 @@ export function hasOrganizationManagerRole(
   ).includes(userId);
 }
 
+/**
+ * True when the user is an effective manager on any visible project, team, or organization.
+ * Used for instance-wide manager capabilities such as the shared `mgr-uploads` pool.
+ */
+export function hasEffectiveManagerAnywhere(
+  database: AppDatabase,
+  userId: number,
+): boolean {
+  const projectIds = listProjectIdsVisibleByMembership(database, userId);
+  for (const projectId of projectIds) {
+    if (hasEffectiveProjectManagerRole(database, projectId, userId)) {
+      return true;
+    }
+  }
+
+  const teamIds = listTeamIdsVisibleByMembership(database, userId);
+  for (const teamId of teamIds) {
+    if (hasEffectiveTeamManagerRole(database, teamId, userId)) {
+      return true;
+    }
+  }
+
+  const organizationIds = listOrganizationIdsVisibleByMembership(database, userId);
+  for (const organizationId of organizationIds) {
+    if (hasOrganizationManagerRole(database, organizationId, userId)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function hasProjectAccess(
   database: AppDatabase,
   projectId: number,

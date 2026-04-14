@@ -439,6 +439,7 @@ export function ProjectManagerIssuePage(props: ProjectManagerIssuePageProps) {
           </Typography>
         </Stack>
         <ProjectManagerProjectNavigation
+          authToken={props.token}
           currentSection={
             props.projectId !== null && props.issueId !== null ? "issue-detail" : "issues"
           }

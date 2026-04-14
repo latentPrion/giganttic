@@ -108,12 +108,15 @@ export function createCrudTestHarness(
   async function buildApp(databasePath: string): Promise<NestFastifyApplication> {
     const sandboxRoot = path.dirname(databasePath);
     const resolvedChartsDir = path.join(sandboxRoot, "charts");
+    const resolvedSharedUploadsDir = path.join(sandboxRoot, "shared-instance-uploads");
     const config = buildBackendConfig({
       ...backendConfigOverrides,
       chartsDir: resolvedChartsDir,
       createDbIfMissing: false,
       dbPath: databasePath,
       port: 0,
+      sharedInstanceUploadsDir:
+        backendConfigOverrides.sharedInstanceUploadsDir ?? resolvedSharedUploadsDir,
       untrustedContentAttachmentsDir: path.join(sandboxRoot, "untrusted", "attachments"),
       untrustedContentIssueCommentsDir: path.join(
         sandboxRoot,
@@ -129,9 +132,7 @@ export function createCrudTestHarness(
       new FastifyAdapter(),
     );
     nextApp.setGlobalPrefix(config.routePrefix);
-    await nextApp.register(multipart, {
-      limits: { fileSize: config.maxAttachmentUploadBytes },
-    });
+    await nextApp.register(multipart);
     await nextApp.init();
     await nextApp.getHttpAdapter().getInstance().ready();
 

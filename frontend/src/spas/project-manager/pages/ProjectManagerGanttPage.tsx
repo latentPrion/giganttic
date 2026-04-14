@@ -566,6 +566,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             {PAGE_OVERLINE}
           </Typography>
           <ProjectManagerProjectNavigation
+            authToken={props.token}
             currentSection="gantt"
             projectId={props.projectId}
           />

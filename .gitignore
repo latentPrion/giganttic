@@ -13,5 +13,6 @@ run/*.sqlite3
 run/*.bkp
 charts/[0-9]*.xml
 untrusted-content/
+uploads/
 /docs/3rdParty
 *.pyc

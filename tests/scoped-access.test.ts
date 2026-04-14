@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { rm } from "node:fs/promises";
+import path from "node:path";
 
 import multipart from "@fastify/multipart";
 import {
@@ -50,6 +51,7 @@ describe("scoped access tokens", () => {
       createDbIfMissing: false,
       dbPath,
       port: 0,
+      sharedInstanceUploadsDir: path.join(path.dirname(dbPath), "shared-instance-uploads"),
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule.register(config)],

@@ -3,9 +3,15 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithTheme } from "../../../test/render-with-theme.js";
+import { useMgrUploadsTabVisibility } from "../hooks/use-mgr-uploads-tab-visibility.js";
 import { ProjectManagerProjectNavigation } from "./ProjectManagerProjectNavigation.js";
 
 const navigateMock = vi.fn();
+const TEST_AUTH_TOKEN = "test-auth-token";
+
+vi.mock("../hooks/use-mgr-uploads-tab-visibility.js", () => ({
+  useMgrUploadsTabVisibility: vi.fn(() => "forbidden"),
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
@@ -18,13 +24,35 @@ vi.mock("react-router-dom", async () => {
 describe("ProjectManagerProjectNavigation", () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    vi.mocked(useMgrUploadsTabVisibility).mockReturnValue("forbidden");
+  });
+
+  it("navigates to mgr-uploads when the shared uploads tab is visible", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useMgrUploadsTabVisibility).mockReturnValue("allowed");
+
+    renderWithTheme(
+      <ProjectManagerProjectNavigation
+        authToken={TEST_AUTH_TOKEN}
+        currentSection="detail"
+        projectId={42}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Shared uploads" }));
+
+    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads?projectId=42");
   });
 
   it("navigates to the other project-scoped PM routes while preserving projectId", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(
-      <ProjectManagerProjectNavigation currentSection="detail" projectId={42} />,
+      <ProjectManagerProjectNavigation
+        authToken={TEST_AUTH_TOKEN}
+        currentSection="detail"
+        projectId={42}
+      />,
     );
 
     await user.click(screen.getByRole("tab", { name: "Gantt" }));
@@ -40,7 +68,11 @@ describe("ProjectManagerProjectNavigation", () => {
 
   it("disables project-scoped navigation when no project is selected", () => {
     renderWithTheme(
-      <ProjectManagerProjectNavigation currentSection="issues" projectId={null} />,
+      <ProjectManagerProjectNavigation
+        authToken={TEST_AUTH_TOKEN}
+        currentSection="issues"
+        projectId={null}
+      />,
     );
 
     expect(screen.getByRole("tab", { name: "Details" })).toBeDisabled();
@@ -54,6 +86,7 @@ describe("ProjectManagerProjectNavigation", () => {
     renderWithTheme(
       <ProjectManagerProjectNavigation
         actions={<button type="button">Download XML</button>}
+        authToken={TEST_AUTH_TOKEN}
         currentSection="gantt"
         projectId={42}
       />,
@@ -69,6 +102,7 @@ describe("ProjectManagerProjectNavigation", () => {
 
     renderWithTheme(
       <ProjectManagerProjectNavigation
+        authToken={TEST_AUTH_TOKEN}
         currentSection="task-detail"
         projectId={42}
         taskDetailContext={{ onCloseTaskTab, taskId: "task-7" }}

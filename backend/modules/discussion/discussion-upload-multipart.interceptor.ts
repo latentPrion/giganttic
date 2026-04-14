@@ -53,6 +53,21 @@ function mapMulterError(error: unknown): Error {
   return new BadRequestException(error.message);
 }
 
+function mapFastifyMultipartReadError(error: unknown): Error {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = String((error as { code: unknown }).code);
+    if (code === "FST_REQ_FILE_TOO_LARGE") {
+      return new PayloadTooLargeException("Uploaded file is too large");
+    }
+  }
+
+  if (error instanceof Error && error.message.toLowerCase().includes("too large")) {
+    return new PayloadTooLargeException("Uploaded file is too large");
+  }
+
+  return mapMulterError(error);
+}
+
 async function readFastifyMultipartFile(
   request: FastifyMultipartLikeRequest,
   maxBytes: number,
@@ -61,20 +76,24 @@ async function readFastifyMultipartFile(
     return undefined;
   }
 
-  const data = await request.file({
-    limits: { fileSize: maxBytes },
-  });
+  try {
+    const data = await request.file({
+      limits: { fileSize: maxBytes },
+    });
 
-  if (!data) {
-    return undefined;
+    if (!data) {
+      return undefined;
+    }
+
+    const buffer = await data.toBuffer();
+
+    return {
+      buffer,
+      originalname: data.filename ?? DISCUSSION_UPLOAD_FIELD_NAME,
+    };
+  } catch (error) {
+    throw mapFastifyMultipartReadError(error);
   }
-
-  const buffer = await data.toBuffer();
-
-  return {
-    buffer,
-    originalname: data.filename ?? DISCUSSION_UPLOAD_FIELD_NAME,
-  };
 }
 
 function assignStoredFile(

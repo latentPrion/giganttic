@@ -7,6 +7,7 @@ import {
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
   PROJECT_MANAGER_KANBAN_ROUTE_PATH,
+  PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
   PROJECT_MANAGER_ROUTE_PATH,
@@ -31,6 +32,7 @@ import { GanttRoute } from "../spas/project-manager/routes/GanttRoute.js";
 import { IssueRoute } from "../spas/project-manager/routes/IssueRoute.js";
 import { IssuesRoute } from "../spas/project-manager/routes/IssuesRoute.js";
 import { KanbanRoute } from "../spas/project-manager/routes/KanbanRoute.js";
+import { MgrUploadsRoute } from "../spas/project-manager/routes/MgrUploadsRoute.js";
 import { NotificationsRoute } from "../spas/project-manager/routes/NotificationsRoute.js";
 import { OrganizationRoute } from "../spas/project-manager/routes/OrganizationRoute.js";
 import { ProjectRoute } from "../spas/project-manager/routes/ProjectRoute.js";
@@ -67,6 +69,7 @@ export function AppRoutes() {
       <Route element={<UserSpaRoute />} path={`${USER_ROUTE_PATH}/*`} />
       <Route element={<GanttRoute />} path={PROJECT_MANAGER_GANTT_ROUTE_PATH} />
       <Route element={<KanbanRoute />} path={PROJECT_MANAGER_KANBAN_ROUTE_PATH} />
+      <Route element={<MgrUploadsRoute />} path={PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH} />
       <Route element={<NotificationsRoute />} path={PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH} />
       <Route element={<IssuesRoute />} path={PROJECT_MANAGER_ISSUES_ROUTE_PATH} />
       <Route element={<TasksRoute />} path={PROJECT_MANAGER_TASKS_ROUTE_PATH} />

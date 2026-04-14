@@ -438,6 +438,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
           </Typography>
         </Stack>
         <ProjectManagerProjectNavigation
+          authToken={props.token}
           currentSection={
             props.projectId !== null && props.taskId !== null ? "task-detail" : "tasks"
           }

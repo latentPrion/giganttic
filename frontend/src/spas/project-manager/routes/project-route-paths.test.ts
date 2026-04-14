@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createProjectDetailRoute,
   createProjectIssueRoute,
+  createProjectMgrUploadsRoute,
   createProjectTaskRoute,
 } from "./project-route-paths.js";
 
@@ -25,6 +26,10 @@ describe("project route paths", () => {
     expect(
       createProjectIssueRoute(42, 7, { commentId: 99, tab: "comments" }),
     ).toBe("/pm/project/issue?projectId=42&id=7&tab=comments&commentId=99");
+  });
+
+  it("creates mgr-uploads routes with projectId", () => {
+    expect(createProjectMgrUploadsRoute(42)).toBe("/pm/mgr-uploads?projectId=42");
   });
 
   it("creates task detail routes and encodes task ids safely", () => {

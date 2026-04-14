@@ -368,7 +368,11 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
           <Typography color="primary" variant="overline" sx={{ letterSpacing: "0.14em" }}>
             {PAGE_OVERLINE}
           </Typography>
-          <ProjectManagerProjectNavigation currentSection="issues" projectId={props.projectId} />
+          <ProjectManagerProjectNavigation
+            authToken={props.token}
+            currentSection="issues"
+            projectId={props.projectId}
+          />
           <Typography component="h1" variant="h3">
             {PAGE_TITLE}
           </Typography>

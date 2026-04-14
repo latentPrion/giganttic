@@ -8,11 +8,14 @@ import {
   Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+
+import { useMgrUploadsTabVisibility } from "../hooks/use-mgr-uploads-tab-visibility.js";
 import {
   createProjectDetailRoute,
   createProjectGanttRoute,
   createProjectIssueRoute,
   createProjectKanbanRoute,
+  createProjectMgrUploadsRoute,
   createProjectTaskRoute,
   createProjectIssuesRoute,
   createProjectTasksRoute,
@@ -31,6 +34,7 @@ export interface ProjectTaskDetailTabContext {
 
 interface ProjectManagerProjectNavigationProps {
   actions?: React.ReactNode;
+  authToken: string | undefined;
   currentSection: ProjectRouteSection;
   issueDetailContext?: ProjectIssueDetailTabContext | null;
   taskDetailContext?: ProjectTaskDetailTabContext | null;
@@ -44,6 +48,7 @@ const GANTT_LABEL = "Gantt";
 const KANBAN_LABEL = "Kanban Board";
 const ISSUES_LABEL = "Issues";
 const TASKS_LABEL = "Tasks";
+const MGR_UPLOADS_LABEL = "Shared uploads";
 
 function buildRouteForSection(
   currentSection: ProjectRouteSection,
@@ -70,6 +75,8 @@ function buildRouteForSection(
       return createProjectIssuesRoute(projectId);
     case "tasks":
       return createProjectTasksRoute(projectId);
+    case "mgr-uploads":
+      return createProjectMgrUploadsRoute(projectId);
     case "issue-detail":
       if (issueDetailIssueId == null) {
         return createProjectIssuesRoute(projectId);
@@ -134,6 +141,7 @@ export function ProjectManagerProjectNavigation(
   props: ProjectManagerProjectNavigationProps,
 ) {
   const navigate = useNavigate();
+  const mgrUploadsAccess = useMgrUploadsTabVisibility(props.authToken);
 
   function handleSectionChange(
     _event: React.SyntheticEvent,
@@ -199,6 +207,9 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
         <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />
+        {mgrUploadsAccess === "allowed" && props.projectId !== null ? (
+          <Tab label={MGR_UPLOADS_LABEL} value="mgr-uploads" />
+        ) : null}
         {props.issueDetailContext && props.projectId !== null ? (
           <Tab label={renderIssueDetailTabLabel()} value="issue-detail" />
         ) : null}

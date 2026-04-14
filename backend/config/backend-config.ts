@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { DEFAULT_DISCUSSION_ATTACHMENT_MAX_UPLOAD_BYTES } from "../../common/discussion/discussion-upload.constants.js";
+import { MGR_UPLOADS_MAX_UPLOAD_BYTES } from "../../common/mgr-uploads/mgr-uploads.constants.js";
 import { DEFAULT_NOTIFICATIONS_DROPDOWN_LIMIT } from "../modules/notifications/notifications.constants.js";
 import {
   resolveRuntimeSchemaSnapshotSubdir,
@@ -32,6 +33,7 @@ export interface BackendConfig {
   dbPath: string;
   ganttExportServerUrl: string | null;
   host: string;
+  mgrUploadsMaxUploadBytes: number;
   maxAttachmentUploadBytes: number;
   maxAttachmentsPerIssueOrComment: number;
   notificationsDropdownLimit: number;
@@ -39,6 +41,7 @@ export interface BackendConfig {
   routePrefix: string;
   runtimeSchemaSnapshotSubdir: string;
   sessionTtlMs: number;
+  sharedInstanceUploadsDir: string;
   trustProxy: boolean;
   scopedSessionRouteAllowlist: ReadonlyArray<{
     method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
@@ -53,6 +56,10 @@ export interface BackendConfig {
 }
 
 export const BACKEND_CONFIG = Symbol("BACKEND_CONFIG");
+
+function createDefaultSharedInstanceUploadsDir(cwd: string): string {
+  return path.join(cwd, "uploads");
+}
 
 function createDefaultUntrustedAttachmentsDir(cwd: string): string {
   return path.join(cwd, "untrusted-content", "attachments");
@@ -203,6 +210,9 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
       method: "POST",
       pattern: "/notifications/:notificationId/toggle-noticed",
     },
+    { method: "GET", pattern: "/mgr-uploads" },
+    { method: "POST", pattern: "/mgr-uploads" },
+    { method: "DELETE", pattern: "/mgr-uploads/:filename" },
   ];
 }
 
@@ -218,6 +228,7 @@ export function buildBackendConfig(
     dbPath: path.resolve(cwd, resolveRuntimeTarget(process.env)),
     ganttExportServerUrl: null,
     host: "127.0.0.1",
+    mgrUploadsMaxUploadBytes: MGR_UPLOADS_MAX_UPLOAD_BYTES,
     maxAttachmentUploadBytes: DEFAULT_MAX_ATTACHMENT_UPLOAD_BYTES,
     maxAttachmentsPerIssueOrComment: DEFAULT_MAX_ATTACHMENTS_PER_ISSUE_OR_COMMENT,
     notificationsDropdownLimit: DEFAULT_NOTIFICATIONS_DROPDOWN_LIMIT,
@@ -225,6 +236,7 @@ export function buildBackendConfig(
     routePrefix: "stc-proj-mgmt/api",
     runtimeSchemaSnapshotSubdir: resolveRuntimeSchemaSnapshotSubdir(process.env),
     sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
+    sharedInstanceUploadsDir: createDefaultSharedInstanceUploadsDir(cwd),
     trustProxy: false,
     scopedSessionRouteAllowlist: createDefaultScopedSessionRouteAllowlist(),
     untrustedContentAttachmentsDir: createDefaultUntrustedAttachmentsDir(cwd),
@@ -294,10 +306,24 @@ export function buildBackendConfigFromEnv(
       : path.resolve(cwd, raw);
   }
 
+  if (env.GGTC_SHARED_INSTANCE_UPLOADS_DIR?.trim()) {
+    const raw = env.GGTC_SHARED_INSTANCE_UPLOADS_DIR.trim();
+    overrides.sharedInstanceUploadsDir = path.isAbsolute(raw)
+      ? raw
+      : path.resolve(cwd, raw);
+  }
+
   if (env.GGTC_MAX_ATTACHMENT_UPLOAD_BYTES) {
     const maxBytes = Number(env.GGTC_MAX_ATTACHMENT_UPLOAD_BYTES);
     if (Number.isFinite(maxBytes) && maxBytes > 0) {
       overrides.maxAttachmentUploadBytes = maxBytes;
+    }
+  }
+
+  if (env.GGTC_MGR_UPLOADS_MAX_UPLOAD_BYTES?.trim()) {
+    const maxBytes = Number(env.GGTC_MGR_UPLOADS_MAX_UPLOAD_BYTES.trim());
+    if (Number.isFinite(maxBytes) && maxBytes > 0) {
+      overrides.mgrUploadsMaxUploadBytes = maxBytes;
     }
   }
 

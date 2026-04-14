@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { rm } from "node:fs/promises";
+import path from "node:path";
 
 import {
   FastifyAdapter,
@@ -57,6 +58,7 @@ describe("backend auth api", () => {
       createDbIfMissing: false,
       dbPath,
       port: 0,
+      sharedInstanceUploadsDir: path.join(path.dirname(dbPath), "shared-instance-uploads"),
       trustProxy: true,
     });
     const moduleRef = await Test.createTestingModule({
