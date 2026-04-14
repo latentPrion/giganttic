@@ -10,12 +10,12 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { useMgrUploadsTabVisibility } from "../hooks/use-mgr-uploads-tab-visibility.js";
+import { PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import {
   createProjectDetailRoute,
   createProjectGanttRoute,
   createProjectIssueRoute,
   createProjectKanbanRoute,
-  createProjectMgrUploadsRoute,
   createProjectTaskRoute,
   createProjectIssuesRoute,
   createProjectTasksRoute,
@@ -58,6 +58,10 @@ function buildRouteForSection(
     taskDetailTaskId?: string | null;
   } = {},
 ): string {
+  if (currentSection === "mgr-uploads") {
+    return PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH;
+  }
+
   if (projectId === null) {
     return "";
   }
@@ -75,8 +79,6 @@ function buildRouteForSection(
       return createProjectIssuesRoute(projectId);
     case "tasks":
       return createProjectTasksRoute(projectId);
-    case "mgr-uploads":
-      return createProjectMgrUploadsRoute(projectId);
     case "issue-detail":
       if (issueDetailIssueId == null) {
         return createProjectIssuesRoute(projectId);
@@ -147,6 +149,11 @@ export function ProjectManagerProjectNavigation(
     _event: React.SyntheticEvent,
     nextSection: ProjectRouteSection,
   ): void {
+    if (nextSection === "mgr-uploads") {
+      navigate(PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH);
+      return;
+    }
+
     if (props.projectId === null) {
       return;
     }
@@ -207,7 +214,7 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
         <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />
-        {mgrUploadsAccess === "allowed" && props.projectId !== null ? (
+        {mgrUploadsAccess === "allowed" ? (
           <Tab label={MGR_UPLOADS_LABEL} value="mgr-uploads" />
         ) : null}
         {props.issueDetailContext && props.projectId !== null ? (

@@ -45,7 +45,7 @@ describe("ProjectManagerMgrUploadsPage", () => {
     );
 
     renderWithTheme(
-      <ProjectManagerMgrUploadsPage projectId={9} token="tok" />,
+      <ProjectManagerMgrUploadsPage token="tok" />,
     );
 
     await waitFor(() => {
@@ -73,7 +73,7 @@ describe("ProjectManagerMgrUploadsPage", () => {
     });
 
     renderWithTheme(
-      <ProjectManagerMgrUploadsPage projectId={9} token="tok" />,
+      <ProjectManagerMgrUploadsPage token="tok" />,
     );
 
     await waitFor(() => {

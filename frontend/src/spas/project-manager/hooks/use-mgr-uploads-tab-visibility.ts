@@ -10,7 +10,8 @@ export type MgrUploadsTabVisibilityState =
 
 /**
  * Resolves whether the Shared uploads tab should be shown for the current bearer token.
- * Uses the mgr-uploads list endpoint so visibility matches backend authorization.
+ * The mgr-uploads pool is instance-global (not project-scoped); this probe does not use
+ * project context. Visibility matches backend authorization via the list endpoint.
  */
 export function useMgrUploadsTabVisibility(
   authToken: string | undefined,

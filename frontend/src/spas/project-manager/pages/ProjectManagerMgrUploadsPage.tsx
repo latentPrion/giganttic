@@ -26,7 +26,6 @@ import { buildMgrUploadPublicFileUrl } from "../lib/build-mgr-upload-public-file
 
 const PAGE_OVERLINE = "PM SPA";
 const PAGE_TITLE = "Shared instance uploads";
-const SELECT_PROJECT_MESSAGE = "Select a valid project to use the shared uploads workspace.";
 const FORBIDDEN_MESSAGE =
   "You do not have manager access to shared uploads. Effective project, team, or organization managers may use this section.";
 const LOAD_ERROR_MESSAGE = "Could not load shared uploads. Try again later.";
@@ -35,7 +34,6 @@ const COPY_SUCCESS_FEEDBACK_MS = 2000;
 const MAX_UPLOAD_HELP_TEXT = `Max file size: ${MGR_UPLOADS_MAX_UPLOAD_MIB} MiB per file.`;
 
 interface ProjectManagerMgrUploadsPageProps {
-  projectId: number | null;
   token: string;
 }
 
@@ -69,20 +67,11 @@ export function ProjectManagerMgrUploadsPage(
   );
 
   const refreshFiles = useCallback(async () => {
-    if (props.projectId === null) {
-      return;
-    }
     const response = await mgrUploadsApi.listFiles(props.token);
     setFiles(response.files);
-  }, [props.projectId, props.token]);
+  }, [props.token]);
 
   useEffect(() => {
-    if (props.projectId === null) {
-      setLoadState("ready");
-      setFiles([]);
-      return;
-    }
-
     let cancelled = false;
     setLoadState("loading");
 
@@ -106,7 +95,7 @@ export function ProjectManagerMgrUploadsPage(
     return () => {
       cancelled = true;
     };
-  }, [props.projectId, props.token]);
+  }, [props.token]);
 
   async function handleUpload(fileList: FileList | null): Promise<void> {
     const file = fileList?.[0];
@@ -160,10 +149,6 @@ export function ProjectManagerMgrUploadsPage(
   }
 
   function renderBody(): React.ReactNode {
-    if (props.projectId === null) {
-      return <Alert severity="info">{SELECT_PROJECT_MESSAGE}</Alert>;
-    }
-
     if (loadState === "loading") {
       return (
         <Stack alignItems="center" spacing={2} sx={{ py: 4 }}>
@@ -280,7 +265,7 @@ export function ProjectManagerMgrUploadsPage(
       <ProjectManagerProjectNavigation
         authToken={props.token}
         currentSection="mgr-uploads"
-        projectId={props.projectId}
+        projectId={null}
       />
       {renderBody()}
     </Stack>

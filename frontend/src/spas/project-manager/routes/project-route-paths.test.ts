@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   createProjectDetailRoute,
   createProjectIssueRoute,
-  createProjectMgrUploadsRoute,
   createProjectTaskRoute,
 } from "./project-route-paths.js";
+import { PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 
 describe("project route paths", () => {
   it("creates project detail routes with optional attachment-tab deep-link params", () => {
@@ -28,8 +28,8 @@ describe("project route paths", () => {
     ).toBe("/pm/project/issue?projectId=42&id=7&tab=comments&commentId=99");
   });
 
-  it("creates mgr-uploads routes with projectId", () => {
-    expect(createProjectMgrUploadsRoute(42)).toBe("/pm/mgr-uploads?projectId=42");
+  it("exposes a global mgr-uploads SPA path without project scope", () => {
+    expect(PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH).toBe("/pm/mgr-uploads");
   });
 
   it("creates task detail routes and encodes task ids safely", () => {

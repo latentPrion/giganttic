@@ -41,7 +41,7 @@ describe("ProjectManagerProjectNavigation", () => {
 
     await user.click(screen.getByRole("tab", { name: "Shared uploads" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads");
   });
 
   it("navigates to the other project-scoped PM routes while preserving projectId", async () => {
@@ -80,6 +80,24 @@ describe("ProjectManagerProjectNavigation", () => {
     expect(screen.getByRole("tab", { name: "Kanban Board" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Issues" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "Tasks" })).toBeDisabled();
+  });
+
+  it("navigates to global mgr-uploads from Shared uploads without a project", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useMgrUploadsTabVisibility).mockReturnValue("allowed");
+
+    renderWithTheme(
+      <ProjectManagerProjectNavigation
+        authToken={TEST_AUTH_TOKEN}
+        currentSection="issues"
+        projectId={null}
+      />,
+    );
+
+    const sharedTab = screen.getByRole("tab", { name: "Shared uploads" });
+    expect(sharedTab).toBeEnabled();
+    await user.click(sharedTab);
+    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads");
   });
 
   it("renders optional right-side actions alongside the project tabs", () => {

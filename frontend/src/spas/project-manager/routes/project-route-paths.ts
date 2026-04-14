@@ -3,7 +3,6 @@ import {
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
   PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-  PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
   PROJECT_MANAGER_ROUTE_PATH,
@@ -95,12 +94,6 @@ export function createProjectTasksRoute(projectId: number): string {
 
 export function createProjectNotificationsRoute(): string {
   return PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH;
-}
-
-export function createProjectMgrUploadsRoute(projectId: number): string {
-  const parameters = new URLSearchParams();
-  parameters.set("projectId", String(projectId));
-  return `${PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH}?${parameters.toString()}`;
 }
 
 export function createProjectIssueRoute(
