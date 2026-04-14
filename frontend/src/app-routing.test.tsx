@@ -297,6 +297,17 @@ describe("app routing", () => {
     ).toBeVisible();
   });
 
+  it("redirects /pm to the PM project route for authenticated users", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/"],
+    });
+
+    expect(await screen.findByText("Project")).toBeVisible();
+  });
+
   it("renders the PM project detail SPA for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());

@@ -11,6 +11,7 @@ import {
   PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
+  PROJECT_MANAGER_ROUTE_ROOT,
   PROJECT_MANAGER_ROUTE_PATH,
   PROJECT_MANAGER_TASKS_ROUTE_PATH,
   PROJECT_MANAGER_TASK_ROUTE_PATH,
@@ -75,6 +76,7 @@ export function AppRoutes() {
       </Route>
       <Route element={<ScopedAccessTokenLoginRoute />} path={SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH} />
       <Route element={<LegacyProjectRouteRedirect />} path={LEGACY_PROJECT_ROUTE_PATTERN} />
+      <Route element={<Navigate replace to={PROJECT_MANAGER_ROUTE_PATH} />} path={PROJECT_MANAGER_ROUTE_ROOT} />
       <Route element={<ProjectRoute />} path={PROJECT_MANAGER_ROUTE_PATH} />
       <Route element={<TeamRoute />} path={PROJECT_MANAGER_TEAM_ROUTE_PATH} />
       <Route element={<OrganizationRoute />} path={PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH} />
