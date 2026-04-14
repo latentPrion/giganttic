@@ -156,7 +156,14 @@ describe("app routing", () => {
       },
     });
     listMgrUploadsFilesMock.mockReset();
-    listMgrUploadsFilesMock.mockResolvedValue({ files: [] });
+    listMgrUploadsFilesMock.mockResolvedValue({
+      files: [],
+      storage: {
+        availableBytes: 100,
+        availableMib: 0.0,
+        devicePath: "/dev/sda1",
+      },
+    });
   });
 
   afterEach(() => {

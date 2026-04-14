@@ -24,6 +24,12 @@ vi.mock("../components/ProjectManagerProjectNavigation.js", () => ({
 }));
 
 describe("ProjectManagerMgrUploadsPage", () => {
+  const defaultStorage = {
+    availableBytes: 123456789,
+    availableMib: 117.74,
+    devicePath: "/dev/sda1",
+  };
+
   beforeEach(() => {
     listFilesMock.mockReset();
     uploadFileMock.mockReset();
@@ -32,6 +38,7 @@ describe("ProjectManagerMgrUploadsPage", () => {
       files: [
         { name: "a.txt", sizeBytes: 3, updatedAtMs: 1 },
       ],
+      storage: defaultStorage,
     });
   });
 
@@ -64,12 +71,14 @@ describe("ProjectManagerMgrUploadsPage", () => {
     });
     listFilesMock.mockResolvedValueOnce({
       files: [{ name: "a.txt", sizeBytes: 3, updatedAtMs: 1 }],
+      storage: defaultStorage,
     });
     listFilesMock.mockResolvedValueOnce({
       files: [
         { name: "a.txt", sizeBytes: 3, updatedAtMs: 1 },
         { name: "new.bin", sizeBytes: 2, updatedAtMs: 2 },
       ],
+      storage: defaultStorage,
     });
 
     renderWithTheme(
@@ -94,6 +103,18 @@ describe("ProjectManagerMgrUploadsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("new.bin")).toBeInTheDocument();
+    });
+  });
+
+  it("shows available /dev/sda1 storage in bytes and MiB", async () => {
+    renderWithTheme(
+      <ProjectManagerMgrUploadsPage token="tok" />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Available on /dev/sda1: 123456789 bytes (117.74 MiB)"),
+      ).toBeInTheDocument();
     });
   });
 });

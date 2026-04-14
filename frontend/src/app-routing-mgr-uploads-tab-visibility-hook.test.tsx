@@ -27,7 +27,14 @@ describe("app routing — mgr-uploads route (real tab visibility hook)", () => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.getCurrentSession.mockReset();
     listMgrUploadsFilesMock.mockReset();
-    listMgrUploadsFilesMock.mockResolvedValue({ files: [] });
+    listMgrUploadsFilesMock.mockResolvedValue({
+      files: [],
+      storage: {
+        availableBytes: 100,
+        availableMib: 0.0,
+        devicePath: "/dev/sda1",
+      },
+    });
   });
 
   afterEach(() => {

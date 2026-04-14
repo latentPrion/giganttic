@@ -6,7 +6,16 @@ describe("mgrUploadsApi", () => {
   it("lists files using the mgr-uploads path", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      text: vi.fn().mockResolvedValue(JSON.stringify({ files: [] })),
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          files: [],
+          storage: {
+            availableBytes: 100,
+            availableMib: 0.0,
+            devicePath: "/dev/sda1",
+          },
+        }),
+      ),
     });
     vi.stubGlobal("fetch", fetchMock);
 

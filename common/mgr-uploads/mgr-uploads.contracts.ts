@@ -8,8 +8,17 @@ export const mgrUploadFileEntrySchema = z.object({
 
 export type MgrUploadFileEntry = z.infer<typeof mgrUploadFileEntrySchema>;
 
+export const mgrUploadsStorageSchema = z.object({
+  devicePath: z.string(),
+  availableBytes: z.number().int().nonnegative(),
+  availableMib: z.number().nonnegative(),
+});
+
+export type MgrUploadsStorage = z.infer<typeof mgrUploadsStorageSchema>;
+
 export const listMgrUploadsResponseSchema = z.object({
   files: z.array(mgrUploadFileEntrySchema),
+  storage: mgrUploadsStorageSchema,
 });
 
 export type ListMgrUploadsResponse = z.infer<typeof listMgrUploadsResponseSchema>;

@@ -40,8 +40,11 @@ export class UploadsController {
   @Authenticated()
   @Get()
   async listMgrUploads(@Req() request: AuthenticatedRequest) {
-    const files = await this.uploadsService.listMgrUploadFiles(request.authContext!);
-    return listMgrUploadsResponseSchema.parse({ files });
+    const [files, storage] = await Promise.all([
+      this.uploadsService.listMgrUploadFiles(request.authContext!),
+      this.uploadsService.readMgrUploadsStorage(request.authContext!),
+    ]);
+    return listMgrUploadsResponseSchema.parse({ files, storage });
   }
 
   @Authenticated()

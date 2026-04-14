@@ -7,8 +7,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { OnModuleInit } from "@nestjs/common";
+import { execFile } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 
 import {
   BACKEND_CONFIG,
@@ -24,7 +26,15 @@ import {
   resolveMgrUploadFilePath,
   sanitizeMgrUploadFilename,
 } from "./mgr-upload-filename.utils.js";
-import type { MgrUploadFileEntry } from "./uploads.contracts.js";
+import type { MgrUploadFileEntry, MgrUploadsStorage } from "./uploads.contracts.js";
+
+const DEFAULT_STORAGE_DEVICE_PATH = "/dev/sda1";
+const BYTES_PER_MIB = 1024 * 1024;
+const DF_OUTPUT_VALUE_BASE_10 = "1";
+const DF_OUTPUT_FIELDS = "avail";
+const DF_FIELD_INDEX_AVAILABLE_BYTES = 1;
+const DF_MINIMUM_OUTPUT_LINES = 2;
+const execFileAsync = promisify(execFile);
 
 function mgrUploadStatFields(
   fileStat: Awaited<ReturnType<typeof stat>>,
@@ -32,6 +42,35 @@ function mgrUploadStatFields(
   return {
     sizeBytes: Number(fileStat.size),
     updatedAtMs: Number(fileStat.mtimeMs),
+  };
+}
+
+function parseDfAvailableBytes(stdout: string): number {
+  const lines = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length < DF_MINIMUM_OUTPUT_LINES) {
+    throw new Error("Unexpected df output while reading available storage");
+  }
+  const value = Number.parseInt(
+    lines[DF_FIELD_INDEX_AVAILABLE_BYTES] ?? "",
+    10,
+  );
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Invalid df available byte value");
+  }
+  return value;
+}
+
+function createStorageInfo(
+  devicePath: string,
+  availableBytes: number,
+): MgrUploadsStorage {
+  return {
+    availableBytes,
+    availableMib: Number((availableBytes / BYTES_PER_MIB).toFixed(2)),
+    devicePath,
   };
 }
 
@@ -127,6 +166,17 @@ export class UploadsService implements OnModuleInit {
 
     entries.sort((left, right) => left.name.localeCompare(right.name));
     return entries;
+  }
+
+  async readMgrUploadsStorage(authContext: AuthContext): Promise<MgrUploadsStorage> {
+    this.assertCanManageMgrUploads(authContext);
+    const { stdout } = await execFileAsync("df", [
+      `--block-size=${DF_OUTPUT_VALUE_BASE_10}`,
+      `--output=${DF_OUTPUT_FIELDS}`,
+      DEFAULT_STORAGE_DEVICE_PATH,
+    ]);
+    const availableBytes = parseDfAvailableBytes(stdout);
+    return createStorageInfo(DEFAULT_STORAGE_DEVICE_PATH, availableBytes);
   }
 
   async uploadMgrUploadFile(

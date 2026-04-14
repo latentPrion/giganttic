@@ -18,7 +18,10 @@ import {
 } from "@mui/material";
 
 import { MGR_UPLOADS_MAX_UPLOAD_MIB } from "../../../../../common/mgr-uploads/mgr-uploads.constants.js";
-import type { MgrUploadFileEntry } from "../../../../../common/mgr-uploads/mgr-uploads.contracts.js";
+import type {
+  MgrUploadFileEntry,
+  MgrUploadsStorage,
+} from "../../../../../common/mgr-uploads/mgr-uploads.contracts.js";
 import { isApiError } from "../../../common/api/api-error.js";
 import { mgrUploadsApi } from "../api/mgr-uploads-api.js";
 import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
@@ -52,6 +55,13 @@ function formatByteLength(byteLength: number): string {
   return `${(byteLength / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+function formatStorageSummary(storage: MgrUploadsStorage | null): string {
+  if (!storage) {
+    return "Available disk space: unavailable";
+  }
+  return `Available on ${storage.devicePath}: ${storage.availableBytes} bytes (${storage.availableMib.toFixed(2)} MiB)`;
+}
+
 function resolveLoadErrorKind(error: unknown): "forbidden" | "error" {
   if (isApiError(error) && error.kind === "http" && error.status === 403) {
     return "forbidden";
@@ -63,6 +73,7 @@ export function ProjectManagerMgrUploadsPage(
   props: ProjectManagerMgrUploadsPageProps,
 ) {
   const [files, setFiles] = useState<MgrUploadFileEntry[]>([]);
+  const [storage, setStorage] = useState<MgrUploadsStorage | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [actionError, setActionError] = useState<string | null>(null);
   const [copyFeedbackFilename, setCopyFeedbackFilename] = useState<string | null>(
@@ -72,6 +83,7 @@ export function ProjectManagerMgrUploadsPage(
   const refreshFiles = useCallback(async () => {
     const response = await mgrUploadsApi.listFiles(props.token);
     setFiles(response.files);
+    setStorage(response.storage);
   }, [props.token]);
 
   useEffect(() => {
@@ -83,6 +95,7 @@ export function ProjectManagerMgrUploadsPage(
         const response = await mgrUploadsApi.listFiles(props.token);
         if (!cancelled) {
           setFiles(response.files);
+          setStorage(response.storage);
           setLoadState("ready");
         }
       } catch (error) {
@@ -189,6 +202,9 @@ export function ProjectManagerMgrUploadsPage(
           </Stack>
           <Typography color="text.secondary" variant="body2">
             {MAX_UPLOAD_HELP_TEXT}
+          </Typography>
+          <Typography color="text.secondary" variant="body2">
+            {formatStorageSummary(storage)}
           </Typography>
         </Stack>
         <Table size="small">
