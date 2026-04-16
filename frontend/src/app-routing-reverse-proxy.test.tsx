@@ -2,7 +2,8 @@
  * Comprehensive reverse-proxy / sub-directory deployment routing tests.
  *
  * Canonical PM URLs use **two** `/pm` segments: nginx + `VITE_APP_BASE_PATH` mount (`/pm/`)
- * and the PM module root (`/pm/pm/...`). There are no compatibility redirects for older URL shapes.
+ * and the PM module root (`/pm/pm/...`). The deploy mount alone (`/pm`, `/pm/`) redirects in-app to
+ * `PROJECT_MANAGER_ROUTE_PATH` so the catch-all home route does not steal those URLs.
  *
  * Failure modes this suite guards against (see git history around f2db0ed, 3e5d74e, b514142):
  *
@@ -50,6 +51,7 @@ import * as routePaths from "../../common/routes/app-route-paths.js";
 import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
+  DEPLOYMENT_SPA_MOUNT_PATH,
   HOME_ROUTE_PATH,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
@@ -531,6 +533,22 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   it("shows the PM sign-in prompt when unauthenticated on the project route", async () => {
     renderWithTheme(<App />, { initialEntries: [PROJECT_MANAGER_ROUTE_PATH] });
+    expect(
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
+    ).toBeVisible();
+  });
+
+  it("redirects deploy mount /pm to the PM project route and shows the sign-in prompt", async () => {
+    renderWithTheme(<App />, { initialEntries: [DEPLOYMENT_SPA_MOUNT_PATH] });
+    expect(
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
+    ).toBeVisible();
+  });
+
+  it("redirects deploy mount /pm/ to the PM project route and shows the sign-in prompt", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: [`${DEPLOYMENT_SPA_MOUNT_PATH}/`],
+    });
     expect(
       await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
     ).toBeVisible();

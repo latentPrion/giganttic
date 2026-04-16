@@ -2,6 +2,7 @@ import React from "react";
 import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
+  DEPLOYMENT_SPA_MOUNT_PATH,
   HOME_ROUTE_PATH,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
@@ -51,6 +52,14 @@ export function AppRoutes() {
         <Route element={<AboutPage />} path={ABOUT_ROUTE_PATH} />
       </Route>
       <Route element={<ScopedAccessTokenLoginRoute />} path={SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH} />
+      <Route
+        element={<Navigate replace to={PROJECT_MANAGER_ROUTE_PATH} />}
+        path={DEPLOYMENT_SPA_MOUNT_PATH}
+      />
+      <Route
+        element={<Navigate replace to={PROJECT_MANAGER_ROUTE_PATH} />}
+        path={`${DEPLOYMENT_SPA_MOUNT_PATH}/`}
+      />
       <Route element={<Navigate replace to={PROJECT_MANAGER_ROUTE_PATH} />} path={PROJECT_MANAGER_ROUTE_ROOT} />
       <Route element={<ProjectRoute />} path={PROJECT_MANAGER_ROUTE_PATH} />
       <Route element={<TeamRoute />} path={PROJECT_MANAGER_TEAM_ROUTE_PATH} />

@@ -22,6 +22,12 @@ const AUTH_ROUTE_ROOT = "/auth";
  * Prefer `PROJECT_MANAGER_*_ROUTE_PATH` instead of concatenating this value manually.
  */
 export const PROJECT_MANAGER_ROUTE_ROOT = "/pm/pm";
+/**
+ * Nginx + Vite public mount (`location ^~ /pm/`). Not the PM module root (`PROJECT_MANAGER_ROUTE_ROOT`).
+ * `/pm` and `/pm/` must map into PM routes; in `AppRoutes`, add a second `<Route>` whose `path` is
+ * `` `${DEPLOYMENT_SPA_MOUNT_PATH}/` `` (template literal) so `/pm/` matches.
+ */
+export const DEPLOYMENT_SPA_MOUNT_PATH = "/pm";
 const USER_ROUTE_ROOT = "/user";
 
 export const HOME_ROUTE_PATH = ROOT_ROUTE_PATH;
