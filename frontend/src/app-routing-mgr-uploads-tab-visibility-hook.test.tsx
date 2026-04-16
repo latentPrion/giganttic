@@ -1,10 +1,6 @@
 /**
- * Exercises the real `useMgrUploadsTabVisibility` hook (no mock): listFiles succeeds → tab becomes
- * allowed → "Shared uploads" appears. Complements `app-routing-mgr-uploads-route.test.tsx`, which pins
- * visibility to avoid a one-frame MUI `Tabs` mismatch during `"loading"`.
- *
- * While `mgrUploadsAccess === "loading"`, MUI may log a `Tabs` value mismatch on stderr; that resolves
- * once the probe completes (same transient as production on a slow network).
+ * Shared uploads remains a direct route (`/project/mgr-uploads`) and is intentionally not shown as a
+ * tab in project navigation for any user. This test ensures the route renders while the tab stays hidden.
  */
 import React from "react";
 import { screen, within } from "@testing-library/react";
@@ -22,7 +18,7 @@ import { App } from "./App.js";
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
 
-describe("app routing — mgr-uploads route (real tab visibility hook)", () => {
+describe("app routing — mgr-uploads route", () => {
   beforeEach(() => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.getCurrentSession.mockReset();
@@ -41,7 +37,7 @@ describe("app routing — mgr-uploads route (real tab visibility hook)", () => {
     vi.clearAllMocks();
   });
 
-  it("shows the Shared uploads tab after the visibility probe lists files", async () => {
+  it("renders mgr-uploads route and keeps Shared uploads tab hidden", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
@@ -50,13 +46,10 @@ describe("app routing — mgr-uploads route (real tab visibility hook)", () => {
       initialEntries: ["/project/mgr-uploads"],
     });
 
-    expect(
-      await screen.findByRole("tab", { name: "Shared uploads" }),
-    ).toBeVisible();
-
-    const root = screen.getByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID);
+    const root = await screen.findByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID);
     expect(
       within(root).getByRole("heading", { name: "Shared instance uploads" }),
     ).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "Shared uploads" })).not.toBeInTheDocument();
   });
 });

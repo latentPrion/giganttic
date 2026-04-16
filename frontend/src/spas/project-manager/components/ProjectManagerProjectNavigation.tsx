@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-import { useMgrUploadsTabVisibility } from "../hooks/use-mgr-uploads-tab-visibility.js";
 import { PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import {
   createProjectDetailRoute,
@@ -48,7 +47,6 @@ const GANTT_LABEL = "Gantt";
 const KANBAN_LABEL = "Kanban Board";
 const ISSUES_LABEL = "Issues";
 const TASKS_LABEL = "Tasks";
-const MGR_UPLOADS_LABEL = "Shared uploads";
 
 function buildRouteForSection(
   currentSection: ProjectRouteSection,
@@ -143,17 +141,14 @@ export function ProjectManagerProjectNavigation(
   props: ProjectManagerProjectNavigationProps,
 ) {
   const navigate = useNavigate();
-  const mgrUploadsAccess = useMgrUploadsTabVisibility(props.authToken);
+  const selectedSection: ProjectRouteSection | false = props.currentSection === "mgr-uploads"
+    ? false
+    : props.currentSection;
 
   function handleSectionChange(
     _event: React.SyntheticEvent,
     nextSection: ProjectRouteSection,
   ): void {
-    if (nextSection === "mgr-uploads") {
-      navigate(PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH);
-      return;
-    }
-
     if (props.projectId === null) {
       return;
     }
@@ -206,7 +201,7 @@ export function ProjectManagerProjectNavigation(
         aria-label={PROJECT_WORKSPACE_TABLIST_LABEL}
         onChange={handleSectionChange}
         sx={{ flex: 1, minWidth: 0 }}
-        value={props.currentSection}
+        value={selectedSection}
         variant="scrollable"
       >
         <Tab disabled={props.projectId === null} label={DETAIL_LABEL} value="detail" />
@@ -214,9 +209,6 @@ export function ProjectManagerProjectNavigation(
         <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
         <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />
-        {mgrUploadsAccess === "allowed" ? (
-          <Tab label={MGR_UPLOADS_LABEL} value="mgr-uploads" />
-        ) : null}
         {props.issueDetailContext && props.projectId !== null ? (
           <Tab label={renderIssueDetailTabLabel()} value="issue-detail" />
         ) : null}
