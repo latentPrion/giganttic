@@ -1,6 +1,6 @@
 # Project Instructions
 
-- **Project manager URLs (reverse-proxy deploy):** route constants in `common/routes/app-route-paths.ts` are deploy-base-path agnostic (for example, `/project/...`), and `VITE_APP_BASE_PATH` is the single deploy parameter that prefixes them externally (for example, `/pm/project/...`). Keep route constants free of hardcoded deploy prefixes.
+- **Project manager URLs (reverse-proxy deploy):** `VITE_APP_BASE_PATH` is the single deployment-path parameter. It must drive both Vite `base` and React Router `basename` via `frontendConfig.appBasePath` so the same app can mount at `/` or `/pm` without route-code changes. Route constants in `common/routes/app-route-paths.ts` must stay deploy-base-path agnostic (for example, `/project/...`), and external URLs become `${VITE_APP_BASE_PATH}/project/...` (for example, `/pm/project/...`).
 - Always break functions into logical subfunctions. No long-scrolling functions, in any language. This applies to source code, scripts, build scripts, CMake, Makefiles, and similar project files. Preserve this subfunction splitting discipline during refactors.
 - Modularity is non-negotiable. Always group logically related functions together into a module. Preserve modularity during refactors.
 - Reuse or extend existing abstractions instead of duplicating logic wherever possible. Don't repeat yourself. The goal here is to prevent duplication. Not to discourage appropriate logical separation of prior abstractions into new logical abstractions where sensible.

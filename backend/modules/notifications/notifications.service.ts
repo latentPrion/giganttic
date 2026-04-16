@@ -51,6 +51,7 @@ import {
 } from "./project-chart-task-notification-snapshots.js";
 
 const NOTIFICATION_NOT_FOUND_MESSAGE = "Notification not found";
+const LEGACY_PM_TARGET_URL_PREFIX = "/pm/pm";
 
 interface ListNotificationsQuery {
   eventTypes: NotificationEventCategory[];
@@ -95,8 +96,14 @@ function toNotificationSummaryRow(row: JoinedNotificationRow): NotificationSumma
     id: row.id,
     message: row.message,
     noticedTimestamp: row.noticedTimestamp?.toISOString() ?? null,
-    targetUrl: row.targetUrl,
+    targetUrl: normalizeNotificationTargetUrl(row.targetUrl),
   };
+}
+
+function normalizeNotificationTargetUrl(targetUrl: string): string {
+  return targetUrl.startsWith(`${LEGACY_PM_TARGET_URL_PREFIX}/`)
+    ? targetUrl.slice(LEGACY_PM_TARGET_URL_PREFIX.length)
+    : targetUrl;
 }
 
 function createListWhereClause(
@@ -132,6 +139,8 @@ function createMentionContainerWhereClause(
 
 @Injectable()
 export class NotificationsService {
+  private hasNormalizedLegacyNotificationTargets = false;
+
   constructor(
     @Inject(DatabaseService)
     private readonly databaseService: DatabaseService,
@@ -155,6 +164,7 @@ export class NotificationsService {
   }
 
   async listUnnoticedNotifications(authContext: AuthContext, limit: number) {
+    this.normalizeLegacyNotificationTargetsIfNeeded();
     return {
       notifications: this.selectNotificationRows(authContext.userId, {
         eventTypes: [],
@@ -167,6 +177,7 @@ export class NotificationsService {
   }
 
   async listNotifications(authContext: AuthContext, query: ListNotificationsQuery) {
+    this.normalizeLegacyNotificationTargetsIfNeeded();
     const whereClause = createListWhereClause(
       authContext.userId,
       query.includeNoticed,
@@ -665,6 +676,32 @@ export class NotificationsService {
       .offset(query.offset)
       .all()
       .map((row) => toNotificationSummaryRow(row as JoinedNotificationRow));
+  }
+
+  private normalizeLegacyNotificationTargetsIfNeeded(): void {
+    if (this.hasNormalizedLegacyNotificationTargets) {
+      return;
+    }
+
+    const legacyRows = this.databaseService.db
+      .select({
+        id: notifications.id,
+        targetUrl: notifications.targetUrl,
+      })
+      .from(notifications)
+      .where(sql`${notifications.targetUrl} like '/pm/pm/%'`)
+      .all();
+
+    for (const row of legacyRows) {
+      this.databaseService.db.update(notifications)
+        .set({
+          targetUrl: normalizeNotificationTargetUrl(row.targetUrl),
+        })
+        .where(eq(notifications.id, row.id))
+        .run();
+    }
+
+    this.hasNormalizedLegacyNotificationTargets = true;
   }
 
   private async createNotificationEvent(

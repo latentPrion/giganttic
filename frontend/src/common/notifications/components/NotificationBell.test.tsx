@@ -46,7 +46,7 @@ describe("NotificationBell", () => {
           id: 7,
           message: "alice commented on Issue \"API rollout\" under Project 4",
           noticedTimestamp: null,
-          targetUrl: "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -71,19 +71,19 @@ describe("NotificationBell", () => {
     expect(within(menu).getByRole("link", { name: "View all notifications" })).toBeVisible();
   });
 
-  it("resolves View all notifications href (production-shaped /pm/pm routes)", async () => {
+  it("resolves View all notifications href against app-relative PM routes", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(<NotificationBell token="token-1" />, {
       basename: "/",
-      initialEntries: ["/pm/pm/project?projectId=4"],
+      initialEntries: ["/project?projectId=4"],
     });
 
     await user.click(await screen.findByLabelText("Notifications (2 unnoticed)"));
 
     expect(
       await screen.findByRole("link", { name: "View all notifications" }),
-    ).toHaveAttribute("href", "/pm/pm/notifications");
+    ).toHaveAttribute("href", "/project/notifications");
   });
 
   it("renders mention notifications through the shared bell row UI", async () => {
@@ -98,7 +98,7 @@ describe("NotificationBell", () => {
           id: 8,
           message: "alice mentioned you in a comment on Issue \"API rollout\" under Project 4.",
           noticedTimestamp: null,
-          targetUrl: "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -123,7 +123,7 @@ describe("NotificationBell", () => {
       expect(notificationsApiMock.toggleNotificationNoticed).toHaveBeenCalledWith("token-1", 7);
     });
     expect(navigateMock).toHaveBeenCalledWith(
-      "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+      "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
     );
   });
 
