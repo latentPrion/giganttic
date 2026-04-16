@@ -16,11 +16,19 @@ export function buildAppRelativeUrl(
   appBasePath: string = frontendConfig.appBasePath,
 ): string {
   const normalizedPath = normalizeRoutePath(path);
+  const trimmedBase = trimTrailingSlash(appBasePath);
+  if (appBasePath !== "/" && (normalizedPath === trimmedBase || normalizedPath.startsWith(`${trimmedBase}/`))) {
+    throw new Error(
+      `buildAppRelativeUrl: path "${path}" already contains appBasePath "${appBasePath}". ` +
+      `Pass a path relative to appBasePath to avoid double-prefixing (e.g. "/some-page", not "${appBasePath}/some-page").`,
+    );
+  }
+
   if (appBasePath === "/") {
     return normalizedPath;
   }
 
-  return `${trimTrailingSlash(appBasePath)}${normalizedPath}`;
+  return `${trimmedBase}${normalizedPath}`;
 }
 
 export function buildAppAbsoluteUrl(

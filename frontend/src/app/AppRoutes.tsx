@@ -2,6 +2,7 @@ import React from "react";
 import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
+  HOME_ROUTE_PATH,
   LEGACY_PROJECT_ROUTE_PATTERN,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
@@ -90,6 +91,7 @@ export function AppRoutes() {
       <Route element={<TasksRoute />} path={PROJECT_MANAGER_TASKS_ROUTE_PATH} />
       <Route element={<IssueRoute />} path={PROJECT_MANAGER_ISSUE_ROUTE_PATH} />
       <Route element={<TaskRoute />} path={PROJECT_MANAGER_TASK_ROUTE_PATH} />
+      <Route element={<Navigate replace to={HOME_ROUTE_PATH} />} path="*" />
     </Routes>
   );
 }

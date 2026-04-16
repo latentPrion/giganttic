@@ -1,38 +1,47 @@
 /**
  * Comprehensive reverse-proxy / sub-directory deployment routing tests.
  *
- * These tests exist to prevent the recurring blank-screen bug that has appeared
- * multiple times when:
+ * These tests exist to prevent the recurring blank-screen bug patterns found
+ * across the commit history:
  *
- * 1. A route path constant lacks the `/pm` prefix (e.g. `/auth/scoped-token-login`
- *    instead of `/pm/auth/scoped-token-login`) — the browser URL includes `/pm/...`
- *    but React Router sees no match. (commits f2db0ed, current scoped-token fix)
+ * 1. **Missing `/pm` prefix on a route constant** — e.g. `/auth/scoped-token-login`
+ *    instead of `/pm/auth/scoped-token-login`. The browser URL includes `/pm/...`
+ *    but no Route matches → blank screen. (commits f2db0ed, current scoped-token fix)
  *
- * 2. `BrowserRouter basename` is set to the deploy prefix (`/pm`) instead of `"/"`
- *    — React Router strips `/pm` from the pathname, so full-path routes like
- *    `/pm/project` no longer match the stripped `/project`. (commit 3e5d74e)
+ * 2. **`BrowserRouter basename` set to the deploy prefix** — changing `basename` from
+ *    `"/"` to `frontendConfig.appBasePath` causes React Router to strip `/pm` from
+ *    the pathname, so full-path constants like `/pm/project` no longer match.
+ *    (commit 3e5d74e)
  *
- * 3. A navigable URL like `/pm` or `/pm/` has no corresponding route entry and
- *    renders nothing. (commit b514142)
+ * 3. **No route entry for a navigable URL** — `/pm` and `/pm/` had no Route, so
+ *    landing on them rendered nothing. (commit b514142)
  *
- * 4. A new route is added but not wired into `AppRoutes`, or wired with the wrong
- *    path. (commits a56aadf, d100501 — mgr-uploads)
+ * 4. **New constant not covered by structural tests** — hardcoded lists in tests
+ *    don't auto-expand when new exports are added to `app-route-paths.ts`.
+ *    Addressed here by dynamically importing all exports.
  *
- * 5. Redirect routes (typos, legacy patterns) break under sub-path deployment
- *    because the target path is wrong.
+ * 5. **Hardcoded path strings in AppRoutes** — a path like `"/pm/new-feature"` written
+ *    directly in `<Route path="...">` bypasses all constant-level checks. Addressed
+ *    here by a source-text assertion on AppRoutes.tsx.
  *
- * The tests verify every registered route renders content (not a blank screen)
- * under the production deployment shape: `BrowserRouter basename="/"` with route
- * paths that include the `/pm` prefix.
+ * 6. **No catch-all route** — any unregistered path (typo in a link, old bookmark)
+ *    renders nothing. Addressed in AppRoutes by a `path="*"` fallback.
  *
- * **Why `basename="/"`?**  See `common/routes/app-route-paths.ts` — all PM route
+ * 7. **`buildAppRelativeUrl` called with an already-prefixed path** — passing a PM
+ *    route path through `buildAppRelativeUrl` when `appBasePath=/pm` produces
+ *    `/pm/pm/...`. Addressed by a runtime guard in the function and tests here.
+ *
+ * **Why `basename="/"`?**  See `common/routes/app-route-paths.ts`. All PM route
  * constants encode full site pathnames (`/pm/project`, `/pm/team`, etc.). With
  * `basename="/"`, React Router matches against the full `location.pathname`. If
  * `basename` were `/pm`, the router would strip one `/pm` segment and route
  * constants would need to omit it — a different (and previously broken) design.
  */
 import React from "react";
-import { screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./app-routing-test-vi-mocks.js";
@@ -49,11 +58,11 @@ import {
   ROUTING_TEST_CHART_XML,
   listMgrUploadsFilesMock,
 } from "./app-routing-test-vi-mocks.js";
+import * as routePaths from "../../common/routes/app-route-paths.js";
 import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
   HOME_ROUTE_PATH,
-  LEGACY_PROJECT_ROUTE_PATTERN,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
@@ -233,124 +242,141 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Route path structural invariants
+// #4 — Route path structural invariants (auto-enumerate all exports)
+//
+// These tests import the entire `app-route-paths` module so every export is
+// automatically covered — no manual list to forget to update.
 // ---------------------------------------------------------------------------
 
-describe("route path constants — structural invariants", () => {
-  it("all PM route paths start with PROJECT_MANAGER_ROUTE_ROOT", () => {
-    const pmPaths = [
-      PROJECT_MANAGER_ROUTE_PATH,
-      PROJECT_MANAGER_TEAM_ROUTE_PATH,
-      PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
-      PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
-      PROJECT_MANAGER_GANTT_ROUTE_PATH,
-      PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUES_ROUTE_PATH,
-      PROJECT_MANAGER_TASKS_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUE_ROUTE_PATH,
-      PROJECT_MANAGER_TASK_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH,
-    ];
+describe("route path constants — structural invariants (auto-enumerated)", () => {
+  // All string exports (route constants) — filter out non-string values if any
+  // are ever added to the module.
+  const allExportedPaths = Object.entries(routePaths)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    .map(([name, value]) => ({ name, value }));
 
-    for (const path of pmPaths) {
-      expect(path, `PM route "${path}" must start with "${PROJECT_MANAGER_ROUTE_ROOT}"`).toMatch(
-        new RegExp(`^${PROJECT_MANAGER_ROUTE_ROOT}(/|$)`),
+  // PM-specific exports: every export whose name starts with PROJECT_MANAGER_
+  const pmExports = allExportedPaths.filter(({ name }) =>
+    name.startsWith("PROJECT_MANAGER_"),
+  );
+
+  it("all PROJECT_MANAGER_ route constants start with PROJECT_MANAGER_ROUTE_ROOT", () => {
+    const root = routePaths.PROJECT_MANAGER_ROUTE_ROOT;
+    for (const { name, value } of pmExports) {
+      expect(value, `${name} must start with "${root}"`).toMatch(
+        new RegExp(`^${root}(/|$)`),
       );
     }
   });
 
-  it("scoped access token login path starts with the PM route root", () => {
+  it("SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH starts with the PM route root", () => {
     expect(
-      SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
-      "Scoped login path must start with the PM deploy prefix to be reachable in sub-dir deployments",
-    ).toMatch(new RegExp(`^${PROJECT_MANAGER_ROUTE_ROOT}/`));
+      routePaths.SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
+      "Scoped login path must start with the PM deploy prefix to be reachable under /pm",
+    ).toMatch(new RegExp(`^${routePaths.PROJECT_MANAGER_ROUTE_ROOT}/`));
   });
 
-  it("all route path constants start with a leading slash", () => {
-    const allPaths = [
-      HOME_ROUTE_PATH,
-      CONTACT_ROUTE_PATH,
-      ABOUT_ROUTE_PATH,
-      SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
-      USER_ROUTE_PATH,
-      USER_LOBBY_ROUTE_PATH,
-      PROJECT_MANAGER_ROUTE_ROOT,
-      PROJECT_MANAGER_ROUTE_PATH,
-      PROJECT_MANAGER_TEAM_ROUTE_PATH,
-      PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
-      PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
-      PROJECT_MANAGER_GANTT_ROUTE_PATH,
-      PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUES_ROUTE_PATH,
-      PROJECT_MANAGER_TASKS_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUE_ROUTE_PATH,
-      PROJECT_MANAGER_TASK_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH,
-    ];
-
-    for (const path of allPaths) {
-      expect(path, `Route "${path}" must start with /`).toMatch(/^\//);
+  it("all exported route path constants start with a leading slash", () => {
+    for (const { name, value } of allExportedPaths) {
+      expect(value, `${name} must start with /`).toMatch(/^\//);
     }
   });
 
-  it("no route path constant contains a doubled slash", () => {
-    const allPaths = [
-      SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
-      PROJECT_MANAGER_ROUTE_PATH,
-      PROJECT_MANAGER_TEAM_ROUTE_PATH,
-      PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
-      PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
-      PROJECT_MANAGER_GANTT_ROUTE_PATH,
-      PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUES_ROUTE_PATH,
-      PROJECT_MANAGER_TASKS_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUE_ROUTE_PATH,
-      PROJECT_MANAGER_TASK_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH,
-      USER_ROUTE_PATH,
-      USER_LOBBY_ROUTE_PATH,
-    ];
-
-    for (const path of allPaths) {
-      expect(path, `Route "${path}" must not contain //`).not.toMatch(/\/\//);
+  it("no exported route path constant contains a doubled slash", () => {
+    for (const { name, value } of allExportedPaths) {
+      expect(value, `${name} must not contain //`).not.toMatch(/\/\//);
     }
   });
 
-  it("no route path constant has a trailing slash", () => {
-    const allPaths = [
-      SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
-      PROJECT_MANAGER_ROUTE_PATH,
-      PROJECT_MANAGER_TEAM_ROUTE_PATH,
-      PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
-      PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
-      PROJECT_MANAGER_GANTT_ROUTE_PATH,
-      PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUES_ROUTE_PATH,
-      PROJECT_MANAGER_TASKS_ROUTE_PATH,
-      PROJECT_MANAGER_ISSUE_ROUTE_PATH,
-      PROJECT_MANAGER_TASK_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
-      PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH,
-      USER_ROUTE_PATH,
-      USER_LOBBY_ROUTE_PATH,
-    ];
-
-    for (const path of allPaths) {
-      expect(path, `Route "${path}" must not end with /`).not.toMatch(/.+\/$/);
+  it("no exported route path constant ends with a trailing slash (except root '/')", () => {
+    for (const { name, value } of allExportedPaths) {
+      if (value === "/") continue;
+      expect(value, `${name} must not end with /`).not.toMatch(/.+\/$/);
     }
   });
 });
 
 // ---------------------------------------------------------------------------
-// Production deployment: basename="/" (the way main.tsx works)
-// Every route must render visible content — never a blank screen.
+// #5 — AppRoutes uses constants, not hardcoded path strings
+//
+// Reads AppRoutes.tsx source text and asserts that no `path=` JSX attribute
+// carries a bare string literal. All paths must come from imported constants
+// or template expressions — never from inline strings that bypass the invariant
+// checks above.
+// ---------------------------------------------------------------------------
+
+describe("AppRoutes source — no hardcoded path string literals", () => {
+  it("every path= prop in AppRoutes uses a constant or template expression, not a bare string", () => {
+    const dir = path.dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(path.join(dir, "app/AppRoutes.tsx"), "utf8");
+
+    // Match path={...} JSX attributes. Capture the inner expression.
+    // We want to flag any where the value is a plain string literal:
+    //   path="/some/literal"          ← bad (unquoted or double-quoted attr)
+    //   path={'some/literal'}         ← bad (single-quoted JSX expression)
+    //   path={`/some/literal`}        ← bad (template literal with no interpolation)
+    //   path={SOME_CONSTANT}          ← ok
+    //   path={`${EXPR}/suffix`}       ← ok (template with at least one interpolation)
+    //   path="*"                      ← ok (the catch-all, not a real route)
+    //
+    // Branch 1: path="..." or path={"..."} (double-quoted string)
+    // Branch 2: path={'...'} (single-quoted JSX expression)
+    // Branch 3: path={`...`} where the template contains no ${ interpolation
+    const pathAttrRe =
+      /\bpath=\{?"([^"*][^"]*)"\}?|\bpath=\{'([^']*)'\}|\bpath=\{`([^`$]*)`\}/g;
+    const violations: string[] = [];
+
+    for (const match of src.matchAll(pathAttrRe)) {
+      const literal = match[1] ?? match[2] ?? match[3];
+      // Allow the catch-all wildcard exactly
+      if (literal !== "*") {
+        violations.push(literal);
+      }
+    }
+
+    expect(
+      violations,
+      `AppRoutes.tsx contains hardcoded path string literals — move them to app-route-paths.ts constants: ${violations.join(", ")}`,
+    ).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #2 — Catch-all route: unknown paths redirect to home, never blank
+// ---------------------------------------------------------------------------
+
+describe("catch-all route — unknown paths never render blank", () => {
+  it("redirects a completely unknown path to the public home page", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/this-route-does-not-exist"],
+    });
+
+    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+  });
+
+  it("redirects an unknown nested path to the public home page", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/pm/project/nonexistent-sub-route"],
+    });
+
+    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+  });
+
+  it("redirects a path completely outside the PM prefix to the public home page", async () => {
+    renderWithTheme(<App />, {
+      initialEntries: ["/totally/unknown/path"],
+    });
+
+    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Production deployment: basename="/" — every route renders content
 // ---------------------------------------------------------------------------
 
 describe("reverse-proxy deployment — all routes render content with basename='/'", () => {
-  // --- Public routes (no auth) ---
+  // --- Public routes ---
 
   it("renders the public home page at '/'", () => {
     renderWithTheme(<App />, { initialEntries: ["/"] });
@@ -369,21 +395,18 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   // --- Scoped token login ---
 
-  it("renders the scoped token login route at '/pm/auth/scoped-token-login'", async () => {
+  it("renders the scoped token login route and redirects after success", async () => {
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
     renderWithTheme(<App />, {
       initialEntries: [`${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=test-token`],
     });
 
-    // Should show the spinner or redirect — not blank
-    expect(
-      await screen.findByText("Project"),
-    ).toBeVisible();
+    expect(await screen.findByText("Project")).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("test-token");
   });
 
-  it("shows an error on the scoped token login route when the token is missing", async () => {
+  it("shows an error when the scoped token query param is missing", async () => {
     renderWithTheme(<App />, {
       initialEntries: [SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH],
     });
@@ -393,21 +416,17 @@ describe("reverse-proxy deployment — all routes render content with basename='
     ).toBeVisible();
   });
 
-  // --- PM root redirect (the /pm -> /pm/project blank screen fix) ---
+  // --- PM root redirects ---
 
-  it("redirects '/pm' to the PM project route for authenticated users", async () => {
+  it("redirects '/pm' to the PM project route", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, { initialEntries: [PROJECT_MANAGER_ROUTE_ROOT] });
-
     expect(await screen.findByText("Project")).toBeVisible();
   });
 
-  it("redirects '/pm/' to the PM project route for authenticated users", async () => {
+  it("redirects '/pm/' to the PM project route", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, { initialEntries: [`${PROJECT_MANAGER_ROUTE_ROOT}/`] });
-
     expect(await screen.findByText("Project")).toBeVisible();
   });
 
@@ -415,114 +434,92 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   it("renders the PM project route at '/pm/project'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ROUTE_PATH}?projectId=1`],
     });
-
     expect(await screen.findByText("Project")).toBeVisible();
     expect(screen.getByText("Selected project: 1")).toBeVisible();
   });
 
   it("renders the PM team route at '/pm/team'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TEAM_ROUTE_PATH}?teamId=7`],
     });
-
     expect(await screen.findByText("Team")).toBeVisible();
     expect(await screen.findByText("Selected team: 7")).toBeVisible();
   });
 
   it("renders the PM organization route at '/pm/organization'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH}?organizationId=9`],
     });
-
     expect(await screen.findByText("Organization")).toBeVisible();
     expect(await screen.findByText("Selected organization: 9")).toBeVisible();
   });
 
   it("renders the PM gantt route at '/pm/project/gantt'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=1`],
     });
-
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
   });
 
   it("renders the PM kanban route at '/pm/project/kanban'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_KANBAN_ROUTE_PATH}?projectId=1`],
     });
-
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
   });
 
   it("renders the PM issues route at '/pm/project/issues'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ISSUES_ROUTE_PATH}?projectId=42`],
     });
-
     expect(await screen.findByText("Project Issues")).toBeVisible();
   });
 
   it("renders the PM tasks route at '/pm/project/tasks'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TASKS_ROUTE_PATH}?projectId=1`],
     });
-
     expect(await screen.findByText("Project Tasks")).toBeVisible();
   });
 
   it("renders the PM issue detail route at '/pm/project/issue'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ISSUE_ROUTE_PATH}?id=7&projectId=42`],
     });
-
     expect(await screen.findByText("Issue Detail")).toBeVisible();
   });
 
   it("renders the PM task detail route at '/pm/project/task'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TASK_ROUTE_PATH}?taskId=1001&projectId=1`],
     });
-
     expect(await screen.findByText("Task Detail")).toBeVisible();
   });
 
   it("renders the PM notifications route at '/pm/notifications'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH],
     });
-
     expect(await screen.findByText("Notifications")).toBeVisible();
   });
 
   it("renders the PM mgr-uploads route at '/pm/mgr-uploads'", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH],
     });
-
     expect(
       await screen.findByRole("heading", { name: "Shared instance uploads", level: 1 }),
     ).toBeVisible();
@@ -530,13 +527,11 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   // --- Redirect routes ---
 
-  it("redirects the mgr-upload typo to mgr-uploads", async () => {
+  it("redirects the mgr-upload typo path to mgr-uploads", async () => {
     authenticateUser();
-
     renderWithTheme(<App />, {
       initialEntries: [PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH],
     });
-
     expect(
       await screen.findByRole("heading", { name: "Shared instance uploads", level: 1 }),
     ).toBeVisible();
@@ -544,11 +539,7 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   it("redirects legacy /project/:projectId to the PM project route", async () => {
     authenticateUser();
-
-    renderWithTheme(<App />, {
-      initialEntries: ["/project/1"],
-    });
-
+    renderWithTheme(<App />, { initialEntries: ["/project/1"] });
     expect(await screen.findByText("Project")).toBeVisible();
     expect(screen.getByText("Selected project: 1")).toBeVisible();
   });
@@ -557,57 +548,116 @@ describe("reverse-proxy deployment — all routes render content with basename='
 
   it("renders the user lobby route at '/user/lobby'", async () => {
     authenticateUser();
-
-    renderWithTheme(<App />, {
-      initialEntries: [USER_LOBBY_ROUTE_PATH],
-    });
-
+    renderWithTheme(<App />, { initialEntries: [USER_LOBBY_ROUTE_PATH] });
     expect(await screen.findByText("User Lobby")).toBeVisible();
   });
 
   it("renders the user SPA route at '/user'", async () => {
     authenticateUser();
-
-    renderWithTheme(<App />, {
-      initialEntries: [`${USER_ROUTE_PATH}?userId=101`],
-    });
-
+    renderWithTheme(<App />, { initialEntries: [`${USER_ROUTE_PATH}?userId=101`] });
     expect(await screen.findByText("User SPA")).toBeVisible();
   });
 
-  // --- Unauthenticated guard (redirects to home, not blank screen) ---
+  // --- Unauthenticated guard: redirect to home, not blank ---
 
-  it("redirects unauthenticated PM project requests to the public home — not blank", async () => {
-    renderWithTheme(<App />, {
-      initialEntries: [PROJECT_MANAGER_ROUTE_PATH],
-    });
-
+  it("redirects unauthenticated PM project requests to home — not blank", async () => {
+    renderWithTheme(<App />, { initialEntries: [PROJECT_MANAGER_ROUTE_PATH] });
     expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
   });
 
-  it("redirects unauthenticated PM gantt requests to the public home — not blank", async () => {
+  it("redirects unauthenticated PM gantt requests to home — not blank", async () => {
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=1`],
     });
-
     expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
   });
 
-  it("redirects unauthenticated user lobby requests to the public home — not blank", async () => {
-    renderWithTheme(<App />, {
-      initialEntries: [USER_LOBBY_ROUTE_PATH],
-    });
-
+  it("redirects unauthenticated user lobby requests to home — not blank", async () => {
+    renderWithTheme(<App />, { initialEntries: [USER_LOBBY_ROUTE_PATH] });
     expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
   });
 });
 
 // ---------------------------------------------------------------------------
-// URL builder consistency: scoped-login URLs match the route path
+// #7 — buildAppRelativeUrl guard against already-prefixed paths
+// ---------------------------------------------------------------------------
+
+describe("buildAppRelativeUrl — double-prefix guard", () => {
+  it("throws when path equals appBasePath exactly (no trailing slash)", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+
+    expect(() =>
+      buildAppRelativeUrl("/pm", "/pm"),
+    ).toThrow(/already contains appBasePath/);
+  });
+
+  it("throws when a path already starts with the non-root appBasePath", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+
+    expect(() =>
+      buildAppRelativeUrl("/pm/project", "/pm"),
+    ).toThrow(/already contains appBasePath/);
+  });
+
+  it("throws for any PM route path when appBasePath is /pm", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+    const pmPaths = [
+      PROJECT_MANAGER_ROUTE_PATH,
+      PROJECT_MANAGER_TEAM_ROUTE_PATH,
+      SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH,
+      PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
+    ];
+
+    for (const p of pmPaths) {
+      expect(
+        () => buildAppRelativeUrl(p, "/pm"),
+        `buildAppRelativeUrl("${p}", "/pm") should throw`,
+      ).toThrow(/already contains appBasePath/);
+    }
+  });
+
+  it("does not throw for a root appBasePath regardless of the path", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+
+    expect(() => buildAppRelativeUrl("/pm/project", "/")).not.toThrow();
+    expect(buildAppRelativeUrl("/pm/project", "/")).toBe("/pm/project");
+  });
+
+  it("does not throw for a path that doesn't start with appBasePath", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+
+    expect(() => buildAppRelativeUrl("/contact", "/pm")).not.toThrow();
+    expect(buildAppRelativeUrl("/contact", "/pm")).toBe("/pm/contact");
+  });
+
+  it("does not double-prefix when the path is built correctly", async () => {
+    const { buildAppRelativeUrl } = await import(
+      "./common/routing/public-app-url.js"
+    );
+
+    // A non-PM path (like /contact) correctly gets the /pm prefix added
+    expect(buildAppRelativeUrl("/contact", "/pm")).toBe("/pm/contact");
+    // The root deployment never adds a prefix
+    expect(buildAppRelativeUrl("/pm/project", "/")).toBe("/pm/project");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// URL builder consistency: generated scoped-login URLs match the route
 // ---------------------------------------------------------------------------
 
 describe("scoped login URL builder consistency", () => {
-  it("createScopedAccessLoginRelativeUrl produces a path that matches the route", async () => {
+  it("createScopedAccessLoginRelativeUrl produces a path matching the route constant", async () => {
     const { createScopedAccessLoginRelativeUrl } = await import(
       "./common/routing/public-app-url.js"
     );
@@ -626,7 +676,7 @@ describe("scoped login URL builder consistency", () => {
     expect(url).toContain(`https://workio.ai${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}`);
   });
 
-  it("the scoped login URL can be navigated in the app and renders content", async () => {
+  it("a generated scoped-login URL navigated in the app renders content", async () => {
     const { createScopedAccessLoginRelativeUrl } = await import(
       "./common/routing/public-app-url.js"
     );
