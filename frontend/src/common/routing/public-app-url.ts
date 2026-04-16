@@ -33,19 +33,13 @@ export function buildAppAbsoluteUrl(
 
 export function createScopedAccessLoginRelativeUrl(
   tokenValue: string,
-  appBasePath: string = frontendConfig.appBasePath,
 ): string {
-  return `${buildAppRelativeUrl(SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH, appBasePath)}?token=${encodeURIComponent(tokenValue)}`;
+  return `${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=${encodeURIComponent(tokenValue)}`;
 }
 
 export function createScopedAccessLoginAbsoluteUrl(
   tokenValue: string,
   origin: string,
-  appBasePath: string = frontendConfig.appBasePath,
 ): string {
-  return buildAppAbsoluteUrl(
-    `${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=${encodeURIComponent(tokenValue)}`,
-    origin,
-    appBasePath,
-  );
+  return `${trimTrailingSlash(origin)}${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=${encodeURIComponent(tokenValue)}`;
 }

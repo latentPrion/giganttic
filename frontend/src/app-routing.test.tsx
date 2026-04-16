@@ -405,15 +405,15 @@ describe("app routing", () => {
     expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
   });
 
-  it("redeems scoped token login route and redirects to the home page", async () => {
+  it("redeems scoped token login route and redirects to the PM project page", async () => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/auth/scoped-token-login?token=scoped-token-abc"],
+      initialEntries: ["/pm/auth/scoped-token-login?token=scoped-token-abc"],
     });
 
-    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+    expect(await screen.findByText("Project")).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
     expect(authTokenStorageMock.write).toHaveBeenCalledWith("scoped-login-token");
   });

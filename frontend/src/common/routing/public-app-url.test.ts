@@ -26,21 +26,15 @@ describe("public app url helpers", () => {
     ).toBe("https://workio.ai/pm/auth/scoped-token-login");
   });
 
-  it("creates scoped access login links for root deployments", () => {
-    expect(createScopedAccessLoginRelativeUrl("abc123", "/")).toBe(
-      "/auth/scoped-token-login?token=abc123",
-    );
-  });
-
-  it("creates scoped access login links for /pm deployments", () => {
-    expect(createScopedAccessLoginRelativeUrl("abc123", "/pm")).toBe(
+  it("creates scoped access login links using the route path directly", () => {
+    expect(createScopedAccessLoginRelativeUrl("abc123")).toBe(
       "/pm/auth/scoped-token-login?token=abc123",
     );
   });
 
-  it("creates absolute scoped access login links for /pm deployments", () => {
+  it("creates absolute scoped access login links", () => {
     expect(
-      createScopedAccessLoginAbsoluteUrl("abc123+", "https://workio.ai", "/pm"),
+      createScopedAccessLoginAbsoluteUrl("abc123+", "https://workio.ai"),
     ).toBe("https://workio.ai/pm/auth/scoped-token-login?token=abc123%2B");
   });
 });

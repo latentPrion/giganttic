@@ -33,7 +33,7 @@ const USER_ROUTE_ROOT = "/user";
 export const HOME_ROUTE_PATH = ROOT_ROUTE_PATH;
 export const CONTACT_ROUTE_PATH = "/contact";
 export const ABOUT_ROUTE_PATH = "/about";
-export const SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH = `${AUTH_ROUTE_ROOT}/scoped-token-login`;
+export const SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}${AUTH_ROUTE_ROOT}/scoped-token-login`;
 export const LEGACY_PROJECT_ROUTE_PATTERN = "/project/:projectId";
 
 export const USER_ROUTE_PATH = USER_ROUTE_ROOT;
