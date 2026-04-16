@@ -46,7 +46,7 @@ describe("NotificationBell", () => {
           id: 7,
           message: "alice commented on Issue \"API rollout\" under Project 4",
           noticedTimestamp: null,
-          targetUrl: "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -71,16 +71,11 @@ describe("NotificationBell", () => {
     expect(within(menu).getByRole("link", { name: "View all notifications" })).toBeVisible();
   });
 
-  /*
-   * Same MemoryRouter quirk as app-routing tests: `basename="/pm"` strips one `/pm`, but `to` values
-   * are full `/pm/notifications`, so the memory location must use `/pm/pm/...` to land on the route.
-   * Production uses `BrowserRouter basename="/"`; hrefs are then `/pm/notifications` once.
-   */
-  it("resolves View all notifications href when MemoryRouter basename is /pm", async () => {
+  it("resolves View all notifications href (production-shaped /pm/pm routes)", async () => {
     const user = userEvent.setup();
 
     renderWithTheme(<NotificationBell token="token-1" />, {
-      basename: "/pm",
+      basename: "/",
       initialEntries: ["/pm/pm/project?projectId=4"],
     });
 
@@ -103,7 +98,7 @@ describe("NotificationBell", () => {
           id: 8,
           message: "alice mentioned you in a comment on Issue \"API rollout\" under Project 4.",
           noticedTimestamp: null,
-          targetUrl: "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -128,7 +123,7 @@ describe("NotificationBell", () => {
       expect(notificationsApiMock.toggleNotificationNoticed).toHaveBeenCalledWith("token-1", 7);
     });
     expect(navigateMock).toHaveBeenCalledWith(
-      "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+      "/pm/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
     );
   });
 

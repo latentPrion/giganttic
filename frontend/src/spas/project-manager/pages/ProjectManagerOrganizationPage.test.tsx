@@ -206,7 +206,7 @@ describe("ProjectManagerOrganizationPage", () => {
         },
       );
     });
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=55");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project?projectId=55");
   });
 
   it("creates a team and associates it to the viewed organization when the current user is an organization manager", async () => {

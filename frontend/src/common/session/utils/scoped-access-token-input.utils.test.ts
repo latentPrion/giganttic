@@ -21,7 +21,7 @@ describe("parseScopedAccessTokenInput", () => {
   });
 
   it("parses token from a /pm-prefixed path-only url using base URL", () => {
-    const input = "/pm/auth/scoped-token-login?token=rel-token";
+    const input = "/pm/pm/auth/scoped-token-login?token=rel-token";
     expect(parseScopedAccessTokenInput(input, TEST_BASE)).toBe("rel-token");
   });
 

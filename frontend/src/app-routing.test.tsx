@@ -289,7 +289,7 @@ describe("app routing", () => {
 
   it("redirects unauthenticated PM project requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=1"],
+      initialEntries: ["/pm/pm/project?projectId=1"],
     });
 
     expect(
@@ -297,12 +297,12 @@ describe("app routing", () => {
     ).toBeVisible();
   });
 
-  it("redirects /pm to the PM project route for authenticated users", async () => {
+  it("redirects /pm/pm to the PM project route for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/"],
+      initialEntries: ["/pm/pm"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -313,26 +313,6 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=1"],
-    });
-
-    expect(await screen.findByText("Project")).toBeVisible();
-    expect(screen.getByText("Selected project: 1")).toBeVisible();
-    expect(await screen.findByText("Detailed Project View")).toBeVisible();
-  });
-
-  /*
-   * MemoryRouter-only quirk: route paths in code are full site paths (`/pm/project`, …). If the test
-   * router uses `basename="/pm"`, React Router strips one `/pm` from the location, so the remaining
-   * segment must still be `/pm/project` — hence the doubled `/pm/pm/...` in `initialEntries`. Production
-   * uses `BrowserRouter basename="/"` in main.tsx, so real URLs stay `/pm/project` once.
-   */
-  it("renders PM routes when MemoryRouter basename is /pm (doubled /pm path in initialEntries)", async () => {
-    authTokenStorageMock.read.mockReturnValue("persisted-token");
-    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
-
-    renderWithTheme(<App />, {
-      basename: "/pm",
       initialEntries: ["/pm/pm/project?projectId=1"],
     });
 
@@ -341,12 +321,17 @@ describe("app routing", () => {
     expect(await screen.findByText("Detailed Project View")).toBeVisible();
   });
 
-  it("redirects legacy /project/:projectId routes into the PM project route", async () => {
+  /*
+   * MemoryRouter `basename="/pm"` strips one leading `/pm`. Prefix `initialEntries` with an extra `/pm`
+   * so the remainder matches full route constants (`/pm/pm/...`).
+   */
+  it("renders PM routes when MemoryRouter basename is /pm", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/project/1"],
+      basename: "/pm",
+      initialEntries: ["/pm/pm/pm/project?projectId=1"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -359,7 +344,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/team?teamId=7"],
+      initialEntries: ["/pm/pm/team?teamId=7"],
     });
 
     expect(await screen.findByText("Team")).toBeVisible();
@@ -371,14 +356,14 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/organization?organizationId=9"],
+      initialEntries: ["/pm/pm/organization?organizationId=9"],
     });
 
     expect(await screen.findByText("Organization")).toBeVisible();
     expect(await screen.findByText("Selected organization: 9")).toBeVisible();
   });
 
-  it("does not render a user SPA for the removed legacy /pm/user route", async () => {
+  it("does not render a user SPA for /pm/user (invalid under deploy basename)", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
@@ -410,7 +395,7 @@ describe("app routing", () => {
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/auth/scoped-token-login?token=scoped-token-abc"],
+      initialEntries: ["/pm/pm/auth/scoped-token-login?token=scoped-token-abc"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -437,7 +422,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/gantt?projectId=1"],
+      initialEntries: ["/pm/pm/project/gantt?projectId=1"],
     });
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
@@ -450,7 +435,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/kanban?projectId=1"],
+      initialEntries: ["/pm/pm/project/kanban?projectId=1"],
     });
 
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
@@ -463,7 +448,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/tasks?projectId=1"],
+      initialEntries: ["/pm/pm/project/tasks?projectId=1"],
     });
 
     expect(await screen.findByText("Project Tasks")).toBeVisible();
@@ -476,7 +461,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project?projectId=invalid"],
+      initialEntries: ["/pm/pm/project?projectId=invalid"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -488,7 +473,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project"],
+      initialEntries: ["/pm/pm/project"],
     });
 
     expect(await screen.findByText("Project")).toBeVisible();
@@ -497,7 +482,7 @@ describe("app routing", () => {
 
   it("redirects unauthenticated PM issues requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issues?projectId=42"],
+      initialEntries: ["/pm/pm/project/issues?projectId=42"],
     });
 
     expect(
@@ -510,7 +495,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issues?projectId=42"],
+      initialEntries: ["/pm/pm/project/issues?projectId=42"],
     });
 
     expect(await screen.findByText("Project Issues")).toBeVisible();
@@ -520,7 +505,7 @@ describe("app routing", () => {
 
   it("redirects unauthenticated PM issue-detail requests to the public home route", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issue?id=7&projectId=42"],
+      initialEntries: ["/pm/pm/project/issue?id=7&projectId=42"],
     });
 
     expect(
@@ -533,7 +518,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issue?id=7&projectId=42"],
+      initialEntries: ["/pm/pm/project/issue?id=7&projectId=42"],
     });
 
     expect(await screen.findByText("Issue Detail")).toBeVisible();
@@ -546,7 +531,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/gantt"],
+      initialEntries: ["/pm/pm/project/gantt"],
     });
 
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
@@ -559,7 +544,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/kanban"],
+      initialEntries: ["/pm/pm/project/kanban"],
     });
 
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
@@ -571,7 +556,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issues"],
+      initialEntries: ["/pm/pm/project/issues"],
     });
 
     expect(await screen.findByText("Project Issues")).toBeVisible();
@@ -583,7 +568,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/tasks"],
+      initialEntries: ["/pm/pm/project/tasks"],
     });
 
     expect(await screen.findByText("Project Tasks")).toBeVisible();
@@ -595,7 +580,7 @@ describe("app routing", () => {
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
-      initialEntries: ["/pm/project/issue?projectId=42"],
+      initialEntries: ["/pm/pm/project/issue?projectId=42"],
     });
 
     expect(await screen.findByText("Issue Detail")).toBeVisible();

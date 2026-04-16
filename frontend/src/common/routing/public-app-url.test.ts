@@ -6,6 +6,7 @@ import {
   createScopedAccessLoginAbsoluteUrl,
   createScopedAccessLoginRelativeUrl,
 } from "./public-app-url.js";
+import { SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH } from "../../../../common/routes/app-route-paths.js";
 
 describe("public app url helpers", () => {
   it("builds root-relative app urls for root deployments", () => {
@@ -28,13 +29,20 @@ describe("public app url helpers", () => {
 
   it("creates scoped access login links using the route path directly", () => {
     expect(createScopedAccessLoginRelativeUrl("abc123")).toBe(
-      "/pm/auth/scoped-token-login?token=abc123",
+      `${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=abc123`,
     );
   });
 
   it("creates absolute scoped access login links", () => {
     expect(
       createScopedAccessLoginAbsoluteUrl("abc123+", "https://workio.ai"),
-    ).toBe("https://workio.ai/pm/auth/scoped-token-login?token=abc123%2B");
+    ).toBe(
+      `https://workio.ai${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=abc123%2B`,
+    );
+  });
+
+  it("returns paths unchanged when they already start with appBasePath (idempotent)", () => {
+    expect(buildAppRelativeUrl("/pm/contact", "/pm")).toBe("/pm/contact");
+    expect(buildAppRelativeUrl("/pm/pm/project", "/pm")).toBe("/pm/pm/project");
   });
 });

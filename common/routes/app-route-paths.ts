@@ -1,40 +1,33 @@
 /**
  * Route path constants for `react-router` `<Route path>` and in-app `navigate` / `<Link to>`.
  *
- * **Browser router basename (`main.tsx`)**
- * - PM paths here are **full site pathnames** (e.g. `/pm/project`). The app uses `BrowserRouter`
- *   `basename="/"` so the matcher sees that full pathname. If you set `basename` to the deploy
- *   prefix (e.g. `/pm`), paths would be stripped and would **not** match these `/pm/...` patterns.
+ * **Two `/pm` segments (canonical PM URLs)**
+ * - **`VITE_APP_BASE_PATH` / nginx** — first segment: the reverse-proxy mount (`/pm/`), static assets, and
+ *   any path that `buildAppRelativeUrl` prefixes when `appBasePath` is `/pm`.
+ * - **Project management module** — second segment: PM routes are **`/pm/pm/...`** (deploy prefix + PM
+ *   module root). This intentionally produces **`/pm/pm/...`** in the browser; it is the supported shape.
+ * - **`BrowserRouter` uses `basename="/"`** in `main.tsx` so matchers see the full pathname (e.g.
+ *   `/pm/pm/project`). Do not set `basename` to `/pm` unless you also change these constants and tests.
  *
- * **`VITE_APP_BASE_PATH` / `buildAppRelativeUrl` (see `frontend/src/common/routing/public-app-url.ts`)**
- * - That env drives Vite `base` and **non-router** URLs (assets, scoped-login links, emails). It is
- *   not the React Router basename. Do not pass PM route strings through `buildAppRelativeUrl` unless
- *   you intend to prepend `appBasePath` again.
- *
- * **Reverse proxy / hosting**
- * - The browser’s `location.pathname` for PM screens must be `/pm/...` as defined here. If nginx
- *   (or similar) mounts the SPA under an extra prefix, either rewrite the URL before the SPA or
- *   change these constants and the server config together; env alone cannot retarget them.
- *
- * **`PROJECT_MANAGER_ROUTE_ROOT`**
- * - Prefer the exported `PROJECT_MANAGER_*_ROUTE_PATH` constants for links and routes. Avoid
- *   hand-building path strings from this segment so paths stay consistent.
+ * **`buildAppRelativeUrl`** (`frontend/src/common/routing/public-app-url.ts`)
+ * - Idempotent: if the path already starts with `appBasePath` (e.g. `/pm`), it is returned unchanged.
+ *   Pass paths *relative* to the deploy prefix for prefixing (e.g. `/contact` → `/pm/contact`). PM route
+ *   constants are full paths; do not run them through `buildAppRelativeUrl` to add another `/pm`.
  */
 
 const ROOT_ROUTE_PATH = "/";
 const AUTH_ROUTE_ROOT = "/auth";
 /**
- * First path segment for PM SPA URLs. Prefer `PROJECT_MANAGER_*_ROUTE_PATH` instead of concatenating
- * this value manually.
+ * PM module root pathname (second `/pm` under the `/pm` deploy prefix → `/pm/pm/...`).
+ * Prefer `PROJECT_MANAGER_*_ROUTE_PATH` instead of concatenating this value manually.
  */
-export const PROJECT_MANAGER_ROUTE_ROOT = "/pm";
+export const PROJECT_MANAGER_ROUTE_ROOT = "/pm/pm";
 const USER_ROUTE_ROOT = "/user";
 
 export const HOME_ROUTE_PATH = ROOT_ROUTE_PATH;
 export const CONTACT_ROUTE_PATH = "/contact";
 export const ABOUT_ROUTE_PATH = "/about";
 export const SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}${AUTH_ROUTE_ROOT}/scoped-token-login`;
-export const LEGACY_PROJECT_ROUTE_PATTERN = "/project/:projectId";
 
 export const USER_ROUTE_PATH = USER_ROUTE_ROOT;
 export const USER_LOBBY_ROUTE_PATH = `${USER_ROUTE_ROOT}/lobby`;
@@ -50,6 +43,3 @@ export const PROJECT_MANAGER_TASKS_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/t
 export const PROJECT_MANAGER_ISSUE_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/issue`;
 export const PROJECT_MANAGER_TASK_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/task`;
 export const PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}/mgr-uploads`;
-
-/** Common typo for `PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH` (`mgr-upload` vs `mgr-uploads`). */
-export const PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}/mgr-upload`;

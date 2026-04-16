@@ -119,7 +119,7 @@ describe("generated sqlite ddl for v10", () => {
     );
     db.exec("INSERT INTO Projects (id, name) VALUES (1, 'Apollo');");
     db.exec(
-      "INSERT INTO Notifications (id, eventType, actorUserId, projectId, issueId, taskId, commentId, attachmentId, mentionedUserId, message, targetUrl) VALUES (10, 'NOTIFICATION_EVENT_PROJECT_JOURNAL_MENTIONED', 1, 1, NULL, NULL, NULL, NULL, 2, 'alice mentioned you in the journal for Project \"Apollo\".', '/pm/project?projectId=1#project-journal');",
+      "INSERT INTO Notifications (id, eventType, actorUserId, projectId, issueId, taskId, commentId, attachmentId, mentionedUserId, message, targetUrl) VALUES (10, 'NOTIFICATION_EVENT_PROJECT_JOURNAL_MENTIONED', 1, 1, NULL, NULL, NULL, NULL, 2, 'alice mentioned you in the journal for Project \"Apollo\".', '/pm/pm/project?projectId=1#project-journal');",
     );
     db.exec(
       "INSERT INTO Users_Notifications (userId, notificationId, hasBeenNoticed) VALUES (2, 10, 0);",

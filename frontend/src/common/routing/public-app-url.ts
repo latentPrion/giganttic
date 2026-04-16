@@ -11,20 +11,23 @@ function trimTrailingSlash(value: string): string {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
+/**
+ * Prefixes a path with `appBasePath` when needed. Idempotent: if `path` is already under the deploy
+ * prefix (e.g. already starts with `/pm` when `appBasePath` is `/pm`), returns `path` unchanged — no
+ * throws. PM routes live at `/pm/pm/...`; pass them only as full path constants, not via this helper.
+ */
 export function buildAppRelativeUrl(
   path: string,
   appBasePath: string = frontendConfig.appBasePath,
 ): string {
   const normalizedPath = normalizeRoutePath(path);
   const trimmedBase = trimTrailingSlash(appBasePath);
-  if (appBasePath !== "/" && (normalizedPath === trimmedBase || normalizedPath.startsWith(`${trimmedBase}/`))) {
-    throw new Error(
-      `buildAppRelativeUrl: path "${path}" already contains appBasePath "${appBasePath}". ` +
-      `Pass a path relative to appBasePath to avoid double-prefixing (e.g. "/some-page", not "${appBasePath}/some-page").`,
-    );
+
+  if (appBasePath === "/" || trimmedBase === "") {
+    return normalizedPath;
   }
 
-  if (appBasePath === "/") {
+  if (normalizedPath === trimmedBase || normalizedPath.startsWith(`${trimmedBase}/`)) {
     return normalizedPath;
   }
 

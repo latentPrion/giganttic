@@ -213,8 +213,8 @@ Current responsibilities:
 - host session-aware login, registration, current-session lookup, and logout UI
 - host the normal user lobby SPA for the current user's associated projects,
 teams, and organizations
-- host authenticated project-manager routes at `/pm/project`,
-`/pm/project/gantt`, `/pm/project/issues`, and `/pm/project/issue`
+- host authenticated project-manager routes at `/pm/pm/project`,
+`/pm/pm/pm/project/gantt`, `/pm/pm/pm/pm/project/issues`, and `/pm/pm/pm/project/issue`
 - render reusable entity list items in the user lobby, with view-specific action
 affordances controlled by parent-selected render modes
 - provide reusable project, team, and organization create, edit, and summary
@@ -247,14 +247,14 @@ deferred until matching backend routes exist
 
 Current project-manager SPA interaction model:
 
-- `/pm/project` is authenticated-only and reuses the shared app shell/header
+- `/pm/pm/project` is authenticated-only and reuses the shared app shell/header
 - the selected project is read from the `projectId` query parameter
-- `/pm/project?projectId=...` shows the selected project entity in detail
-- `/pm/project/gantt?projectId=...` shows the selected project's gantt chart
+- `/pm/pm/project?projectId=...` shows the selected project entity in detail
+- `/pm/pm/pm/project/gantt?projectId=...` shows the selected project's gantt chart
 - the gantt view loads XML from `charts/<projectId>.xml`
-- `/pm/project/issues?projectId=...` is authenticated-only and lists all
+- `/pm/pm/pm/pm/project/issues?projectId=...` is authenticated-only and lists all
 issues for the selected project
-- `/pm/project/issue?projectId=...&id=...` is authenticated-only and shows a
+- `/pm/pm/pm/project/issue?projectId=...&id=...` is authenticated-only and shows a
 single issue detail view
 - PM issue routes use reusable `IssueListItem` rows together with reusable
 create, edit, delete, and open-detail issue buttons

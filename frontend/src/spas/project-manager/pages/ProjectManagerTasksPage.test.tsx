@@ -290,7 +290,7 @@ describe("ProjectManagerTasksPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /In Progress Task/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=inprog");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/task?projectId=42&id=inprog");
   });
 
   it("shows runtime validation errors when the loaded chart contains duplicate task ids", async () => {

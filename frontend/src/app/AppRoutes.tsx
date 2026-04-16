@@ -3,12 +3,10 @@ import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
   HOME_ROUTE_PATH,
-  LEGACY_PROJECT_ROUTE_PATTERN,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
   PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-  PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH,
   PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
@@ -24,8 +22,6 @@ import {
   Navigate,
   Route,
   Routes,
-  useLocation,
-  useParams,
 } from "react-router-dom";
 
 import { AboutPage } from "../home/components/AboutPage.js";
@@ -46,27 +42,6 @@ import { TeamRoute } from "../spas/project-manager/routes/TeamRoute.js";
 import { PublicHomeLayout } from "../spas/public-home/layouts/PublicHomeLayout.js";
 import { UserSpaRoute } from "../spas/user/routes/UserSpaRoute.js";
 
-function MgrUploadsTypoRedirect() {
-  const location = useLocation();
-  return (
-    <Navigate
-      replace
-      to={`${PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH}${location.search}`}
-    />
-  );
-}
-
-function LegacyProjectRouteRedirect() {
-  const params = useParams<{ projectId?: string }>();
-  const rawProjectId = params.projectId?.trim() ?? "";
-  const parsedProjectId = Number(rawProjectId);
-  const targetPath = Number.isInteger(parsedProjectId) && parsedProjectId > 0
-    ? `${PROJECT_MANAGER_ROUTE_PATH}?projectId=${parsedProjectId}`
-    : PROJECT_MANAGER_ROUTE_PATH;
-
-  return <Navigate replace to={targetPath} />;
-}
-
 export function AppRoutes() {
   return (
     <Routes>
@@ -76,7 +51,6 @@ export function AppRoutes() {
         <Route element={<AboutPage />} path={ABOUT_ROUTE_PATH} />
       </Route>
       <Route element={<ScopedAccessTokenLoginRoute />} path={SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH} />
-      <Route element={<LegacyProjectRouteRedirect />} path={LEGACY_PROJECT_ROUTE_PATTERN} />
       <Route element={<Navigate replace to={PROJECT_MANAGER_ROUTE_PATH} />} path={PROJECT_MANAGER_ROUTE_ROOT} />
       <Route element={<ProjectRoute />} path={PROJECT_MANAGER_ROUTE_PATH} />
       <Route element={<TeamRoute />} path={PROJECT_MANAGER_TEAM_ROUTE_PATH} />
@@ -84,7 +58,6 @@ export function AppRoutes() {
       <Route element={<UserSpaRoute />} path={`${USER_ROUTE_PATH}/*`} />
       <Route element={<GanttRoute />} path={PROJECT_MANAGER_GANTT_ROUTE_PATH} />
       <Route element={<KanbanRoute />} path={PROJECT_MANAGER_KANBAN_ROUTE_PATH} />
-      <Route element={<MgrUploadsTypoRedirect />} path={PROJECT_MANAGER_MGR_UPLOAD_TYPO_ROUTE_PATH} />
       <Route element={<MgrUploadsRoute />} path={PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH} />
       <Route element={<NotificationsRoute />} path={PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH} />
       <Route element={<IssuesRoute />} path={PROJECT_MANAGER_ISSUES_ROUTE_PATH} />

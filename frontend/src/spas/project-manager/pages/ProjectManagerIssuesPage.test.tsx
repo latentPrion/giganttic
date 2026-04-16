@@ -264,7 +264,7 @@ describe("ProjectManagerIssuesPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /In Progress High/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issue?projectId=42&id=7");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/issue?projectId=42&id=7");
   });
 
   it("uses the shared project-scoped navigation tabs", async () => {
@@ -277,8 +277,8 @@ describe("ProjectManagerIssuesPage", () => {
     await user.click(await screen.findByRole("tab", { name: "Details" }));
     await user.click(screen.getByRole("tab", { name: "Gantt" }));
 
-    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/pm/project?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/pm/project/gantt?projectId=42");
   });
 
   it("renders the missing-project fallback and disables create when no project is selected", async () => {

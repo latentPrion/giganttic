@@ -41,7 +41,7 @@ describe("ProjectManagerProjectNavigation", () => {
 
     await user.click(screen.getByRole("tab", { name: "Shared uploads" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/mgr-uploads");
   });
 
   it("navigates to the other project-scoped PM routes while preserving projectId", async () => {
@@ -60,10 +60,10 @@ describe("ProjectManagerProjectNavigation", () => {
     await user.click(screen.getByRole("tab", { name: "Issues" }));
     await user.click(screen.getByRole("tab", { name: "Tasks" }));
 
-    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project/gantt?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/kanban?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(3, "/pm/project/issues?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(4, "/pm/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/pm/project/kanban?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(3, "/pm/pm/project/issues?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(4, "/pm/pm/project/tasks?projectId=42");
   });
 
   it("disables project-scoped navigation when no project is selected", () => {
@@ -97,7 +97,7 @@ describe("ProjectManagerProjectNavigation", () => {
     const sharedTab = screen.getByRole("tab", { name: "Shared uploads" });
     expect(sharedTab).toBeEnabled();
     await user.click(sharedTab);
-    expect(navigateMock).toHaveBeenCalledWith("/pm/mgr-uploads");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/mgr-uploads");
   });
 
   it("renders optional right-side actions alongside the project tabs", () => {

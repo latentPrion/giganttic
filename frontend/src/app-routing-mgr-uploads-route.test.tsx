@@ -44,7 +44,7 @@ describe("app routing — mgr-uploads route", () => {
 
     renderWithTheme(<App />, {
       basename: "/",
-      initialEntries: ["/pm/mgr-uploads"],
+      initialEntries: ["/pm/pm/mgr-uploads"],
     });
 
     const root = await screen.findByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID);

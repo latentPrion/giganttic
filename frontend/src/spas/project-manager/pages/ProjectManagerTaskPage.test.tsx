@@ -150,7 +150,7 @@ describe("ProjectManagerTaskPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Back to Tasks" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/tasks?projectId=42");
   });
 
   it("shows project and task attachment embedding instructions in the task journal editor", async () => {
@@ -183,7 +183,7 @@ describe("ProjectManagerTaskPage", () => {
 
     await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Gantt" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/gantt?projectId=42");
   });
 
   it("loads task comments in the comments tab", async () => {

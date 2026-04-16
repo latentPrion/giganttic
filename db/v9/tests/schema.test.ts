@@ -57,7 +57,7 @@ describe("notifications v9 zod schemas", () => {
       mentionedUserId: null,
       message: "alice created Issue \"Ship it\" under Apollo.",
       projectId: 4,
-      targetUrl: "/pm/project/issue?projectId=4&id=3&tab=details",
+      targetUrl: "/pm/pm/project/issue?projectId=4&id=3&tab=details",
       taskId: null,
     });
 
@@ -75,7 +75,7 @@ describe("notifications v9 zod schemas", () => {
       mentionedUserId: 7,
       message: "alice mentioned you in a comment on Task \"Build API\" under Apollo.",
       projectId: 4,
-      targetUrl: "/pm/project/task?projectId=4&id=task-1&tab=comments&commentId=12",
+      targetUrl: "/pm/pm/project/task?projectId=4&id=task-1&tab=comments&commentId=12",
       taskId: "task-1",
     });
 

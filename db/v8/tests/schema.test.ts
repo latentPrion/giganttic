@@ -146,7 +146,7 @@ describe("notifications v8 zod schemas", () => {
       issueId: 3,
       message: "alice commented on Issue \"Ship it\" under Apollo.",
       projectId: 4,
-      targetUrl: "/pm/project/issue?projectId=4&id=3&tab=comments&commentId=2",
+      targetUrl: "/pm/pm/project/issue?projectId=4&id=3&tab=comments&commentId=2",
       taskId: null,
     });
 

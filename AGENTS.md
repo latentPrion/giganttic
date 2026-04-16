@@ -1,5 +1,6 @@
 # Project Instructions
 
+- **Project manager URLs (reverse-proxy deploy):** canonical paths are **`/pm/pm/...`** — first `/pm` is the nginx/Vite public mount (`VITE_APP_BASE_PATH`), second `/pm` is the PM module. This double segment is intentional and expected. There are no legacy compatibility redirects for older single-`/pm` URL shapes; bookmarks and stored links must use the current constants in `common/routes/app-route-paths.ts`.
 - Always break functions into logical subfunctions. No long-scrolling functions, in any language. This applies to source code, scripts, build scripts, CMake, Makefiles, and similar project files. Preserve this subfunction splitting discipline during refactors.
 - Modularity is non-negotiable. Always group logically related functions together into a module. Preserve modularity during refactors.
 - Reuse or extend existing abstractions instead of duplicating logic wherever possible. Don't repeat yourself. The goal here is to prevent duplication. Not to discourage appropriate logical separation of prior abstractions into new logical abstractions where sensible.

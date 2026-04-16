@@ -15,7 +15,7 @@ describe("notifications message builders", () => {
     });
 
     expect(snapshot.targetUrl).toBe(
-      "/pm/project?projectId=4&tab=attachments&attachmentId=att-77",
+      "/pm/pm/project?projectId=4&tab=attachments&attachmentId=att-77",
     );
   });
 
@@ -26,6 +26,6 @@ describe("notifications message builders", () => {
       projectName: "Project 4",
     });
 
-    expect(snapshot.targetUrl).toBe("/pm/project?projectId=4#project-journal");
+    expect(snapshot.targetUrl).toBe("/pm/pm/project?projectId=4#project-journal");
   });
 });
