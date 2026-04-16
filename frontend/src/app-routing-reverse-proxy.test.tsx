@@ -382,14 +382,14 @@ describe("reverse-proxy deployment — all routes render content", () => {
 
   // --- Scoped token login ---
 
-  it("renders the scoped token login route and redirects after success", async () => {
+  it("renders the scoped token login route and redirects to the user lobby after success", async () => {
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
     renderWithTheme(<App />, {
       initialEntries: [`${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=test-token`],
     });
 
-    expect(await screen.findByText("Project")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Lobby" })).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("test-token");
   });
 
@@ -619,7 +619,7 @@ describe("scoped login URL builder consistency", () => {
     const url = createScopedAccessLoginRelativeUrl("my-scoped-token");
     renderWithTheme(<App />, { initialEntries: [url] });
 
-    expect(await screen.findByText("Project")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Lobby" })).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("my-scoped-token");
   });
 });

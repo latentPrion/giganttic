@@ -247,7 +247,7 @@ describe("app routing", () => {
 
     await user.click(await screen.findByRole("link", { name: "Go to your lobby" }));
 
-    expect(await screen.findByText("User Lobby")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Lobby" })).toBeVisible();
     expect(await screen.findByText("Your projects, teams, and organizations")).toBeVisible();
   });
 
@@ -269,7 +269,7 @@ describe("app routing", () => {
       initialEntries: ["/user/lobby"],
     });
 
-    expect(await screen.findByText("User Lobby")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Lobby" })).toBeVisible();
     expect(await screen.findByRole("button", { name: /^Projects$/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Teams$/i })).toBeVisible();
     expect(screen.getByRole("button", { name: /^Organizations$/i })).toBeVisible();
@@ -391,7 +391,7 @@ describe("app routing", () => {
     expect(screen.getByRole("tab", { name: "Settings" })).toBeVisible();
   });
 
-  it("redeems scoped token login route and redirects to the PM project page", async () => {
+  it("redeems scoped token login route and redirects to the user lobby", async () => {
     authTokenStorageMock.read.mockReturnValue(null);
     authApiMock.loginWithScopedAccessToken.mockResolvedValue(createLoginResponse());
 
@@ -399,7 +399,7 @@ describe("app routing", () => {
       initialEntries: ["/auth/scoped-token-login?token=scoped-token-abc"],
     });
 
-    expect(await screen.findByText("Project")).toBeVisible();
+    expect(await screen.findByText("User Lobby")).toBeVisible();
     expect(authApiMock.loginWithScopedAccessToken).toHaveBeenCalledWith("scoped-token-abc");
     expect(authTokenStorageMock.write).toHaveBeenCalledWith("scoped-login-token");
   });
