@@ -1,6 +1,6 @@
 # Project Instructions
 
-- **Project manager URLs (reverse-proxy deploy):** canonical paths are **`/pm/pm/...`** — first `/pm` is the nginx/Vite public mount (`VITE_APP_BASE_PATH`), second `/pm` is the PM module. This double segment is intentional and expected. The app also registers **`/pm`** and **`/pm/`** (deploy mount only) to redirect into the PM entry route so nginx default paths do not fall through to the marketing home catch-all. Bookmarks and stored links should still use the constants in `common/routes/app-route-paths.ts`.
+- **Project manager URLs (reverse-proxy deploy):** route constants in `common/routes/app-route-paths.ts` are deploy-base-path agnostic (for example, `/project/...`), and `VITE_APP_BASE_PATH` is the single deploy parameter that prefixes them externally (for example, `/pm/project/...`). Keep route constants free of hardcoded deploy prefixes.
 - Always break functions into logical subfunctions. No long-scrolling functions, in any language. This applies to source code, scripts, build scripts, CMake, Makefiles, and similar project files. Preserve this subfunction splitting discipline during refactors.
 - Modularity is non-negotiable. Always group logically related functions together into a module. Preserve modularity during refactors.
 - Reuse or extend existing abstractions instead of duplicating logic wherever possible. Don't repeat yourself. The goal here is to prevent duplication. Not to discourage appropriate logical separation of prior abstractions into new logical abstractions where sensible.

@@ -45,12 +45,13 @@ export function buildAppAbsoluteUrl(
 export function createScopedAccessLoginRelativeUrl(
   tokenValue: string,
 ): string {
-  return `${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=${encodeURIComponent(tokenValue)}`;
+  const relativePath = buildAppRelativeUrl(SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH);
+  return `${relativePath}?token=${encodeURIComponent(tokenValue)}`;
 }
 
 export function createScopedAccessLoginAbsoluteUrl(
   tokenValue: string,
   origin: string,
 ): string {
-  return `${trimTrailingSlash(origin)}${SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH}?token=${encodeURIComponent(tokenValue)}`;
+  return `${trimTrailingSlash(origin)}${createScopedAccessLoginRelativeUrl(tokenValue)}`;
 }

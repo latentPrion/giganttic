@@ -4,15 +4,15 @@ import { CssBaseline, ThemeProvider } from "@mui/material";
 import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./App.js";
+import { frontendConfig } from "./config/frontend-config.js";
 import { appTheme } from "./theme/app-theme.js";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
-      {/* Router basename: see `common/routes/app-route-paths.ts`. */}
       <BrowserRouter
-        basename="/"
+        basename={frontendConfig.appBasePath}
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true,
