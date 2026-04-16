@@ -15,6 +15,12 @@ interface ProjectManagerAuthenticatedRouteProps {
 const LOADING_MESSAGE = "Loading the project manager workspace...";
 const LOADING_SIZE = 28;
 
+/** Shown when the PM route matches but the user is not signed in — keep the URL; do not send users to `/`. */
+export const PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT =
+  "Sign in to use the project manager.";
+
+export const PROJECT_MANAGER_SIGN_IN_PROMPT_TEST_ID = "project-manager-sign-in-prompt";
+
 function ProjectManagerLoadingState() {
   return (
     <Stack
@@ -43,7 +49,27 @@ export function ProjectManagerAuthenticatedRoute(
   }
 
   if (authState.status !== "authenticated") {
-    return <Navigate replace to="/" />;
+    return (
+      <AppShell>
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          spacing={2}
+          sx={{ flex: 1, px: 2, py: 4 }}
+        >
+          <Typography
+            component="p"
+            data-testid={PROJECT_MANAGER_SIGN_IN_PROMPT_TEST_ID}
+            variant="h6"
+          >
+            {PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT}
+          </Typography>
+          <Typography color="text.secondary" variant="body2">
+            Use Login or Register in the header.
+          </Typography>
+        </Stack>
+      </AppShell>
+    );
   }
 
   return (

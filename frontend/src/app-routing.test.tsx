@@ -18,6 +18,7 @@ import {
   listMgrUploadsFilesMock,
 } from "./app-routing-test-vi-mocks.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
+import { PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT } from "./spas/project-manager/routes/ProjectManagerAuthenticatedRoute.js";
 import { App } from "./App.js";
 
 const authApiMock = vi.mocked(authApi);
@@ -287,13 +288,13 @@ describe("app routing", () => {
     expect(await screen.findByText("Your projects, teams, and organizations")).toBeVisible();
   });
 
-  it("redirects unauthenticated PM project requests to the public home route", async () => {
+  it("shows the PM sign-in prompt when unauthenticated on the project route", async () => {
     renderWithTheme(<App />, {
       initialEntries: ["/pm/pm/project?projectId=1"],
     });
 
     expect(
-      await screen.findByText("Run projects with clarity."),
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
     ).toBeVisible();
   });
 
@@ -480,13 +481,13 @@ describe("app routing", () => {
     expect(screen.getByText("Provide a valid projectId to view a project.")).toBeVisible();
   });
 
-  it("redirects unauthenticated PM issues requests to the public home route", async () => {
+  it("shows the PM sign-in prompt when unauthenticated on the issues route", async () => {
     renderWithTheme(<App />, {
       initialEntries: ["/pm/pm/project/issues?projectId=42"],
     });
 
     expect(
-      await screen.findByText("Run projects with clarity."),
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
     ).toBeVisible();
   });
 
@@ -503,13 +504,13 @@ describe("app routing", () => {
     expect(await screen.findByRole("tab", { name: "In Progress", selected: true })).toBeVisible();
   });
 
-  it("redirects unauthenticated PM issue-detail requests to the public home route", async () => {
+  it("shows the PM sign-in prompt when unauthenticated on the issue detail route", async () => {
     renderWithTheme(<App />, {
       initialEntries: ["/pm/pm/project/issue?id=7&projectId=42"],
     });
 
     expect(
-      await screen.findByText("Run projects with clarity."),
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
     ).toBeVisible();
   });
 

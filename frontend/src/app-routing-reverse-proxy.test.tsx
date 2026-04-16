@@ -69,6 +69,7 @@ import {
 } from "../../common/routes/app-route-paths.js";
 import { renderWithTheme } from "./test/render-with-theme.js";
 import { App } from "./App.js";
+import { PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT } from "./spas/project-manager/routes/ProjectManagerAuthenticatedRoute.js";
 
 const authApiMock = vi.mocked(authApi);
 const authTokenStorageMock = vi.mocked(authTokenStorage);
@@ -526,18 +527,22 @@ describe("reverse-proxy deployment — all routes render content with basename='
     expect(await screen.findByText("User SPA")).toBeVisible();
   });
 
-  // --- Unauthenticated guard: redirect to home, not blank ---
+  // --- Unauthenticated PM: stay on PM URL, show sign-in prompt (not marketing home) ---
 
-  it("redirects unauthenticated PM project requests to home — not blank", async () => {
+  it("shows the PM sign-in prompt when unauthenticated on the project route", async () => {
     renderWithTheme(<App />, { initialEntries: [PROJECT_MANAGER_ROUTE_PATH] });
-    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+    expect(
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
+    ).toBeVisible();
   });
 
-  it("redirects unauthenticated PM gantt requests to home — not blank", async () => {
+  it("shows the PM sign-in prompt when unauthenticated on the gantt route", async () => {
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=1`],
     });
-    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+    expect(
+      await screen.findByText(PROJECT_MANAGER_UNAUTHENTICATED_PROMPT_TEXT),
+    ).toBeVisible();
   });
 
   it("redirects unauthenticated user lobby requests to home — not blank", async () => {
