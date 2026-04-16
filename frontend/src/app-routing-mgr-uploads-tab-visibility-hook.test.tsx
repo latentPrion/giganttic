@@ -47,7 +47,7 @@ describe("app routing — mgr-uploads route (real tab visibility hook)", () => {
 
     renderWithTheme(<App />, {
       basename: "/",
-      initialEntries: ["/pm/pm/mgr-uploads"],
+      initialEntries: ["/project/mgr-uploads"],
     });
 
     expect(

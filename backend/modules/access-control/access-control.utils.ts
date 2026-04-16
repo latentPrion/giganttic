@@ -497,7 +497,8 @@ export function hasProjectUploadFileTypeBypassRole(
   projectId: number,
   userId: number,
 ): boolean {
-  return hasEffectiveProjectManagerRole(database, projectId, userId)
+  return hasDirectProjectOwnerRole(database, projectId, userId)
+    || hasEffectiveProjectManagerRole(database, projectId, userId)
     || hasEffectiveLinkedTeamManagerRoleForProject(database, projectId, userId)
     || hasAssociatedOrganizationManagerRoleForProject(
       database,
@@ -596,7 +597,10 @@ export function hasEffectiveManagerAnywhere(
 ): boolean {
   const projectIds = listProjectIdsVisibleByMembership(database, userId);
   for (const projectId of projectIds) {
-    if (hasEffectiveProjectManagerRole(database, projectId, userId)) {
+    if (
+      hasDirectProjectOwnerRole(database, projectId, userId)
+      || hasEffectiveProjectManagerRole(database, projectId, userId)
+    ) {
       return true;
     }
   }

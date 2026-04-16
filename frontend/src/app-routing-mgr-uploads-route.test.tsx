@@ -38,13 +38,13 @@ describe("app routing — mgr-uploads route", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the shared mgr-uploads SPA for authenticated users (production-shaped URL and basename)", async () => {
+  it("renders the shared mgr-uploads SPA for authenticated users", async () => {
     authTokenStorageMock.read.mockReturnValue("persisted-token");
     authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
 
     renderWithTheme(<App />, {
       basename: "/",
-      initialEntries: ["/pm/pm/mgr-uploads"],
+      initialEntries: ["/project/mgr-uploads"],
     });
 
     const root = await screen.findByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID);

@@ -98,6 +98,42 @@ describe("mgr-uploads api auth matrix", () => {
     expect(listResponse.statusCode).toBe(200);
   });
 
+  it("allows a direct project owner without project-manager role", async () => {
+    const ownerOnly = await harness.registerUser("mgr-uploads-owner-only");
+    const projectResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(ownerOnly.accessToken),
+      method: "POST",
+      payload: { name: "Mgr uploads owner-only project" },
+      url: "/stc-proj-mgmt/api/projects",
+    });
+    expect(projectResponse.statusCode).toBe(201);
+    const projectId = harness.parseJson<{ project: { id: number } }>(
+      projectResponse.payload,
+    ).project.id;
+
+    const membershipResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(ownerOnly.accessToken),
+      method: "PUT",
+      payload: {
+        members: [
+          {
+            roleCodes: [PROJECT_OWNER_ROLE],
+            userId: ownerOnly.user.id,
+          },
+        ],
+      },
+      url: `/stc-proj-mgmt/api/projects/${projectId}/members`,
+    });
+    expect(membershipResponse.statusCode).toBe(200);
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(ownerOnly.accessToken),
+      method: "GET",
+      url: MGR_UPLOADS_BASE,
+    });
+    expect(listResponse.statusCode).toBe(200);
+  });
+
   it("allows a team manager (team creator)", async () => {
     const teamManager = await harness.registerUser("mgr-uploads-team-mgr");
     const teamResponse = await harness.app.inject({
