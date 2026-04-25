@@ -23,7 +23,6 @@ export const PROJECT_ROUTE_SECTION_VALUES = [
   "kanban",
   "issues",
   "tasks",
-  "mgr-uploads",
   "issue-detail",
   "task-detail",
 ] as const;

@@ -9,7 +9,6 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-import { PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 import {
   createProjectDetailRoute,
   createProjectGanttRoute,
@@ -56,10 +55,6 @@ function buildRouteForSection(
     taskDetailTaskId?: string | null;
   } = {},
 ): string {
-  if (currentSection === "mgr-uploads") {
-    return PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH;
-  }
-
   if (projectId === null) {
     return "";
   }
@@ -141,9 +136,7 @@ export function ProjectManagerProjectNavigation(
   props: ProjectManagerProjectNavigationProps,
 ) {
   const navigate = useNavigate();
-  const selectedSection: ProjectRouteSection | false = props.currentSection === "mgr-uploads"
-    ? false
-    : props.currentSection;
+  const selectedSection: ProjectRouteSection = props.currentSection;
 
   function handleSectionChange(
     _event: React.SyntheticEvent,

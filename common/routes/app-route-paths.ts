@@ -10,6 +10,7 @@
 
 const ROOT_ROUTE_PATH = "/";
 const AUTH_ROUTE_ROOT = "/auth";
+const MGR_UPLOADS_ROUTE_ROOT = "/mgr-uploads";
 const PROJECT_MANAGER_ROUTE_NAMESPACE = "/pm";
 /**
  * PM module root path within the SPA (before the proxy-pass mount path is applied).
@@ -36,4 +37,4 @@ export const PROJECT_MANAGER_ISSUES_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/
 export const PROJECT_MANAGER_TASKS_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/tasks`;
 export const PROJECT_MANAGER_ISSUE_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/issue`;
 export const PROJECT_MANAGER_TASK_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_PATH}/task`;
-export const PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH = `${PROJECT_MANAGER_ROUTE_ROOT}/mgr-uploads`;
+export const MGR_UPLOADS_ROUTE_PATH = MGR_UPLOADS_ROUTE_ROOT;

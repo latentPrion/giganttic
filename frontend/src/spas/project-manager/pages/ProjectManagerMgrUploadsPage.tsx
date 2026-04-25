@@ -24,7 +24,6 @@ import type {
 } from "../../../../../common/mgr-uploads/mgr-uploads.contracts.js";
 import { isApiError } from "../../../common/api/api-error.js";
 import { mgrUploadsApi } from "../api/mgr-uploads-api.js";
-import { ProjectManagerProjectNavigation } from "../components/ProjectManagerProjectNavigation.js";
 import { buildMgrUploadPublicFileUrl } from "../lib/build-mgr-upload-public-file-url.js";
 
 /** Stable selector for routing/integration tests (`app-routing-mgr-uploads-route.test.tsx`). */
@@ -285,11 +284,6 @@ export function ProjectManagerMgrUploadsPage(
           {PAGE_TITLE}
         </Typography>
       </Box>
-      <ProjectManagerProjectNavigation
-        authToken={props.token}
-        currentSection="mgr-uploads"
-        projectId={null}
-      />
       {renderBody()}
     </Stack>
   );

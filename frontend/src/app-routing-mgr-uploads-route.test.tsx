@@ -1,13 +1,8 @@
-/**
- * Pins `useMgrUploadsTabVisibility` to `"allowed"` via `app-routing-mgr-uploads-route-vi-mocks` so the
- * mgr-uploads route matches without a one-frame MUI `Tabs` warning. For behavior with the real hook,
- * see `app-routing-mgr-uploads-tab-visibility-hook.test.tsx`.
- */
 import React from "react";
 import { screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import "./app-routing-mgr-uploads-route-vi-mocks.js";
+import "./app-routing-test-vi-mocks.js";
 import { authApi } from "./common/session/api/auth-api.js";
 import { authTokenStorage } from "./common/session/storage/auth-token-storage.js";
 import { createAuthenticatedResponse } from "./app-routing-test-auth-helpers.js";
@@ -44,7 +39,7 @@ describe("app routing — mgr-uploads route", () => {
 
     renderWithTheme(<App />, {
       basename: "/",
-      initialEntries: ["/pm/project/mgr-uploads"],
+      initialEntries: ["/mgr-uploads"],
     });
 
     const root = await screen.findByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID);
@@ -52,5 +47,34 @@ describe("app routing — mgr-uploads route", () => {
     expect(
       within(root).getByRole("heading", { name: "Shared instance uploads", level: 1 }),
     ).toBeVisible();
+    expect(within(root).queryByRole("tab", { name: "Details" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Shared uploads" })).not.toBeInTheDocument();
+  });
+
+  it("renders at the proxy-pass URL when the app is mounted under /pm", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      basename: "/pm",
+      initialEntries: ["/pm/mgr-uploads"],
+    });
+
+    expect(
+      await screen.findByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID),
+    ).toBeVisible();
+  });
+
+  it("does not keep the old project-scoped mgr-uploads route alive", async () => {
+    authTokenStorageMock.read.mockReturnValue("persisted-token");
+    authApiMock.getCurrentSession.mockResolvedValue(createAuthenticatedResponse());
+
+    renderWithTheme(<App />, {
+      basename: "/pm",
+      initialEntries: ["/pm/pm/project/mgr-uploads"],
+    });
+
+    expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
+    expect(screen.queryByTestId(PROJECT_MANAGER_MGR_UPLOADS_PAGE_TEST_ID)).not.toBeInTheDocument();
   });
 });

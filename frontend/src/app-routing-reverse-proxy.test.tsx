@@ -50,11 +50,11 @@ import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
   HOME_ROUTE_PATH,
+  MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
   PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-  PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
   PROJECT_MANAGER_ROUTE_PATH,
@@ -242,18 +242,23 @@ describe("route path constants — structural invariants (auto-enumerated)", () 
     .filter((entry) => typeof entry[1] === "string")
     .map(([name, value]) => ({ name, value: String(value) }));
 
-  // PM-specific exports: every export whose name starts with PROJECT_MANAGER_
-  const pmExports = allExportedPaths.filter(({ name }) =>
+  // Project-scoped PM exports: every PROJECT_MANAGER_ export should remain under
+  // PROJECT_MANAGER_ROUTE_ROOT. Instance-global routes must not use this prefix.
+  const projectScopedPmExports = allExportedPaths.filter(({ name }) =>
     name.startsWith("PROJECT_MANAGER_"),
   );
 
-  it("all PROJECT_MANAGER_ route constants start with PROJECT_MANAGER_ROUTE_ROOT", () => {
+  it("all project-scoped PROJECT_MANAGER_ route constants start with PROJECT_MANAGER_ROUTE_ROOT", () => {
     const root = routePaths.PROJECT_MANAGER_ROUTE_ROOT;
-    for (const { name, value } of pmExports) {
+    for (const { name, value } of projectScopedPmExports) {
       expect(value, `${name} must start with "${root}"`).toMatch(
         new RegExp(`^${root}(/|$)`),
       );
     }
+  });
+
+  it("keeps shared mgr-uploads global rather than project-scoped", () => {
+    expect(routePaths.MGR_UPLOADS_ROUTE_PATH).toBe("/mgr-uploads");
   });
 
   it("SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH stays app-relative", () => {
@@ -502,10 +507,10 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Notifications")).toBeVisible();
   });
 
-  it("renders the PM mgr-uploads route at '/pm/project/mgr-uploads'", async () => {
+  it("renders the shared mgr-uploads route at '/mgr-uploads'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
-      initialEntries: [PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH],
+      initialEntries: [MGR_UPLOADS_ROUTE_PATH],
     });
     expect(
       await screen.findByRole("heading", { name: "Shared instance uploads", level: 1 }),
@@ -563,6 +568,7 @@ describe("buildAppRelativeUrl — overlapping proxy and app route segments", () 
     expect(buildAppRelativeUrl("/pm", "/pm")).toBe("/pm/pm");
     expect(buildAppRelativeUrl("/pm/project", "/pm")).toBe("/pm/pm/project");
     expect(buildAppRelativeUrl(PROJECT_MANAGER_ROUTE_PATH, "/pm")).toBe("/pm/pm/project");
+    expect(buildAppRelativeUrl(MGR_UPLOADS_ROUTE_PATH, "/pm")).toBe("/pm/mgr-uploads");
     expect(buildAppRelativeUrl(SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH, "/pm")).toBe("/pm/auth/scoped-token-login");
   });
 

@@ -3,11 +3,11 @@ import {
   ABOUT_ROUTE_PATH,
   CONTACT_ROUTE_PATH,
   HOME_ROUTE_PATH,
+  MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_GANTT_ROUTE_PATH,
   PROJECT_MANAGER_ISSUES_ROUTE_PATH,
   PROJECT_MANAGER_ISSUE_ROUTE_PATH,
   PROJECT_MANAGER_KANBAN_ROUTE_PATH,
-  PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH,
   PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH,
   PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH,
   PROJECT_MANAGER_ROUTE_PATH,
@@ -56,7 +56,7 @@ export function AppRoutes() {
       <Route element={<UserSpaRoute />} path={`${USER_ROUTE_PATH}/*`} />
       <Route element={<GanttRoute />} path={PROJECT_MANAGER_GANTT_ROUTE_PATH} />
       <Route element={<KanbanRoute />} path={PROJECT_MANAGER_KANBAN_ROUTE_PATH} />
-      <Route element={<MgrUploadsRoute />} path={PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH} />
+      <Route element={<MgrUploadsRoute />} path={MGR_UPLOADS_ROUTE_PATH} />
       <Route element={<NotificationsRoute />} path={PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH} />
       <Route element={<IssuesRoute />} path={PROJECT_MANAGER_ISSUES_ROUTE_PATH} />
       <Route element={<TasksRoute />} path={PROJECT_MANAGER_TASKS_ROUTE_PATH} />

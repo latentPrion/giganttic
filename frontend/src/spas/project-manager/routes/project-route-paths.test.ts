@@ -5,7 +5,7 @@ import {
   createProjectIssueRoute,
   createProjectTaskRoute,
 } from "./project-route-paths.js";
-import { PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
+import { MGR_UPLOADS_ROUTE_PATH } from "../../../../../common/routes/app-route-paths.js";
 
 describe("project route paths", () => {
   it("creates project detail routes with optional attachment-tab deep-link params", () => {
@@ -29,7 +29,7 @@ describe("project route paths", () => {
   });
 
   it("exposes a global mgr-uploads SPA path without project scope", () => {
-    expect(PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH).toBe("/pm/project/mgr-uploads");
+    expect(MGR_UPLOADS_ROUTE_PATH).toBe("/mgr-uploads");
   });
 
   it("creates task detail routes and encodes task ids safely", () => {
