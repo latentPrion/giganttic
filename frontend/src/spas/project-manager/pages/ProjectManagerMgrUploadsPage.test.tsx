@@ -19,10 +19,6 @@ vi.mock("../api/mgr-uploads-api.js", () => ({
   },
 }));
 
-vi.mock("../components/ProjectManagerProjectNavigation.js", () => ({
-  ProjectManagerProjectNavigation: () => null,
-}));
-
 describe("ProjectManagerMgrUploadsPage", () => {
   const defaultStorage = {
     availableBytes: 123456789,

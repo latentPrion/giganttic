@@ -13,7 +13,9 @@ interface UserTopNavigationProps {
 export function UserTopNavigation(props: UserTopNavigationProps) {
   return (
     <Tabs
+      allowScrollButtonsMobile
       onChange={(_event, nextTab: UserTopTab) => props.onChange(nextTab)}
+      scrollButtons="auto"
       value={props.value}
       variant="scrollable"
     >

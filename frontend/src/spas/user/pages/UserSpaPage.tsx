@@ -872,7 +872,9 @@ export function UserSpaPage(props: UserSpaPageProps) {
         <DialogTitle>Edit Token Scope</DialogTitle>
         <DialogContent sx={{ display: "grid", gap: 2 }}>
           <Tabs
+            allowScrollButtonsMobile
             onChange={(_, value: TokenScopeTab) => setScopeModalTab(value)}
+            scrollButtons="auto"
             value={scopeModalTab}
             variant="scrollable"
           >

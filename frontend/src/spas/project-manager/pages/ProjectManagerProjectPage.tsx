@@ -821,8 +821,11 @@ export function ProjectManagerProjectPage(props: ProjectManagerProjectPageProps)
           />
         ) : null}
         <Tabs
+          allowScrollButtonsMobile
           onChange={(_event, nextValue: ProjectDetailsTabValue) => setActiveTab(nextValue)}
+          scrollButtons="auto"
           value={activeTab}
+          variant="scrollable"
         >
           <Tab label={DETAILS_TAB_LABEL} value="details" />
           <Tab

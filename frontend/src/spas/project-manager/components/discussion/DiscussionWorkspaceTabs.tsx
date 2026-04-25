@@ -26,10 +26,12 @@ export function DiscussionWorkspaceTabs(props: DiscussionWorkspaceTabsProps) {
 
   return (
     <Tabs
+      allowScrollButtonsMobile
       aria-label={ariaLabel}
       onChange={onChange}
+      scrollButtons="auto"
       value={value}
-      variant="fullWidth"
+      variant="scrollable"
     >
       <Tab label="Details" value="details" />
       <Tab

@@ -194,7 +194,13 @@ export function LoginModal(props: LoginModalProps) {
       >
         <DialogTitle>{DIALOG_TITLE}</DialogTitle>
         <Box sx={{ borderBottom: 1, borderColor: "divider", px: 2, pt: 1 }}>
-          <Tabs onChange={handleTabChange} value={activeTab} variant="fullWidth">
+          <Tabs
+            allowScrollButtonsMobile
+            onChange={handleTabChange}
+            scrollButtons="auto"
+            value={activeTab}
+            variant="scrollable"
+          >
             <Tab label="Password" value="password" />
             <Tab label="Scoped Access Token" value="scoped-token" />
             <Tab label="Passkey" value="passkey" />

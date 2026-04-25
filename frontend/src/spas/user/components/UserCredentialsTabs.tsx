@@ -11,7 +11,9 @@ interface UserCredentialsTabsProps {
 export function UserCredentialsTabs(props: UserCredentialsTabsProps) {
   return (
     <Tabs
+      allowScrollButtonsMobile
       onChange={(_event, nextTab: UserCredentialsTab) => props.onChange(nextTab)}
+      scrollButtons="auto"
       value={props.value}
       variant="scrollable"
     >

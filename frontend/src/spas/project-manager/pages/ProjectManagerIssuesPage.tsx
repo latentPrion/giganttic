@@ -394,8 +394,11 @@ export function ProjectManagerIssuesPage(props: ProjectManagerIssuesPageProps) {
           spacing={1.5}
         >
           <Tabs
+            allowScrollButtonsMobile
             onChange={(_event, nextValue: IssueFilterTab) => setActiveStatusTab(nextValue)}
+            scrollButtons="auto"
             value={activeStatusTab}
+            variant="scrollable"
           >
             <Tab label={ISSUE_STATUS_TAB_LABEL_OPEN} value={ISSUE_STATUS_TAB_OPEN} />
             <Tab label={ISSUE_STATUS_TAB_LABEL_IN_PROGRESS} value={ISSUE_STATUS_TAB_IN_PROGRESS} />

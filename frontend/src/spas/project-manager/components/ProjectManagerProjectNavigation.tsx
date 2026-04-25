@@ -191,8 +191,10 @@ export function ProjectManagerProjectNavigation(
       }}
     >
       <Tabs
+        allowScrollButtonsMobile
         aria-label={PROJECT_WORKSPACE_TABLIST_LABEL}
         onChange={handleSectionChange}
+        scrollButtons="auto"
         sx={{ flex: 1, minWidth: 0 }}
         value={selectedSection}
         variant="scrollable"

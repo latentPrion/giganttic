@@ -39,4 +39,23 @@ describe("DiscussionWorkspaceTabs", () => {
     expect(screen.queryByTestId("discussion-tab-count-comments")).not.toBeInTheDocument();
     expect(screen.queryByTestId("discussion-tab-count-attachments")).not.toBeInTheDocument();
   });
+
+  it("keeps discussion tabs horizontally scrollable", () => {
+    renderWithTheme(
+      <DiscussionWorkspaceTabs
+        ariaLabel="Discussion tabs"
+        attachmentsCount={2}
+        commentsCount={5}
+        onChange={vi.fn()}
+        value="details"
+      />,
+    );
+
+    const tabList = screen.getByRole("tablist", { name: "Discussion tabs" });
+    const tabsRoot = tabList.closest(".MuiTabs-root");
+    const tabsScroller = tabsRoot?.querySelector(".MuiTabs-scroller");
+
+    expect(tabsScroller).toHaveClass("MuiTabs-scrollableX");
+    expect(tabsScroller).not.toHaveClass("MuiTabs-fixed");
+  });
 });

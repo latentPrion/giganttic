@@ -217,10 +217,13 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
         >
           <Typography variant="h6">All tasks for the current project</Typography>
           <Tabs
+            allowScrollButtonsMobile
             onChange={(_event, nextValue: IssueStatus) => {
               setActiveStatusTab(nextValue);
             }}
+            scrollButtons="auto"
             value={activeStatusTab}
+            variant="scrollable"
           >
             <Tab label={STATUS_TAB_LABEL_OPEN} value={STATUS_TAB_OPEN} />
             <Tab label={STATUS_TAB_LABEL_IN_PROGRESS} value={STATUS_TAB_IN_PROGRESS} />
