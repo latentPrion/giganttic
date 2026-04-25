@@ -419,7 +419,7 @@ describe("UserLobbyPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /Apollo/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project?projectId=1");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=1");
   });
 
   it("opens a project summary modal from the view button", async () => {

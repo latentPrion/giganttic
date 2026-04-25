@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizePublicBasePath } from "./vite.config.js";
+import { normalizeProxyPassPublicBasePath } from "./vite.config.js";
 
-describe("vite public base path normalization", () => {
-  it("keeps the default public base path at root", () => {
-    expect(normalizePublicBasePath(undefined)).toBe("/");
-    expect(normalizePublicBasePath("")).toBe("/");
-    expect(normalizePublicBasePath("/")).toBe("/");
+describe("vite proxy-pass public base path normalization", () => {
+  it("keeps the default proxy-pass public base path at root", () => {
+    expect(normalizeProxyPassPublicBasePath(undefined)).toBe("/");
+    expect(normalizeProxyPassPublicBasePath("")).toBe("/");
+    expect(normalizeProxyPassPublicBasePath("/")).toBe("/");
   });
 
-  it("normalizes non-root public base paths with leading and trailing slashes", () => {
-    expect(normalizePublicBasePath("pm")).toBe("/pm/");
-    expect(normalizePublicBasePath("/pm")).toBe("/pm/");
-    expect(normalizePublicBasePath("/pm/")).toBe("/pm/");
+  it("normalizes non-root proxy-pass public base paths with leading and trailing slashes", () => {
+    expect(normalizeProxyPassPublicBasePath("pm")).toBe("/pm/");
+    expect(normalizeProxyPassPublicBasePath("/pm")).toBe("/pm/");
+    expect(normalizeProxyPassPublicBasePath("/pm/")).toBe("/pm/");
   });
 });

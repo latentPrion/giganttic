@@ -2,22 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeApiBaseUrl,
-  normalizeAppBasePath,
+  normalizeProxyPassMountPath,
   normalizeBooleanFlag,
   normalizeOptionalUrl,
 } from "./frontend-config.js";
 
 describe("frontend config normalization", () => {
-  it("keeps the default app base path at root", () => {
-    expect(normalizeAppBasePath(undefined)).toBe("/");
-    expect(normalizeAppBasePath("")).toBe("/");
-    expect(normalizeAppBasePath("/")).toBe("/");
+  it("keeps the default proxy-pass mount path at root", () => {
+    expect(normalizeProxyPassMountPath(undefined)).toBe("/");
+    expect(normalizeProxyPassMountPath("")).toBe("/");
+    expect(normalizeProxyPassMountPath("/")).toBe("/");
   });
 
-  it("normalizes non-root app base paths without trailing slashes", () => {
-    expect(normalizeAppBasePath("pm")).toBe("/pm");
-    expect(normalizeAppBasePath("/pm")).toBe("/pm");
-    expect(normalizeAppBasePath("/pm/")).toBe("/pm");
+  it("normalizes non-root proxy-pass mount paths without trailing slashes", () => {
+    expect(normalizeProxyPassMountPath("pm")).toBe("/pm");
+    expect(normalizeProxyPassMountPath("/pm")).toBe("/pm");
+    expect(normalizeProxyPassMountPath("/pm/")).toBe("/pm");
   });
 
   it("normalizes api base urls without trailing slashes", () => {

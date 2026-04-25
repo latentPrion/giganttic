@@ -37,10 +37,10 @@ describe("ProjectManagerProjectNavigation", () => {
     await user.click(screen.getByRole("tab", { name: "Issues" }));
     await user.click(screen.getByRole("tab", { name: "Tasks" }));
 
-    expect(navigateMock).toHaveBeenNthCalledWith(1, "/project/gantt?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/project/kanban?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(3, "/project/issues?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(4, "/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/kanban?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(3, "/pm/project/issues?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(4, "/pm/project/tasks?projectId=42");
   });
 
   it("disables project-scoped navigation when no project is selected", () => {

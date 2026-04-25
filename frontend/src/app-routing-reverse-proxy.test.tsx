@@ -1,18 +1,18 @@
 /**
  * Comprehensive reverse-proxy / sub-directory deployment routing tests.
  *
- * PM routes are deploy-base-path agnostic (`/project/...`) and are prefixed by
- * `VITE_APP_BASE_PATH` at runtime through `BrowserRouter.basename`.
+ * PM routes own their app namespace (`/pm/project/...`) and are prefixed by
+ * `VITE_PROXY_PASS_MOUNT_PATH` at runtime through `BrowserRouter.basename`.
  *
  * Failure modes this suite guards against (see git history around f2db0ed, 3e5d74e, b514142):
  *
- * 1. **Hardcoded deploy prefix in route constants** — e.g. route constants including `/pm`
- *    directly — deployment no longer configurable from one base-path parameter.
+ * 1. **Eliding the app route namespace** — e.g. treating `/pm/project` as already proxy-prefixed
+ *    and collapsing the externally expected `/pm/pm/project` URL.
  *
- * 2. **`BrowserRouter basename` set to `/pm`** — strips one segment; full path constants
- *    then stop matching unless tests and routes are redesigned together.
+ * 2. **`BrowserRouter basename` set to `/pm`** — strips the proxy-pass mount segment only;
+ *    the app-owned `/pm` route segment must remain present.
  *
- * 3. **No route entry for a navigable PM URL** — e.g. `/project` with no `<Route>` → blank.
+ * 3. **No route entry for a navigable PM URL** — e.g. `/pm/project` with no `<Route>` -> blank.
  *
  * 4. **New `app-route-paths` exports** — structural tests auto-enumerate string exports.
  *
@@ -20,9 +20,9 @@
  *
  * 6. **No catch-all route** — unregistered paths fall through to `path="*"`.
  *
- * 7. **`buildAppRelativeUrl`** — prefixes deploy base path exactly once for app-relative routes.
+ * 7. **`buildAppRelativeUrl`** — prefixes the proxy-pass mount path without deduping app route segments.
  *
- * **Why configurable basename in `main.tsx`?** route constants stay app-relative (`/project/...`).
+ * **Why configurable basename in `main.tsx`?** route constants stay proxy-mount-relative (`/pm/project/...`).
  */
 import React from "react";
 import { readFileSync } from "node:fs";
@@ -239,8 +239,8 @@ describe("route path constants — structural invariants (auto-enumerated)", () 
   // All string exports (route constants) — filter out non-string values if any
   // are ever added to the module.
   const allExportedPaths = Object.entries(routePaths)
-    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-    .map(([name, value]) => ({ name, value }));
+    .filter((entry) => typeof entry[1] === "string")
+    .map(([name, value]) => ({ name, value: String(value) }));
 
   // PM-specific exports: every export whose name starts with PROJECT_MANAGER_
   const pmExports = allExportedPaths.filter(({ name }) =>
@@ -343,7 +343,7 @@ describe("catch-all route — unknown paths never render blank", () => {
 
   it("redirects an unknown nested path to the public home page", async () => {
     renderWithTheme(<App />, {
-      initialEntries: ["/project/nonexistent-sub-route"],
+      initialEntries: ["/pm/project/nonexistent-sub-route"],
     });
 
     expect(await screen.findByText("Run projects with clarity.")).toBeVisible();
@@ -405,13 +405,13 @@ describe("reverse-proxy deployment — all routes render content", () => {
 
   // --- PM entry route ---
 
-  it("renders '/project' as the PM project route", async () => {
+  it("renders '/pm/project' as the PM project route", async () => {
     authenticateUser();
     renderWithTheme(<App />, { initialEntries: [PROJECT_MANAGER_ROUTE_ROOT] });
     expect(await screen.findByText("Project")).toBeVisible();
   });
 
-  it("renders '/project/' as the PM project route", async () => {
+  it("renders '/pm/project/' as the PM project route", async () => {
     authenticateUser();
     renderWithTheme(<App />, { initialEntries: [`${PROJECT_MANAGER_ROUTE_ROOT}/`] });
     expect(await screen.findByText("Project")).toBeVisible();
@@ -419,7 +419,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
 
   // --- PM authenticated routes ---
 
-  it("renders the PM project route at '/project'", async () => {
+  it("renders the PM project route at '/pm/project'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ROUTE_PATH}?projectId=1`],
@@ -428,7 +428,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(screen.getByText("Selected project: 1")).toBeVisible();
   });
 
-  it("renders the PM team route at '/project/team'", async () => {
+  it("renders the PM team route at '/pm/project/team'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TEAM_ROUTE_PATH}?teamId=7`],
@@ -437,7 +437,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Selected team: 7")).toBeVisible();
   });
 
-  it("renders the PM organization route at '/project/organization'", async () => {
+  it("renders the PM organization route at '/pm/project/organization'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ORGANIZATION_ROUTE_PATH}?organizationId=9`],
@@ -446,7 +446,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Selected organization: 9")).toBeVisible();
   });
 
-  it("renders the PM gantt route at '/project/gantt'", async () => {
+  it("renders the PM gantt route at '/pm/project/gantt'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=1`],
@@ -454,7 +454,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Project Manager Gantt")).toBeVisible();
   });
 
-  it("renders the PM kanban route at '/project/kanban'", async () => {
+  it("renders the PM kanban route at '/pm/project/kanban'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_KANBAN_ROUTE_PATH}?projectId=1`],
@@ -462,7 +462,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
   });
 
-  it("renders the PM issues route at '/project/issues'", async () => {
+  it("renders the PM issues route at '/pm/project/issues'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ISSUES_ROUTE_PATH}?projectId=42`],
@@ -470,7 +470,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Project Issues")).toBeVisible();
   });
 
-  it("renders the PM tasks route at '/project/tasks'", async () => {
+  it("renders the PM tasks route at '/pm/project/tasks'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TASKS_ROUTE_PATH}?projectId=1`],
@@ -478,7 +478,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Project Tasks")).toBeVisible();
   });
 
-  it("renders the PM issue detail route at '/project/issue'", async () => {
+  it("renders the PM issue detail route at '/pm/project/issue'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_ISSUE_ROUTE_PATH}?id=7&projectId=42`],
@@ -486,7 +486,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Issue Detail")).toBeVisible();
   });
 
-  it("renders the PM task detail route at '/project/task'", async () => {
+  it("renders the PM task detail route at '/pm/project/task'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [`${PROJECT_MANAGER_TASK_ROUTE_PATH}?taskId=1001&projectId=1`],
@@ -494,7 +494,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Task Detail")).toBeVisible();
   });
 
-  it("renders the PM notifications route at '/project/notifications'", async () => {
+  it("renders the PM notifications route at '/pm/project/notifications'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [PROJECT_MANAGER_NOTIFICATIONS_ROUTE_PATH],
@@ -502,7 +502,7 @@ describe("reverse-proxy deployment — all routes render content", () => {
     expect(await screen.findByText("Notifications")).toBeVisible();
   });
 
-  it("renders the PM mgr-uploads route at '/project/mgr-uploads'", async () => {
+  it("renders the PM mgr-uploads route at '/pm/project/mgr-uploads'", async () => {
     authenticateUser();
     renderWithTheme(<App />, {
       initialEntries: [PROJECT_MANAGER_MGR_UPLOADS_ROUTE_PATH],
@@ -551,22 +551,22 @@ describe("reverse-proxy deployment — all routes render content", () => {
 });
 
 // ---------------------------------------------------------------------------
-// #7 — buildAppRelativeUrl is idempotent under the deploy prefix
+// #7 — buildAppRelativeUrl preserves overlapping proxy and app segments
 // ---------------------------------------------------------------------------
 
-describe("buildAppRelativeUrl — idempotent deploy prefix", () => {
-  it("returns the path unchanged when it already starts with appBasePath", async () => {
+describe("buildAppRelativeUrl — overlapping proxy and app route segments", () => {
+  it("adds the proxy-pass mount path even when the app route starts with the same segment", async () => {
     const { buildAppRelativeUrl } = await import(
       "./common/routing/public-app-url.js"
     );
 
-    expect(buildAppRelativeUrl("/pm", "/pm")).toBe("/pm");
-    expect(buildAppRelativeUrl("/pm/project", "/pm")).toBe("/pm/project");
-    expect(buildAppRelativeUrl(PROJECT_MANAGER_ROUTE_PATH, "/pm")).toBe("/pm/project");
+    expect(buildAppRelativeUrl("/pm", "/pm")).toBe("/pm/pm");
+    expect(buildAppRelativeUrl("/pm/project", "/pm")).toBe("/pm/pm/project");
+    expect(buildAppRelativeUrl(PROJECT_MANAGER_ROUTE_PATH, "/pm")).toBe("/pm/pm/project");
     expect(buildAppRelativeUrl(SCOPED_ACCESS_TOKEN_LOGIN_ROUTE_PATH, "/pm")).toBe("/pm/auth/scoped-token-login");
   });
 
-  it("prefixes when the path is not yet under appBasePath", async () => {
+  it("prefixes public paths with the proxy-pass mount path", async () => {
     const { buildAppRelativeUrl } = await import(
       "./common/routing/public-app-url.js"
     );
@@ -577,12 +577,12 @@ describe("buildAppRelativeUrl — idempotent deploy prefix", () => {
     );
   });
 
-  it("does not add a prefix for root appBasePath", async () => {
+  it("does not add a prefix for a root proxy-pass mount path", async () => {
     const { buildAppRelativeUrl } = await import(
       "./common/routing/public-app-url.js"
     );
 
-    expect(buildAppRelativeUrl("/project", "/")).toBe("/project");
+    expect(buildAppRelativeUrl(PROJECT_MANAGER_ROUTE_PATH, "/")).toBe(PROJECT_MANAGER_ROUTE_PATH);
   });
 });
 

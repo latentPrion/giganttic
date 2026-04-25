@@ -348,7 +348,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Gantt" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
   });
 
   it("navigates to the kanban route while preserving project id", async () => {
@@ -364,7 +364,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Kanban Board" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/kanban?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/kanban?projectId=42");
   });
 
   it("navigates to the issues route while preserving project id", async () => {
@@ -380,7 +380,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Issues" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/issues?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
   });
 
   it("navigates to the tasks route while preserving project id", async () => {
@@ -396,7 +396,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Tasks" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
   });
 
   it("opens the attachments tab from the query tab deep-link", async () => {
@@ -406,7 +406,7 @@ describe("ProjectManagerProjectPage", () => {
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
-      { initialEntries: ["/pm/pm/project?projectId=42&tab=attachments"] },
+      { initialEntries: ["/pm/project?projectId=42&tab=attachments"] },
     );
 
     expect(await screen.findByText("Project attachments")).toBeVisible();
@@ -419,7 +419,7 @@ describe("ProjectManagerProjectPage", () => {
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
-      { initialEntries: ["/pm/pm/project?projectId=42&tab=unknown"] },
+      { initialEntries: ["/pm/project?projectId=42&tab=unknown"] },
     );
 
     expect(await screen.findByText("Project Journal")).toBeVisible();
@@ -434,7 +434,7 @@ describe("ProjectManagerProjectPage", () => {
         projectId={42}
         token={DEFAULT_TOKEN}
       />,
-      { initialEntries: ["/pm/pm/project?projectId=42&tab=attachments"] },
+      { initialEntries: ["/pm/project?projectId=42&tab=attachments"] },
     );
 
     expect(await screen.findByText("Project attachments")).toBeVisible();
@@ -510,11 +510,11 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Teams" }));
     await user.click(screen.getByText("Team 7"));
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/team?teamId=7");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/team?teamId=7");
 
     await user.click(screen.getByRole("tab", { name: "Organizations" }));
     await user.click(screen.getByText("Org 9"));
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/organization?organizationId=9");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/organization?organizationId=9");
   });
 
   it("navigates to the PM user route from project owner and manager rows", async () => {

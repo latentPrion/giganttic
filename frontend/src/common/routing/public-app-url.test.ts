@@ -15,13 +15,13 @@ describe("public app url helpers", () => {
     );
   });
 
-  it("prefixes app urls with the configured app base path", () => {
+  it("prefixes app urls with the configured proxy-pass mount path", () => {
     expect(buildAppRelativeUrl("/auth/scoped-token-login", "/pm")).toBe(
       "/pm/auth/scoped-token-login",
     );
   });
 
-  it("builds absolute urls with the configured app base path", () => {
+  it("builds absolute urls with the configured proxy-pass mount path", () => {
     expect(
       buildAppAbsoluteUrl("/auth/scoped-token-login", "https://workio.ai", "/pm"),
     ).toBe("https://workio.ai/pm/auth/scoped-token-login");
@@ -41,8 +41,8 @@ describe("public app url helpers", () => {
     );
   });
 
-  it("returns paths unchanged when they already start with appBasePath (idempotent)", () => {
-    expect(buildAppRelativeUrl("/pm/contact", "/pm")).toBe("/pm/contact");
-    expect(buildAppRelativeUrl("/pm/pm/project", "/pm")).toBe("/pm/pm/project");
+  it("keeps both proxy-pass and app route segments when names overlap", () => {
+    expect(buildAppRelativeUrl("/pm/contact", "/pm")).toBe("/pm/pm/contact");
+    expect(buildAppRelativeUrl("/pm/project", "/pm")).toBe("/pm/pm/project");
   });
 });

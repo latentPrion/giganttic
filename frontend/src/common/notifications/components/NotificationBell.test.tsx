@@ -46,7 +46,7 @@ describe("NotificationBell", () => {
           id: 7,
           message: "alice commented on Issue \"API rollout\" under Project 4",
           noticedTimestamp: null,
-          targetUrl: "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -76,14 +76,14 @@ describe("NotificationBell", () => {
 
     renderWithTheme(<NotificationBell token="token-1" />, {
       basename: "/",
-      initialEntries: ["/project?projectId=4"],
+      initialEntries: ["/pm/project?projectId=4"],
     });
 
     await user.click(await screen.findByLabelText("Notifications (2 unnoticed)"));
 
     expect(
       await screen.findByRole("link", { name: "View all notifications" }),
-    ).toHaveAttribute("href", "/project/notifications");
+    ).toHaveAttribute("href", "/pm/project/notifications");
   });
 
   it("renders mention notifications through the shared bell row UI", async () => {
@@ -98,7 +98,7 @@ describe("NotificationBell", () => {
           id: 8,
           message: "alice mentioned you in a comment on Issue \"API rollout\" under Project 4.",
           noticedTimestamp: null,
-          targetUrl: "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+          targetUrl: "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
         },
       ],
     });
@@ -123,7 +123,7 @@ describe("NotificationBell", () => {
       expect(notificationsApiMock.toggleNotificationNoticed).toHaveBeenCalledWith("token-1", 7);
     });
     expect(navigateMock).toHaveBeenCalledWith(
-      "/project/issue?projectId=4&id=17&tab=comments&commentId=31",
+      "/pm/project/issue?projectId=4&id=17&tab=comments&commentId=31",
     );
   });
 

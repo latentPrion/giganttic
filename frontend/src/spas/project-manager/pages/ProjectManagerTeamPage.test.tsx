@@ -148,7 +148,7 @@ describe("ProjectManagerTeamPage", () => {
         teamId: 7,
       });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project?projectId=55");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=55");
   });
 
   it("navigates to the PM user route from a team member row", async () => {

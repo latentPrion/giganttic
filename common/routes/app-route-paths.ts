@@ -1,18 +1,21 @@
 /**
  * Route path constants for `react-router` `<Route path>` and in-app `navigate` / `<Link to>`.
  *
- * These constants are deployment-base-path agnostic and intentionally do not include `/pm`.
- * The deploy prefix is controlled by `VITE_APP_BASE_PATH` via `frontendConfig.appBasePath` and
- * `BrowserRouter.basename` in `frontend/src/main.tsx`.
+ * These constants describe the app's own route namespace. They intentionally do not include the
+ * reverse-proxy mount path; that external deployment prefix is controlled by
+ * `VITE_PROXY_PASS_MOUNT_PATH` via `frontendConfig.proxyPassMountPath` and
+ * `BrowserRouter.basename` in `frontend/src/main.tsx`. If the proxy mount path and an app route
+ * segment are both `/pm`, the external URL is expected to contain both segments, e.g. `/pm/pm/project`.
  */
 
 const ROOT_ROUTE_PATH = "/";
 const AUTH_ROUTE_ROOT = "/auth";
+const PROJECT_MANAGER_ROUTE_NAMESPACE = "/pm";
 /**
- * PM module root path within the SPA (before deploy basename is applied).
- * With `VITE_APP_BASE_PATH=/pm`, this renders externally as `/pm/project`.
+ * PM module root path within the SPA (before the proxy-pass mount path is applied).
+ * With `VITE_PROXY_PASS_MOUNT_PATH=/pm`, this renders externally as `/pm/pm/project`.
  */
-export const PROJECT_MANAGER_ROUTE_ROOT = "/project";
+export const PROJECT_MANAGER_ROUTE_ROOT = `${PROJECT_MANAGER_ROUTE_NAMESPACE}/project`;
 const USER_ROUTE_ROOT = "/user";
 
 export const HOME_ROUTE_PATH = ROOT_ROUTE_PATH;

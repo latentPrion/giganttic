@@ -92,13 +92,13 @@ describe("ProjectManagerUserPage", () => {
     renderWithTheme(<ProjectManagerUserPage token={DEFAULT_TOKEN} userId={101} />);
 
     await user.click(await screen.findByRole("button", { name: /Project 42/i }));
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project?projectId=42");
 
     await user.click(screen.getByRole("button", { name: /Team 7/i }));
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/team?teamId=7");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/team?teamId=7");
 
     await user.click(screen.getByRole("button", { name: /Org 9/i }));
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/organization?organizationId=9");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/organization?organizationId=9");
   });
 
   it("keeps the profile header row navigable through the shared user list item", async () => {

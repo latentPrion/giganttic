@@ -12,22 +12,17 @@ function trimTrailingSlash(value: string): string {
 }
 
 /**
- * Prefixes a path with `appBasePath` when needed. Idempotent: if `path` is already under the deploy
- * prefix (e.g. already starts with `/pm` when `appBasePath` is `/pm`), returns `path` unchanged — no
- * throws. PM routes live at `/pm/pm/...`; pass them only as full path constants, not via this helper.
+ * Prefixes a route path with the reverse-proxy mount path. This deliberately does not
+ * dedupe same-named app route segments, so `/pm` mounted PM routes become `/pm/pm/...`.
  */
 export function buildAppRelativeUrl(
   path: string,
-  appBasePath: string = frontendConfig.appBasePath,
+  proxyPassMountPath: string = frontendConfig.proxyPassMountPath,
 ): string {
   const normalizedPath = normalizeRoutePath(path);
-  const trimmedBase = trimTrailingSlash(appBasePath);
+  const trimmedBase = trimTrailingSlash(proxyPassMountPath);
 
-  if (appBasePath === "/" || trimmedBase === "") {
-    return normalizedPath;
-  }
-
-  if (normalizedPath === trimmedBase || normalizedPath.startsWith(`${trimmedBase}/`)) {
+  if (proxyPassMountPath === "/" || trimmedBase === "") {
     return normalizedPath;
   }
 
@@ -37,9 +32,9 @@ export function buildAppRelativeUrl(
 export function buildAppAbsoluteUrl(
   path: string,
   origin: string,
-  appBasePath: string = frontendConfig.appBasePath,
+  proxyPassMountPath: string = frontendConfig.proxyPassMountPath,
 ): string {
-  return `${trimTrailingSlash(origin)}${buildAppRelativeUrl(path, appBasePath)}`;
+  return `${trimTrailingSlash(origin)}${buildAppRelativeUrl(path, proxyPassMountPath)}`;
 }
 
 export function createScopedAccessLoginRelativeUrl(

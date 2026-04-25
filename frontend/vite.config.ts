@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 
 const DEFAULT_BACKEND_TARGET = "http://127.0.0.1:3000";
 const API_PREFIX = "/stc-proj-mgmt/api";
-const DEFAULT_APP_BASE_PATH = "/";
+const DEFAULT_PROXY_PASS_MOUNT_PATH = "/";
 const CURRENT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT_DIRECTORY = path.resolve(CURRENT_DIRECTORY, "..");
 const CHARTS_DIRECTORY = path.resolve(PROJECT_ROOT_DIRECTORY, "charts");
@@ -15,11 +15,11 @@ const DHTMLX_GANTT_CODEBASE_DIRECTORY = path.resolve(
   "dhtmlx-gantt/codebase",
 );
 
-export function normalizePublicBasePath(value: string | undefined): string {
+export function normalizeProxyPassPublicBasePath(value: string | undefined): string {
   const normalizedValue = value?.trim() ?? "";
 
   if (normalizedValue.length === 0 || normalizedValue === "/") {
-    return DEFAULT_APP_BASE_PATH;
+    return DEFAULT_PROXY_PASS_MOUNT_PATH;
   }
 
   const ensuredLeadingSlash = normalizedValue.startsWith("/")
@@ -32,7 +32,9 @@ export function normalizePublicBasePath(value: string | undefined): string {
 }
 
 export default defineConfig({
-  base: normalizePublicBasePath(process.env.VITE_APP_BASE_PATH),
+  base: normalizeProxyPassPublicBasePath(
+    process.env.VITE_PROXY_PASS_MOUNT_PATH,
+  ),
   plugins: [react()],
   resolve: {
     alias: {

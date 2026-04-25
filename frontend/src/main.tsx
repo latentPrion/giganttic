@@ -12,7 +12,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
       <BrowserRouter
-        basename={frontendConfig.appBasePath}
+        basename={frontendConfig.proxyPassMountPath}
         future={{
           v7_relativeSplatPath: true,
           v7_startTransition: true,

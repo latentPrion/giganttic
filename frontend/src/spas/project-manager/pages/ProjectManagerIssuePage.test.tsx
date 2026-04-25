@@ -262,7 +262,7 @@ describe("ProjectManagerIssuePage", () => {
     await waitFor(() => {
       expect(issuesApiMock.deleteIssue).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 7);
     });
-    expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/issues?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/issues?projectId=42");
   });
 
   it("uses the shared project-scoped navigation tabs", async () => {
@@ -283,8 +283,8 @@ describe("ProjectManagerIssuePage", () => {
     await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Details" }));
     await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Gantt" }));
 
-    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/pm/project?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
   });
 
   it("renders a safe fallback when issue id or projectId is missing", async () => {

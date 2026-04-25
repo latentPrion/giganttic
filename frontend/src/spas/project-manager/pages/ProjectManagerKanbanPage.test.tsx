@@ -324,7 +324,7 @@ describe("ProjectManagerKanbanPage", () => {
     await user.click(issueCard);
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/issue?projectId=42&id=1");
+      expect(navigateMock).toHaveBeenCalledWith("/pm/project/issue?projectId=42&id=1");
     });
   });
 
@@ -336,7 +336,7 @@ describe("ProjectManagerKanbanPage", () => {
     await user.click(taskCard);
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/pm/pm/project/task?projectId=42&id=101");
+      expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=101");
     });
   });
 
