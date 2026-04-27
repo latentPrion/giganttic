@@ -346,9 +346,9 @@ describe("ProjectManagerProjectPage", () => {
       />,
     );
 
-    await user.click(await screen.findByRole("tab", { name: "Gantt" }));
+    await user.click(await screen.findByRole("tab", { name: /Gantt/ }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42&chartId=0");
   });
 
   it("navigates to the kanban route while preserving project id", async () => {
@@ -364,7 +364,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Kanban Board" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/kanban?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/kanban?projectId=42&chartId=0");
   });
 
   it("navigates to the issues route while preserving project id", async () => {
@@ -396,7 +396,7 @@ describe("ProjectManagerProjectPage", () => {
 
     await user.click(await screen.findByRole("tab", { name: "Tasks" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42&chartId=0");
   });
 
   it("opens the attachments tab from the query tab deep-link", async () => {

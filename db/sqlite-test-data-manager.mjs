@@ -283,7 +283,7 @@ function purgeSeededProjectCharts(chartsDir, projectIds) {
   }
 
   for (const projectId of projectIds) {
-    deleteProjectChartXml(chartsDir, projectId);
+    deleteProjectChartXml(chartsDir, projectId, 0);
   }
 }
 
@@ -334,16 +334,19 @@ function writeSeededProjectCharts(chartsDir, projectIds, seededCharts) {
   writeProjectChartXml(
     chartsDir,
     projectIds.orgProjectManager,
+    0,
     seededCharts.orgProjectManager,
   );
   writeProjectChartXml(
     chartsDir,
     projectIds.projectProjectManager,
+    0,
     seededCharts.projectProjectManager,
   );
   writeProjectChartXml(
     chartsDir,
     projectIds.teamProjectManager,
+    0,
     seededCharts.teamProjectManager,
   );
 }
@@ -411,7 +414,7 @@ function readInsertedIssueId(db, projectId, issueName) {
 
 function insertSeedIssues(db, schemaName, projectId, seededIssues, projectRoot = null) {
   for (const seededIssue of seededIssues) {
-    const insertSql = schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10"
+    const insertSql = schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10" || schemaName === "v11"
       ? `INSERT INTO Issues (
   projectId,
   name,
@@ -464,7 +467,7 @@ VALUES (
 );`;
     db.exec(insertSql);
 
-    if ((schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10") && projectRoot) {
+    if ((schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10" || schemaName === "v11") && projectRoot) {
       writeIssueJournal(
         projectRoot,
         projectId,
@@ -567,7 +570,7 @@ function createV2StyleTestData(db, schemaName, profile, chartsDir = null) {
     projectIds.teamProjectManager,
   );
 
-  if (schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10") {
+  if (schemaName === "v7" || schemaName === "v8" || schemaName === "v9" || schemaName === "v10" || schemaName === "v11") {
     writeProjectJournal(projectRoot, projectIds.projectProjectManager);
     writeProjectJournal(projectRoot, projectIds.orgProjectManager);
     writeProjectJournal(projectRoot, projectIds.teamProjectManager);
@@ -693,8 +696,9 @@ function ensureSeededTestData(
       && schemaName !== "v8"
       && schemaName !== "v9"
       && schemaName !== "v10"
+      && schemaName !== "v11"
     ) {
-      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6/v7/v8/v9/v10, received ${schemaName}.`);
+      throw new Error(`Test data seeding is only supported for schema v2/v3/v4/v5/v6/v7/v8/v9/v10/v11, received ${schemaName}.`);
     }
 
     createV2StyleTestData(db, schemaName, profile, chartsDir);

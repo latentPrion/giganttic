@@ -28,6 +28,7 @@ const MINIMAL_PNG_BASE64 =
 const MINIMAL_PNG_BUFFER = Buffer.from(MINIMAL_PNG_BASE64, "base64");
 const MULTIPART_BOUNDARY = "----notificationBoundary";
 const DEFAULT_TASK_ID = "1";
+const DEFAULT_CHART_ID = 0;
 const PROJECT_MANAGER_ROLE = "GGTC_PROJECTROLE_PROJECT_MANAGER";
 const PROJECT_OWNER_ROLE = "GGTC_PROJECTROLE_PROJECT_OWNER";
 const ISSUE_UPDATES_CATEGORY = "issue-updates";
@@ -230,6 +231,55 @@ describe("notifications api", () => {
     )).toBe(true);
   });
 
+  it("normalizes legacy /pm/pm notification targets into /pm app routes", async () => {
+    const actor = await harness.registerUser("notif-legacy-target-actor");
+    const recipient = await harness.registerUser("notif-legacy-target-recipient");
+    const projectId = await createProject(actor.accessToken, "Legacy target project");
+
+    const [createdLegacyNotification] = harness.databaseService.db.insert(notifications)
+      .values({
+        actorUserId: actor.user.id,
+        attachmentId: null,
+        commentId: null,
+        eventType: "NOTIFICATION_EVENT_ISSUE_CREATED",
+        issueId: null,
+        mentionedUserId: null,
+        message: "Legacy double-pm target",
+        projectId,
+        targetUrl: `/pm/pm/project?projectId=${projectId}`,
+        taskId: null,
+      })
+      .returning({ id: notifications.id })
+      .all();
+
+    expect(createdLegacyNotification).toBeDefined();
+
+    harness.databaseService.db.insert(usersNotifications)
+      .values({
+        notificationId: createdLegacyNotification.id,
+        userId: recipient.user.id,
+      })
+      .run();
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(recipient.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/notifications?limit=20&offset=0&includeNoticed=true&sort=desc&eventTypes=${ISSUE_UPDATES_CATEGORY}`,
+    });
+    expect(listResponse.statusCode).toBe(200);
+
+    const body = harness.parseJson<{
+      notifications: Array<{ id: number; targetUrl: string }>;
+    }>(listResponse.payload);
+    expect(
+      body.notifications.some((row) =>
+        row.id === createdLegacyNotification.id
+        && row.targetUrl === `/pm/project?projectId=${projectId}`
+      ),
+    ).toBe(true);
+
+  });
+
   it("does not create a notification for a no-op issue status patch", async () => {
     const actor = await harness.registerUser("notif-issue-status");
     const projectId = harness.parseJson<{ project: { id: number } }>(
@@ -410,7 +460,7 @@ describe("notifications api", () => {
       payload: {
         xml: VALID_OPEN_TASK_CHART_XML,
       },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${DEFAULT_CHART_ID}`,
     });
     expect(unchangedSave.statusCode).toBe(200);
 
@@ -422,7 +472,7 @@ describe("notifications api", () => {
       payload: {
         xml: VALID_BLOCKED_TASK_CHART_XML,
       },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${DEFAULT_CHART_ID}`,
     });
     expect(changedSave.statusCode).toBe(200);
 
@@ -699,7 +749,7 @@ describe("notifications api", () => {
       payload: {
         body: `Please review this task with @${recipient.user.username} today.`,
       },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/comments`,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${DEFAULT_CHART_ID}/tasks/${DEFAULT_TASK_ID}/comments`,
     });
     expect(createCommentResponse.statusCode).toBe(201);
     const commentId = harness.parseJson<{ comment: { id: number } }>(
@@ -718,7 +768,7 @@ describe("notifications api", () => {
       payload: {
         body: `Still need @${recipient.user.username} on this task update today.`,
       },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/comments/${commentId}`,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${DEFAULT_CHART_ID}/tasks/${DEFAULT_TASK_ID}/comments/${commentId}`,
     });
     expect(editResponse.statusCode).toBe(200);
 
@@ -810,7 +860,7 @@ describe("notifications api", () => {
       payload: {
         markdown: `Task journal mentions @${teamUser.user.username} for follow-up work.`,
       },
-      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/journal`,
+      url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${DEFAULT_CHART_ID}/tasks/${DEFAULT_TASK_ID}/journal`,
     });
     expect(taskJournalResponse.statusCode).toBe(200);
 

@@ -4,6 +4,7 @@ export const GANTT_RUNTIME_CHART_UPDATED_EVENT = "gantt-runtime-chart-updated";
 export const GANTT_RUNTIME_METADATA_RELOAD_REQUESTED_EVENT = "gantt-runtime-metadata-reload-requested";
 
 export interface GanttRuntimeChartUpdatedEventDetail {
+  chartId?: number;
   projectId: number;
   /**
    * Post-inference serialized XML that represents the chart state in the editor runtime.
@@ -13,6 +14,7 @@ export interface GanttRuntimeChartUpdatedEventDetail {
 }
 
 export interface GanttRuntimeMetadataReloadRequestedEventDetail {
+  chartId?: number;
   projectId: number;
 }
 
@@ -23,10 +25,14 @@ export function emitGanttRuntimeChartUpdatedEvent(
     return false;
   }
 
-  const result = trySetValidatedGanttRuntimeChartCacheEntry(detail.projectId, {
+  const result = trySetValidatedGanttRuntimeChartCacheEntry(
+    detail.projectId,
+    detail.chartId ?? 0,
+    {
     serializedXml: detail.serializedXml,
     type: "xml",
-  });
+    },
+  );
   if (!result.ok) {
     return false;
   }

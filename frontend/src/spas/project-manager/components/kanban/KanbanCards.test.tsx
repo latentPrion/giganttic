@@ -51,6 +51,7 @@ describe("kanban cards", () => {
           id: "ganttTask:101",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "101",
             isMilestone: false,
             progressPercentage: 65,
@@ -81,6 +82,7 @@ describe("kanban cards", () => {
           id: "ganttTask:101",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "101",
             isMilestone: false,
             progressPercentage: 65,
@@ -95,10 +97,10 @@ describe("kanban cards", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("kanban-task-card-101"));
+    fireEvent.click(screen.getByTestId("kanban-task-card-0-101"));
     vi.advanceTimersByTime(250);
 
-    expect(navigateToTask).toHaveBeenCalledWith("101");
+    expect(navigateToTask).toHaveBeenCalledWith("101", 0);
     vi.useRealTimers();
   });
 
@@ -114,6 +116,7 @@ describe("kanban cards", () => {
           id: "ganttTask:101",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "101",
             isMilestone: false,
             progressPercentage: 65,
@@ -128,7 +131,7 @@ describe("kanban cards", () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-101"));
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-0-101"));
     expect(screen.getByRole("menuitem", { name: "blocked" })).toBeVisible();
     vi.advanceTimersByTime(600);
 
@@ -144,6 +147,7 @@ describe("kanban cards", () => {
           id: "ganttTask:101",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "101",
             isMilestone: false,
             progressPercentage: 65,
@@ -157,7 +161,7 @@ describe("kanban cards", () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-101"));
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-0-101"));
     expect(screen.queryByRole("menuitem", { name: "blocked" })).not.toBeInTheDocument();
   });
 
@@ -170,6 +174,7 @@ describe("kanban cards", () => {
           id: "ganttTask:mile-1",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "mile-1",
             isMilestone: true,
             progressPercentage: 100,
@@ -183,7 +188,7 @@ describe("kanban cards", () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-mile-1"));
+    fireEvent.doubleClick(screen.getByTestId("kanban-task-card-0-mile-1"));
     expect(screen.queryByRole("menuitem", { name: "open" })).not.toBeInTheDocument();
   });
 
@@ -198,6 +203,7 @@ describe("kanban cards", () => {
           id: "ganttTask:mile-1",
           kind: "ganttTask",
           task: {
+            chartId: 0,
             id: "mile-1",
             isMilestone: true,
             progressPercentage: 100,
@@ -212,10 +218,10 @@ describe("kanban cards", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("kanban-task-card-mile-1"));
+    fireEvent.click(screen.getByTestId("kanban-task-card-0-mile-1"));
     vi.advanceTimersByTime(250);
 
-    expect(navigateToTask).toHaveBeenCalledWith("mile-1");
+    expect(navigateToTask).toHaveBeenCalledWith("mile-1", 0);
     vi.useRealTimers();
   });
 });

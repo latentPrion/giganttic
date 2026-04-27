@@ -281,10 +281,10 @@ describe("ProjectManagerIssuePage", () => {
       name: "Project workspace sections",
     });
     await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Details" }));
-    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Gantt" }));
+    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: /Gantt/ }));
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42&chartId=0");
   });
 
   it("renders a safe fallback when issue id or projectId is missing", async () => {

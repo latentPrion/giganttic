@@ -19,14 +19,19 @@ import {
 } from "../../../common/discussion/discussion.contracts.js";
 
 const taskIdSchema = z.string().min(1);
+const chartIdSchema = z.coerce.number().int().nonnegative();
 
 export { COMMENT_BODY_MIN_LENGTH };
 
 export const taskCommentsRouteParamsSchema =
-  createDiscussionCollectionRouteParamsSchema("taskId", taskIdSchema);
+  createDiscussionCollectionRouteParamsSchema("taskId", taskIdSchema).extend({
+    chartId: chartIdSchema,
+  });
 
 export const taskCommentRouteParamsSchema =
-  createDiscussionCommentRouteParamsSchema("taskId", taskIdSchema);
+  createDiscussionCommentRouteParamsSchema("taskId", taskIdSchema).extend({
+    chartId: chartIdSchema,
+  });
 
 export const attachmentSummarySchema = discussionAttachmentSummarySchema;
 
@@ -54,10 +59,14 @@ export const uploadTaskAttachmentResponseSchema = uploadDiscussionAttachmentResp
 export const taskAttachmentRouteParamsSchema = createDiscussionAttachmentRouteParamsSchema(
   "taskId",
   taskIdSchema,
-);
+).extend({
+  chartId: chartIdSchema,
+});
 
 export const taskCommentAttachmentRouteParamsSchema =
-  createDiscussionCommentAttachmentRouteParamsSchema("taskId", taskIdSchema);
+  createDiscussionCommentAttachmentRouteParamsSchema("taskId", taskIdSchema).extend({
+    chartId: chartIdSchema,
+  });
 
 export const deleteTaskAttachmentResponseSchema = deleteDiscussionAttachmentResponseSchema;
 

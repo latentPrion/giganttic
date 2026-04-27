@@ -21,16 +21,22 @@ import {
   upsertDiscussionJournalRequestSchema,
 } from "../../../common/discussion/discussion-journal.contracts.js";
 import {
+  createProjectChartRequestSchema,
+  createProjectChartResponseSchema,
   createProjectRequestSchema,
   createProjectResponseSchema,
   deleteProjectResponseSchema,
   getProjectResponseSchema,
   getProjectChartExportCapabilitiesResponseSchema,
+  listProjectChartsResponseSchema,
   listProjectsResponseSchema,
+  projectChartRouteParamsSchema,
   projectOrganizationAssociationRequestSchema,
   projectRoleAssignmentRequestSchema,
   projectTeamAssociationRequestSchema,
   projectIdParamSchema,
+  updateProjectChartMetadataRequestSchema,
+  updateProjectChartMetadataResponseSchema,
   updateProjectOrganizationsResponseSchema,
   updateProjectMembershipRequestSchema,
   updateProjectMembershipResponseSchema,
@@ -80,35 +86,81 @@ export class ProjectsController {
     );
   }
 
-  @Get(":projectId/chart")
-  async getProjectChart(
+  @Get(":projectId/charts")
+  listProjectCharts(
     @Req() request: AuthenticatedRequest,
-    @Res({ passthrough: true }) response: { type: (contentType: string) => void },
     @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
   ) {
     const { projectId } = projectIdParamSchema.parse(params);
+    return listProjectChartsResponseSchema.parse(
+      this.projectsService.listProjectCharts(request.authContext!, projectId),
+    );
+  }
+
+  @Post(":projectId/charts")
+  async createProjectChart(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Body(new ZodValidationPipe(createProjectChartRequestSchema)) body: unknown,
+  ) {
+    const { projectId } = projectIdParamSchema.parse(params);
+    return createProjectChartResponseSchema.parse(
+      await this.projectsService.createProjectChart(
+        request.authContext!,
+        projectId,
+        createProjectChartRequestSchema.parse(body),
+      ),
+    );
+  }
+
+  @Get(":projectId/charts/:chartId")
+  async getProjectChart(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: { type: (contentType: string) => void },
+    @Param(new ZodValidationPipe(projectChartRouteParamsSchema)) params: unknown,
+  ) {
+    const { chartId, projectId } = projectChartRouteParamsSchema.parse(params);
     response.type("application/xml; charset=utf-8");
 
     return await this.projectsService.getProjectChart(
       request.authContext!,
       projectId,
+      chartId,
     );
   }
 
-  @Put(":projectId/chart")
+  @Put(":projectId/charts/:chartId")
   async updateProjectChart(
     @Req() request: AuthenticatedRequest,
-    @Param(new ZodValidationPipe(projectIdParamSchema)) params: unknown,
+    @Param(new ZodValidationPipe(projectChartRouteParamsSchema)) params: unknown,
     @Body(new ZodValidationPipe(updateProjectChartRequestSchema)) body: unknown,
   ) {
-    const { projectId } = projectIdParamSchema.parse(params);
+    const { chartId, projectId } = projectChartRouteParamsSchema.parse(params);
     const { xml } = updateProjectChartRequestSchema.parse(body);
 
     return updateProjectChartResponseSchema.parse(
       await this.projectsService.updateProjectChart(
         request.authContext!,
         projectId,
+        chartId,
         xml,
+      ),
+    );
+  }
+
+  @Patch(":projectId/charts/:chartId")
+  async updateProjectChartMetadata(
+    @Req() request: AuthenticatedRequest,
+    @Param(new ZodValidationPipe(projectChartRouteParamsSchema)) params: unknown,
+    @Body(new ZodValidationPipe(updateProjectChartMetadataRequestSchema)) body: unknown,
+  ) {
+    const { chartId, projectId } = projectChartRouteParamsSchema.parse(params);
+    return updateProjectChartMetadataResponseSchema.parse(
+      await this.projectsService.updateProjectChartMetadata(
+        request.authContext!,
+        projectId,
+        chartId,
+        updateProjectChartMetadataRequestSchema.parse(body),
       ),
     );
   }

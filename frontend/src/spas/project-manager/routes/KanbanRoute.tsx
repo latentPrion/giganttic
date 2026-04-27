@@ -1,7 +1,10 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { parseProjectIdFromSearchParameters } from "../contracts/route-query.contracts.js";
+import {
+  parseChartIdFromSearchParameters,
+  parseProjectIdFromSearchParameters,
+} from "../contracts/route-query.contracts.js";
 import { ProjectManagerKanbanPage } from "../pages/ProjectManagerKanbanPage.js";
 import { ProjectManagerAuthenticatedRoute } from "./ProjectManagerAuthenticatedRoute.js";
 
@@ -12,6 +15,7 @@ export function KanbanRoute() {
     <ProjectManagerAuthenticatedRoute>
       {(token, currentUserId) => (
         <ProjectManagerKanbanPage
+          chartId={parseChartIdFromSearchParameters(searchParameters)}
           currentUserId={currentUserId}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}
           token={token}

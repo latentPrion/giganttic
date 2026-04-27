@@ -4,9 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import { projects } from "../../../db/index.js";
+import { projectGanttCharts, projects } from "../../../db/index.js";
 import type { DiscussionAttachmentSummary } from "../../../common/discussion/discussion.contracts.js";
 import {
   hasEffectiveProjectManagerRole,
@@ -45,20 +45,28 @@ export class TasksService {
   validateTaskReadableForCurrentUser(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
   ): void {
     this.assertProjectExists(projectId);
+    this.assertProjectChartExists(projectId, chartId);
     this.assertCanViewProject(authContext, projectId);
-    this.taskMirrorService.assertTaskExistsInCurrentChart(projectId, taskId);
+    this.taskMirrorService.assertTaskExistsInCurrentChart(projectId, chartId, taskId);
+  }
+
+  resolveProjectGanttChartId(projectId: number, chartId: number): number {
+    return this.assertProjectChartExists(projectId, chartId).id;
   }
 
   ensureTaskMirrorExistsForReadableTask(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
   ): void {
-    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
-    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+    const chart = this.assertProjectChartExists(projectId, chartId);
+    this.validateTaskReadableForCurrentUser(authContext, projectId, chartId, taskId);
+    this.taskMirrorService.ensureTaskMirrorExists(chart.id, taskId);
   }
 
   assertTaskDiscussionManageableForCurrentUser(
@@ -86,14 +94,16 @@ export class TasksService {
   async deleteTaskAttachment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     attachmentId: string,
   ): Promise<{ deletedAttachmentId: string }> {
-    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    const chart = this.assertProjectChartExists(projectId, chartId);
+    this.validateTaskReadableForCurrentUser(authContext, projectId, chartId, taskId);
     this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
 
     const deletedAttachmentId = await this.attachmentService.deleteTaskAttachmentLink(
-      projectId,
+      chart.id,
       taskId,
       attachmentId,
     );
@@ -104,17 +114,20 @@ export class TasksService {
   async uploadTaskAttachment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     buffer: Buffer,
     originalFilename: string,
   ): Promise<{ attachment: DiscussionAttachmentSummary }> {
-    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    const chart = this.assertProjectChartExists(projectId, chartId);
+    this.validateTaskReadableForCurrentUser(authContext, projectId, chartId, taskId);
     this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
-    this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+    this.taskMirrorService.ensureTaskMirrorExists(chart.id, taskId);
 
     const attachment = await this.attachmentService.createAttachmentAndLinkToTask({
       buffer,
       originalFilename,
+      projectGanttChartId: chart.id,
       projectId,
       taskId,
       uploadedByUserId: authContext.userId,
@@ -122,6 +135,7 @@ export class TasksService {
     await this.notificationsService.notifyTaskAttachmentCreated({
       actorUserId: authContext.userId,
       attachmentId: attachment.id,
+      chartId,
       projectId,
       taskId,
     });
@@ -132,16 +146,18 @@ export class TasksService {
   async getTaskJournal(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
   ): Promise<{
     journalExists: boolean;
     markdown: string | null;
     taskMirrorExists: boolean;
   }> {
-    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
-    const taskMirrorExists = this.taskMirrorService.taskMirrorExists(projectId, taskId);
+    const chart = this.assertProjectChartExists(projectId, chartId);
+    this.validateTaskReadableForCurrentUser(authContext, projectId, chartId, taskId);
+    const taskMirrorExists = this.taskMirrorService.taskMirrorExists(chart.id, taskId);
     const markdown = taskMirrorExists
-      ? await this.journalStorage.readTaskJournal(projectId, taskId)
+      ? await this.journalStorage.readTaskJournal(projectId, chartId, taskId)
       : null;
 
     return {
@@ -154,6 +170,7 @@ export class TasksService {
   async updateTaskJournal(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     markdown: string,
   ): Promise<{
@@ -161,25 +178,31 @@ export class TasksService {
     markdown: string | null;
     taskMirrorExists: boolean;
   }> {
-    this.validateTaskReadableForCurrentUser(authContext, projectId, taskId);
+    const chart = this.assertProjectChartExists(projectId, chartId);
+    this.validateTaskReadableForCurrentUser(authContext, projectId, chartId, taskId);
     this.assertTaskDiscussionManageableForCurrentUser(authContext, projectId);
-    const previousMarkdown = await this.journalStorage.readTaskJournal(projectId, taskId);
+    const previousMarkdown = await this.journalStorage.readTaskJournal(
+      projectId,
+      chartId,
+      taskId,
+    );
 
-    const taskMirrorExisted = this.taskMirrorService.taskMirrorExists(projectId, taskId);
+    const taskMirrorExisted = this.taskMirrorService.taskMirrorExists(chart.id, taskId);
     if (!taskMirrorExisted) {
-      this.taskMirrorService.ensureTaskMirrorExists(projectId, taskId);
+      this.taskMirrorService.ensureTaskMirrorExists(chart.id, taskId);
     }
 
     try {
-      await this.journalStorage.writeTaskJournal(projectId, taskId, markdown);
+      await this.journalStorage.writeTaskJournal(projectId, chartId, taskId, markdown);
     } catch (error) {
       if (!taskMirrorExisted) {
-        this.taskMirrorService.deleteTaskMirror(projectId, taskId);
+        this.taskMirrorService.deleteTaskMirror(chart.id, taskId);
       }
       throw error;
     }
     await this.notificationsService.notifyTaskJournalUpdated({
       actorUserId: authContext.userId,
+      chartId,
       markdown,
       previousMarkdown,
       projectId,
@@ -187,6 +210,7 @@ export class TasksService {
     });
     await this.notificationsService.notifyTaskJournalMentions({
       actorUserId: authContext.userId,
+      chartId,
       markdown,
       projectId,
       taskId,
@@ -207,6 +231,22 @@ export class TasksService {
     if (!project) {
       throw new NotFoundException(PROJECT_NOT_FOUND_MESSAGE);
     }
+  }
+
+  private assertProjectChartExists(projectId: number, chartId: number) {
+    const chart = this.databaseService.db.select()
+      .from(projectGanttCharts)
+      .where(
+        and(
+          eq(projectGanttCharts.projectId, projectId),
+          eq(projectGanttCharts.chartId, chartId),
+        ),
+      )
+      .get();
+    if (!chart) {
+      throw new NotFoundException("Project chart not found");
+    }
+    return chart;
   }
 
   private assertCanViewProject(

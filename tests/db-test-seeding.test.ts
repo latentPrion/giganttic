@@ -70,8 +70,8 @@ describe("db test seeding charts", () => {
   it("writes seeded charts into the sandbox charts directory instead of the repo charts directory", async () => {
     const sandbox = await createSeededSandbox("seeded-sandbox.sqlite");
     const trackedProjectId = readTrackedProjectId(sandbox.dbPath, PROJECT_SEED_KEY);
-    const sandboxChartPath = path.join(sandbox.tempDir, "charts", `${trackedProjectId}.xml`);
-    const repoChartPath = path.join(process.cwd(), "charts", `${trackedProjectId}.xml`);
+    const sandboxChartPath = path.join(sandbox.tempDir, "charts", `${trackedProjectId}-0.xml`);
+    const repoChartPath = path.join(process.cwd(), "charts", `${trackedProjectId}-0.xml`);
 
     expect(await pathExists(sandboxChartPath)).toBe(true);
     expect(path.resolve(sandboxChartPath).startsWith(path.resolve(sandbox.tempDir))).toBe(true);
@@ -92,8 +92,8 @@ describe("db test seeding charts", () => {
     const secondSandbox = await createSeededSandbox("second-seeded-sandbox.sqlite");
     const firstProjectId = readTrackedProjectId(firstSandbox.dbPath, PROJECT_SEED_KEY);
     const secondProjectId = readTrackedProjectId(secondSandbox.dbPath, PROJECT_SEED_KEY);
-    const firstChartPath = path.join(firstSandbox.tempDir, "charts", `${firstProjectId}.xml`);
-    const secondChartPath = path.join(secondSandbox.tempDir, "charts", `${secondProjectId}.xml`);
+    const firstChartPath = path.join(firstSandbox.tempDir, "charts", `${firstProjectId}-0.xml`);
+    const secondChartPath = path.join(secondSandbox.tempDir, "charts", `${secondProjectId}-0.xml`);
 
     expect(firstChartPath).not.toBe(secondChartPath);
     expect(await pathExists(firstChartPath)).toBe(true);
@@ -105,8 +105,8 @@ describe("db test seeding charts", () => {
     const secondSandbox = await createSeededSandbox("second-purge-sandbox.sqlite");
     const firstProjectId = readTrackedProjectId(firstSandbox.dbPath, PROJECT_SEED_KEY);
     const secondProjectId = readTrackedProjectId(secondSandbox.dbPath, PROJECT_SEED_KEY);
-    const firstChartPath = path.join(firstSandbox.tempDir, "charts", `${firstProjectId}.xml`);
-    const secondChartPath = path.join(secondSandbox.tempDir, "charts", `${secondProjectId}.xml`);
+    const firstChartPath = path.join(firstSandbox.tempDir, "charts", `${firstProjectId}-0.xml`);
+    const secondChartPath = path.join(secondSandbox.tempDir, "charts", `${secondProjectId}-0.xml`);
 
     purgeSeededDataInSandbox(firstSandbox.dbPath, path.join(firstSandbox.tempDir, "charts"));
 

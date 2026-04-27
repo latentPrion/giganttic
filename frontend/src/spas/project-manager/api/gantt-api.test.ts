@@ -40,7 +40,7 @@ describe("ganttApi", () => {
 
     expect(result).toEqual({ content: CHART_XML, type: "xml" });
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/stc-proj-mgmt/api/projects/55/chart",
+      "/stc-proj-mgmt/api/projects/55/charts/0",
       expect.objectContaining({
         method: "GET",
       }),
@@ -74,7 +74,7 @@ describe("ganttApi", () => {
 
     expect(result).toEqual({ ok: true });
     expect(fetchSpy).toHaveBeenCalledWith(
-      "/stc-proj-mgmt/api/projects/3/chart",
+      "/stc-proj-mgmt/api/projects/3/charts/0",
       expect.objectContaining({
         body: JSON.stringify({ xml: CHART_XML }),
         method: "PUT",
@@ -84,5 +84,18 @@ describe("ganttApi", () => {
 
   it("putProjectChart throws when client validation rejects empty xml", async () => {
     await expect(ganttApi.putProjectChart(TEST_TOKEN, 3, "")).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("listProjectCharts fetches chart summaries", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      createJsonResponse({ charts: [{ chartId: 0, id: 1, name: "default", projectId: 3 }] }),
+    );
+
+    const result = await ganttApi.listProjectCharts(TEST_TOKEN, 3);
+    expect(result.charts).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/stc-proj-mgmt/api/projects/3/charts",
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 });

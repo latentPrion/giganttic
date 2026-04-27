@@ -52,6 +52,7 @@ import {
 
 const NOTIFICATION_NOT_FOUND_MESSAGE = "Notification not found";
 const LEGACY_PM_TARGET_URL_PREFIX = "/pm/pm";
+const PM_TARGET_URL_PREFIX = "/pm";
 
 interface ListNotificationsQuery {
   eventTypes: NotificationEventCategory[];
@@ -102,7 +103,7 @@ function toNotificationSummaryRow(row: JoinedNotificationRow): NotificationSumma
 
 function normalizeNotificationTargetUrl(targetUrl: string): string {
   return targetUrl.startsWith(`${LEGACY_PM_TARGET_URL_PREFIX}/`)
-    ? targetUrl.slice(LEGACY_PM_TARGET_URL_PREFIX.length)
+    ? `${PM_TARGET_URL_PREFIX}${targetUrl.slice(LEGACY_PM_TARGET_URL_PREFIX.length)}`
     : targetUrl;
 }
 
@@ -287,6 +288,7 @@ export class NotificationsService {
       args.actorUserId,
       args.body,
       {
+        chartId: null,
         commentId: args.commentId,
         issueId: args.issueId,
         mentionContainerType: mentionContainerTypeCodes.issueComment,
@@ -314,17 +316,19 @@ export class NotificationsService {
 
   async notifyTaskCommentCreated(args: {
     actorUserId: number;
+    chartId: number;
     commentId: number;
     projectId: number;
     taskId: string;
   }): Promise<void> {
     const projectName = this.getProjectNameOrThrow(args.projectId);
     const actorUsername = this.getUsernameOrThrow(args.actorUserId);
-    const taskTitle = this.getTaskTitle(args.projectId, args.taskId);
+    const taskTitle = this.getTaskTitle(args.projectId, args.taskId, args.chartId);
     await this.createNotificationEvent(
       args.actorUserId,
       buildTaskCommentNotification({
         actorUsername,
+        chartId: args.chartId,
         commentId: args.commentId,
         projectId: args.projectId,
         projectName,
@@ -337,16 +341,18 @@ export class NotificationsService {
   async notifyTaskCommentMentions(args: {
     actorUserId: number;
     body: string;
+    chartId: number;
     commentId: number;
     projectId: number;
     taskId: string;
   }): Promise<void> {
     const projectName = this.getProjectNameOrThrow(args.projectId);
-    const taskTitle = this.getTaskTitle(args.projectId, args.taskId);
+    const taskTitle = this.getTaskTitle(args.projectId, args.taskId, args.chartId);
     const mentionedUsers = this.collectFirstTimeMentionUsers(
       args.actorUserId,
       args.body,
       {
+        chartId: args.chartId,
         commentId: args.commentId,
         issueId: null,
         mentionContainerType: mentionContainerTypeCodes.taskComment,
@@ -360,6 +366,7 @@ export class NotificationsService {
         args.actorUserId,
         buildTaskCommentMentionedNotification({
           actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          chartId: args.chartId,
           commentId: args.commentId,
           mentionedUserId: mentionedUser.id,
           projectId: args.projectId,
@@ -401,6 +408,7 @@ export class NotificationsService {
 
   async notifyTaskStatusChanges(args: {
     actorUserId: number;
+    chartId: number;
     nextXml: string;
     previousXml: string | null;
     projectId: number;
@@ -418,6 +426,7 @@ export class NotificationsService {
         args.actorUserId,
         buildTaskStatusChangedNotification({
           actorUsername,
+          chartId: args.chartId,
           nextStatus: change.next.status,
           previousStatus: change.previous.status,
           projectId: args.projectId,
@@ -459,6 +468,7 @@ export class NotificationsService {
       args.actorUserId,
       args.markdown,
       {
+        chartId: null,
         commentId: null,
         issueId: null,
         mentionContainerType: mentionContainerTypeCodes.projectJournal,
@@ -516,6 +526,7 @@ export class NotificationsService {
       args.actorUserId,
       args.markdown,
       {
+        chartId: null,
         commentId: null,
         issueId: args.issueId,
         mentionContainerType: mentionContainerTypeCodes.issueJournal,
@@ -542,6 +553,7 @@ export class NotificationsService {
 
   async notifyTaskJournalUpdated(args: {
     actorUserId: number;
+    chartId: number;
     markdown: string;
     previousMarkdown: string | null;
     projectId: number;
@@ -555,26 +567,29 @@ export class NotificationsService {
       args.actorUserId,
       buildTaskJournalUpdatedNotification({
         actorUsername: this.getUsernameOrThrow(args.actorUserId),
+        chartId: args.chartId,
         projectId: args.projectId,
         projectName: this.getProjectNameOrThrow(args.projectId),
         taskId: args.taskId,
-        taskTitle: this.getTaskTitle(args.projectId, args.taskId),
+        taskTitle: this.getTaskTitle(args.projectId, args.taskId, args.chartId),
       }),
     );
   }
 
   async notifyTaskJournalMentions(args: {
     actorUserId: number;
+    chartId: number;
     markdown: string;
     projectId: number;
     taskId: string;
   }): Promise<void> {
     const projectName = this.getProjectNameOrThrow(args.projectId);
-    const taskTitle = this.getTaskTitle(args.projectId, args.taskId);
+    const taskTitle = this.getTaskTitle(args.projectId, args.taskId, args.chartId);
     const mentionedUsers = this.collectFirstTimeMentionUsers(
       args.actorUserId,
       args.markdown,
       {
+        chartId: args.chartId,
         commentId: null,
         issueId: null,
         mentionContainerType: mentionContainerTypeCodes.taskJournal,
@@ -588,6 +603,7 @@ export class NotificationsService {
         args.actorUserId,
         buildTaskJournalMentionedNotification({
           actorUsername: this.getUsernameOrThrow(args.actorUserId),
+          chartId: args.chartId,
           mentionedUserId: mentionedUser.id,
           projectId: args.projectId,
           projectName,
@@ -638,6 +654,7 @@ export class NotificationsService {
   async notifyTaskAttachmentCreated(args: {
     actorUserId: number;
     attachmentId: string;
+    chartId: number;
     projectId: number;
     taskId: string;
   }): Promise<void> {
@@ -646,10 +663,11 @@ export class NotificationsService {
       buildTaskAttachmentCreatedNotification({
         actorUsername: this.getUsernameOrThrow(args.actorUserId),
         attachmentId: args.attachmentId,
+        chartId: args.chartId,
         projectId: args.projectId,
         projectName: this.getProjectNameOrThrow(args.projectId),
         taskId: args.taskId,
-        taskTitle: this.getTaskTitle(args.projectId, args.taskId),
+        taskTitle: this.getTaskTitle(args.projectId, args.taskId, args.chartId),
       }),
     );
   }
@@ -915,13 +933,31 @@ export class NotificationsService {
     return row;
   }
 
-  private getTaskTitle(projectId: number, taskId: string): string | null {
-    const xml = this.projectChartsService.readProjectChart(projectId);
-    if (!xml) {
-      return null;
+  private getTaskTitle(
+    projectId: number,
+    taskId: string,
+    chartId: number | null = null,
+  ): string | null {
+    if (chartId !== null) {
+      const xml = this.projectChartsService.readProjectChart(projectId, chartId);
+      if (!xml) {
+        return null;
+      }
+      return collectProjectChartTaskNotificationSnapshots(xml).get(taskId)?.title ?? null;
     }
 
-    return collectProjectChartTaskNotificationSnapshots(xml).get(taskId)?.title ?? null;
+    const charts = this.projectChartsService.listProjectCharts(projectId);
+    for (const chart of charts) {
+      const xml = this.projectChartsService.readProjectChart(projectId, chart.chartId);
+      if (!xml) {
+        continue;
+      }
+      const title = collectProjectChartTaskNotificationSnapshots(xml).get(taskId)?.title ?? null;
+      if (title !== null) {
+        return title;
+      }
+    }
+    return null;
   }
 
   private getUsernameOrThrow(userId: number): string {

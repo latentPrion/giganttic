@@ -57,7 +57,7 @@ function createProddevDbPath(projectRoot: string) {
 }
 
 function createProjectChartPath(projectRoot: string, projectId: number) {
-  return path.join(projectRoot, "charts", `${projectId}.xml`);
+  return path.join(projectRoot, "charts", `${projectId}-0.xml`);
 }
 
 async function pathExists(targetPath: string) {
@@ -168,6 +168,67 @@ async function seedV2ProjectManagerAssignment(dbPath: string) {
      VALUES (101, 501, 'GGTC_PROJECTROLE_PROJECT_MANAGER');`,
   );
   db.close();
+}
+
+async function seedV10ProjectChartCutoverFixture(dbPath: string) {
+  const db = openDatabaseConnection(dbPath);
+
+  db.exec(
+    `INSERT INTO Users (id, username, email, isActive, createdAt, updatedAt)
+     VALUES
+       (201, 'migration-user-201', 'migration-user-201@example.com', 1, 1000, 1000),
+       (202, 'migration-user-202', 'migration-user-202@example.com', 1, 1000, 1000);`,
+  );
+  db.exec(
+    `INSERT INTO Projects (id, name, createdAt, updatedAt)
+     VALUES
+       (601, 'Migration Project Alpha', 1000, 1000),
+       (602, 'Migration Project Beta', 1000, 1000);`,
+  );
+  db.exec(
+    `INSERT INTO TaskMirror (projectId, taskId, createdAt, updatedAt)
+     VALUES
+       (601, 'alpha-task-a', 1700000000001, 1700000000002),
+       (601, 'alpha-task-b', 1700000000011, 1700000000012),
+       (602, 'beta-task-a', 1700000000101, 1700000000102);`,
+  );
+  db.exec(
+    `INSERT INTO Attachments (
+       id, originalFilename, byteLength, contentHash, uploadedAt, uploadedByUserId, createdAt, updatedAt
+     ) VALUES
+       ('att-alpha-a', 'alpha-a.png', 12, 'hash-alpha-a', 1700000001000, 201, 1700000001000, 1700000001000),
+       ('att-alpha-b', 'alpha-b.png', 13, 'hash-alpha-b', 1700000001001, 201, 1700000001001, 1700000001001),
+       ('att-beta-a', 'beta-a.png', 14, 'hash-beta-a', 1700000001002, 202, 1700000001002, 1700000001002);`,
+  );
+  db.exec(
+    `INSERT INTO TaskAttachments (projectId, taskId, attachmentId)
+     VALUES
+       (601, 'alpha-task-a', 'att-alpha-a'),
+       (602, 'beta-task-a', 'att-beta-a');`,
+  );
+  db.exec(
+    `INSERT INTO TaskComments (
+       id, projectId, taskId, createdByUserId, parentCommentId, thumbsUpCount, thumbsDownCount, createdAt, updatedAt
+     ) VALUES
+       (901, 601, 'alpha-task-a', 201, NULL, 2, 0, 1700000002001, 1700000002002),
+       (902, 601, 'alpha-task-a', 202, 901, 0, 1, 1700000002011, 1700000002012),
+       (903, 602, 'beta-task-a', 202, NULL, 1, 0, 1700000002021, 1700000002022);`,
+  );
+  db.exec(
+    `INSERT INTO TaskComments_Attachments (projectId, taskId, commentId, attachmentId)
+     VALUES
+       (601, 'alpha-task-a', 901, 'att-alpha-b'),
+       (602, 'beta-task-a', 903, 'att-beta-a');`,
+  );
+
+  db.close();
+}
+
+function readTableColumnNames(dbPath: string, tableName: string): string[] {
+  const db = openDatabaseConnection(dbPath, { readonly: true });
+  const columns = db.prepare(`PRAGMA table_info(${tableName});`).all() as Array<{ name: string }>;
+  db.close();
+  return columns.map((column) => column.name);
 }
 
 async function insertNonTestUser(dbPath: string) {
@@ -425,6 +486,11 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v9--v10",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v10--v11",
+      projectRoot: tempDir,
+    });
 
     await expect(prepareDatabase({
       dbTarget: "dev",
@@ -492,6 +558,11 @@ describe("db lifecycle scripts", () => {
     await migrateDatabase({
       dbTarget: "proddev",
       migrationPairName: "v9--v10",
+      projectRoot: tempDir,
+    });
+    await migrateDatabase({
+      dbTarget: "proddev",
+      migrationPairName: "v10--v11",
       projectRoot: tempDir,
     });
 
@@ -864,7 +935,7 @@ describe("db lifecycle scripts", () => {
     ).toBe(1);
   }, 20_000);
 
-  it("migrates v2 through v10 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
+  it("migrates v2 through v11 without changing existing project-manager assignments and seeds the owner role once after prepare", async () => {
     const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
     tempDirs.push(tempDir);
     const dbPath = createTargetDbPath(tempDir, "dev");
@@ -925,12 +996,17 @@ describe("db lifecycle scripts", () => {
       migrationPairName: "v9--v10",
       projectRoot: tempDir,
     });
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v10--v11",
+      projectRoot: tempDir,
+    });
     await prepareDatabase({
       dbTarget: "dev",
       projectRoot: tempDir,
     });
 
-    expect(await readSchemaName(dbPath)).toBe("v10");
+    expect(await readSchemaName(dbPath)).toBe("v11");
     expect(
       await countRowsWhere(
         dbPath,
@@ -945,6 +1021,129 @@ describe("db lifecycle scripts", () => {
         "code = 'GGTC_PROJECTROLE_PROJECT_OWNER'",
       ),
     ).toBe(1);
+  }, 20_000);
+
+  it("migrates v10 multi-chart task/discussion rows to chart-scoped v11 keys without row loss", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+      schemaName: "v10",
+    });
+    await seedV10ProjectChartCutoverFixture(dbPath);
+
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v10--v11",
+      projectRoot: tempDir,
+    });
+
+    expect(await readSchemaName(dbPath)).toBe("v11");
+    expect(readTableColumnNames(dbPath, "TaskMirror")).toContain("projectGanttChartId");
+    expect(readTableColumnNames(dbPath, "TaskMirror")).not.toContain("projectId");
+    expect(readTableColumnNames(dbPath, "TaskComments")).toContain("projectGanttChartId");
+    expect(readTableColumnNames(dbPath, "TaskComments")).not.toContain("projectId");
+    expect(readTableColumnNames(dbPath, "TaskAttachments")).toContain("projectGanttChartId");
+    expect(readTableColumnNames(dbPath, "TaskAttachments")).not.toContain("projectId");
+    expect(readTableColumnNames(dbPath, "TaskComments_Attachments")).toContain("projectGanttChartId");
+    expect(readTableColumnNames(dbPath, "TaskComments_Attachments")).not.toContain("projectId");
+
+    const db = openDatabaseConnection(dbPath, { readonly: true });
+
+    const chartRows = db.prepare(
+      `SELECT projectId, chartId, name
+       FROM ProjectGanttCharts
+       ORDER BY projectId, chartId;`,
+    ).all() as Array<{ chartId: number; name: string; projectId: number }>;
+    expect(chartRows).toEqual([
+      { chartId: 0, name: "default", projectId: 601 },
+      { chartId: 0, name: "default", projectId: 602 },
+    ]);
+
+    const mirrorRows = db.prepare(
+      `SELECT c.projectId AS projectId, tm.taskId AS taskId, tm.createdAt AS createdAt, tm.updatedAt AS updatedAt
+       FROM TaskMirror tm
+       INNER JOIN ProjectGanttCharts c ON c.id = tm.projectGanttChartId
+       ORDER BY c.projectId, tm.taskId;`,
+    ).all() as Array<{
+      createdAt: number;
+      projectId: number;
+      taskId: string;
+      updatedAt: number;
+    }>;
+    expect(mirrorRows).toEqual([
+      { createdAt: 1700000000001, projectId: 601, taskId: "alpha-task-a", updatedAt: 1700000000002 },
+      { createdAt: 1700000000011, projectId: 601, taskId: "alpha-task-b", updatedAt: 1700000000012 },
+      { createdAt: 1700000000101, projectId: 602, taskId: "beta-task-a", updatedAt: 1700000000102 },
+    ]);
+
+    const attachmentRows = db.prepare(
+      `SELECT c.projectId AS projectId, ta.taskId AS taskId, ta.attachmentId AS attachmentId
+       FROM TaskAttachments ta
+       INNER JOIN ProjectGanttCharts c ON c.id = ta.projectGanttChartId
+       ORDER BY c.projectId, ta.taskId, ta.attachmentId;`,
+    ).all() as Array<{
+      attachmentId: string;
+      projectId: number;
+      taskId: string;
+    }>;
+    expect(attachmentRows).toEqual([
+      { attachmentId: "att-alpha-a", projectId: 601, taskId: "alpha-task-a" },
+      { attachmentId: "att-beta-a", projectId: 602, taskId: "beta-task-a" },
+    ]);
+
+    const commentRows = db.prepare(
+      `SELECT tc.id AS id, c.projectId AS projectId, tc.taskId AS taskId, tc.createdByUserId AS createdByUserId
+       FROM TaskComments tc
+       INNER JOIN ProjectGanttCharts c ON c.id = tc.projectGanttChartId
+       ORDER BY tc.id;`,
+    ).all() as Array<{
+      createdByUserId: number;
+      id: number;
+      projectId: number;
+      taskId: string;
+    }>;
+    expect(commentRows).toEqual([
+      { createdByUserId: 201, id: 901, projectId: 601, taskId: "alpha-task-a" },
+      { createdByUserId: 202, id: 902, projectId: 601, taskId: "alpha-task-a" },
+      { createdByUserId: 202, id: 903, projectId: 602, taskId: "beta-task-a" },
+    ]);
+
+    const commentAttachmentRows = db.prepare(
+      `SELECT c.projectId AS projectId, tca.taskId AS taskId, tca.commentId AS commentId, tca.attachmentId AS attachmentId
+       FROM TaskComments_Attachments tca
+       INNER JOIN ProjectGanttCharts c ON c.id = tca.projectGanttChartId
+       ORDER BY c.projectId, tca.commentId, tca.attachmentId;`,
+    ).all() as Array<{
+      attachmentId: string;
+      commentId: number;
+      projectId: number;
+      taskId: string;
+    }>;
+    expect(commentAttachmentRows).toEqual([
+      { attachmentId: "att-alpha-b", commentId: 901, projectId: 601, taskId: "alpha-task-a" },
+      { attachmentId: "att-beta-a", commentId: 903, projectId: 602, taskId: "beta-task-a" },
+    ]);
+
+    expect(
+      Number(
+        querySingleValue(
+          db,
+          `SELECT COUNT(*)
+           FROM TaskComments_Attachments tca
+           INNER JOIN TaskComments tc
+             ON tc.id = tca.commentId
+            AND tc.projectGanttChartId = tca.projectGanttChartId
+            AND tc.taskId = tca.taskId;`,
+        ),
+      ),
+    ).toBe(commentAttachmentRows.length);
+
+    db.close();
   }, 20_000);
 
   it("repairs legacy v9 mention rows by adding and backfilling containerKey during v9--v10", async () => {

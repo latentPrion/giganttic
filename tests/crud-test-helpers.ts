@@ -37,7 +37,7 @@ export interface AuthSession {
 interface CrudTestHarness {
   cleanup(): Promise<void>;
   createAuthHeaders(accessToken: string): Record<string, string>;
-  createProjectChartPath(projectId: number): string;
+  createProjectChartPath(projectId: number, chartId?: number): string;
   databaseService: DatabaseService;
   loginSeededAdmin(): Promise<AuthSession>;
   parseJson<T>(payload: string): T;
@@ -97,8 +97,8 @@ export function createCrudTestHarness(
     };
   }
 
-  function createProjectChartPath(projectId: number): string {
-    return path.join(assertChartsDir(), `${projectId}.xml`);
+  function createProjectChartPath(projectId: number, chartId = 0): string {
+    return path.join(assertChartsDir(), `${projectId}-${chartId}.xml`);
   }
 
   function parseJson<T>(payload: string): T {

@@ -181,7 +181,7 @@ describe("Discussion markdown render wrappers", () => {
       "blob:wrapper-test",
     );
     expect(requestBlobMock).toHaveBeenCalledWith({
-      path: "/projects/42/tasks/task-7/attachments/task-att-1/download",
+      path: "/projects/42/charts/0/tasks/task-7/attachments/task-att-1/download",
       token: "pm-token",
     });
   });
@@ -202,7 +202,7 @@ describe("Discussion markdown render wrappers", () => {
       "blob:wrapper-test",
     );
     expect(requestBlobMock).toHaveBeenCalledWith({
-      path: "/projects/42/tasks/task-7/comments/44/attachments/comment-att-1/download",
+      path: "/projects/42/charts/0/tasks/task-7/comments/44/attachments/comment-att-1/download",
       token: "pm-token",
     });
 

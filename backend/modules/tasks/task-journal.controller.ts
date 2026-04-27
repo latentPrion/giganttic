@@ -19,7 +19,7 @@ import { taskCommentsRouteParamsSchema } from "./task-untrusted.contracts.js";
 import { TasksService } from "./tasks.service.js";
 
 @Authenticated()
-@Controller("projects/:projectId/tasks/:taskId/journal")
+@Controller("projects/:projectId/charts/:chartId/tasks/:taskId/journal")
 export class TaskJournalController {
   constructor(
     @Inject(TasksService)
@@ -31,12 +31,13 @@ export class TaskJournalController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
 
     return getTaskJournalResponseSchema.parse(
       await this.tasksService.getTaskJournal(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
       ),
     );
@@ -48,13 +49,14 @@ export class TaskJournalController {
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
     @Body(new ZodValidationPipe(upsertDiscussionJournalRequestSchema)) body: unknown,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
     const { markdown } = upsertDiscussionJournalRequestSchema.parse(body);
 
     return getTaskJournalResponseSchema.parse(
       await this.tasksService.updateTaskJournal(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         markdown,
       ),

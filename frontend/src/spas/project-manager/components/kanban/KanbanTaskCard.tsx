@@ -25,8 +25,8 @@ export function KanbanTaskCard(props: {
   allowStatusChange?: boolean;
   card: KanbanTaskCardModel;
   disabled?: boolean;
-  onNavigateToTask?: (taskId: string) => void;
-  onUpdateStatus: (taskId: string, status: IssueStatus) => void;
+  onNavigateToTask?: (taskId: string, chartId: number) => void;
+  onUpdateStatus: (taskId: string, chartId: number, status: IssueStatus) => void;
 }) {
   const { task } = props.card;
   const isReadOnlyMilestone = task.isMilestone;
@@ -39,7 +39,7 @@ export function KanbanTaskCard(props: {
   } = useKanbanCardInteraction({
     disabled: props.disabled,
     onNavigate: props.onNavigateToTask
-      ? () => props.onNavigateToTask?.(task.id)
+      ? () => props.onNavigateToTask?.(task.id, task.chartId)
       : undefined,
     shouldOpenMenuOnDoubleClick: () => (props.allowStatusChange ?? false) && !isReadOnlyMilestone,
   });
@@ -49,12 +49,12 @@ export function KanbanTaskCard(props: {
     if (status === task.status) {
       return;
     }
-    props.onUpdateStatus(task.id, status);
+    props.onUpdateStatus(task.id, task.chartId, status);
   }
 
   return (
     <Box
-      data-testid={`kanban-task-card-${task.id}`}
+      data-testid={`kanban-task-card-${task.chartId}-${task.id}`}
       role="button"
       tabIndex={0}
       onClick={handleClick}

@@ -22,42 +22,50 @@ export interface GanttRuntimeChartValidationResult {
   ok: boolean;
 }
 
-const runtimeChartCacheByProjectId = new Map<number, GanttRuntimeChartCacheEntry>();
-const runtimeChartValidationErrorByProjectId = new Map<
-  number,
+const runtimeChartCacheByScopeKey = new Map<string, GanttRuntimeChartCacheEntry>();
+const runtimeChartValidationErrorByScopeKey = new Map<
+  string,
   ProjectChartTaskIdValidationIssue
 >();
-const listenersByProjectId = new Map<number, Set<() => void>>();
+const listenersByScopeKey = new Map<string, Set<() => void>>();
 
-function getOrCreateListeners(projectId: number): Set<() => void> {
-  const existing = listenersByProjectId.get(projectId);
+function createScopeKey(projectId: number, chartId: number): string {
+  return `${projectId}:${chartId}`;
+}
+
+function getOrCreateListeners(projectId: number, chartId: number): Set<() => void> {
+  const key = createScopeKey(projectId, chartId);
+  const existing = listenersByScopeKey.get(key);
   if (existing) {
     return existing;
   }
 
   const created = new Set<() => void>();
-  listenersByProjectId.set(projectId, created);
+  listenersByScopeKey.set(key, created);
   return created;
 }
 
 export function setGanttRuntimeChartCacheEntry(
   projectId: number,
+  chartId: number,
   entry: GanttRuntimeChartCacheEntry,
 ): void {
-  runtimeChartCacheByProjectId.set(projectId, entry);
-  runtimeChartValidationErrorByProjectId.delete(projectId);
-  getOrCreateListeners(projectId).forEach((listener) => {
+  const key = createScopeKey(projectId, chartId);
+  runtimeChartCacheByScopeKey.set(key, entry);
+  runtimeChartValidationErrorByScopeKey.delete(key);
+  getOrCreateListeners(projectId, chartId).forEach((listener) => {
     listener();
   });
 }
 
 export function trySetValidatedGanttRuntimeChartCacheEntry(
   projectId: number,
+  chartId: number,
   entry: GanttRuntimeChartCacheEntry,
 ): GanttRuntimeChartValidationResult {
   try {
     validateProjectChartTaskIdsInFrontend(entry.serializedXml);
-    setGanttRuntimeChartCacheEntry(projectId, entry);
+    setGanttRuntimeChartCacheEntry(projectId, chartId, entry);
     return {
       error: null,
       ok: true,
@@ -66,8 +74,9 @@ export function trySetValidatedGanttRuntimeChartCacheEntry(
     const issue = error instanceof ProjectChartTaskIdValidationError
       ? error.issue
       : createInvalidValidationIssue();
-    runtimeChartValidationErrorByProjectId.set(projectId, issue);
-    getOrCreateListeners(projectId).forEach((listener) => {
+    const key = createScopeKey(projectId, chartId);
+    runtimeChartValidationErrorByScopeKey.set(key, issue);
+    getOrCreateListeners(projectId, chartId).forEach((listener) => {
       listener();
     });
     return {
@@ -87,52 +96,58 @@ function createInvalidValidationIssue(): ProjectChartTaskIdValidationIssue {
 
 export function getGanttRuntimeChartValidationError(
   projectId: number,
+  chartId: number,
 ): ProjectChartTaskIdValidationIssue | null {
-  return runtimeChartValidationErrorByProjectId.get(projectId) ?? null;
+  return runtimeChartValidationErrorByScopeKey.get(createScopeKey(projectId, chartId)) ?? null;
 }
 
-export function clearGanttRuntimeChartValidationError(projectId: number): void {
-  runtimeChartValidationErrorByProjectId.delete(projectId);
-  getOrCreateListeners(projectId).forEach((listener) => {
+export function clearGanttRuntimeChartValidationError(projectId: number, chartId: number): void {
+  runtimeChartValidationErrorByScopeKey.delete(createScopeKey(projectId, chartId));
+  getOrCreateListeners(projectId, chartId).forEach((listener) => {
     listener();
   });
 }
 
 export function getGanttRuntimeChartCacheEntry(
   projectId: number,
+  chartId: number,
 ): GanttRuntimeChartCacheEntry | undefined {
-  return runtimeChartCacheByProjectId.get(projectId);
+  return runtimeChartCacheByScopeKey.get(createScopeKey(projectId, chartId));
 }
 
 export function subscribeGanttRuntimeChartCache(
   projectId: number,
+  chartId: number,
   listener: () => void,
 ): () => void {
-  const listeners = getOrCreateListeners(projectId);
+  const key = createScopeKey(projectId, chartId);
+  const listeners = getOrCreateListeners(projectId, chartId);
   listeners.add(listener);
 
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
-      listenersByProjectId.delete(projectId);
+      listenersByScopeKey.delete(key);
     }
   };
 }
 
-export function clearGanttRuntimeChartCacheEntry(projectId: number): void {
-  runtimeChartCacheByProjectId.delete(projectId);
-  runtimeChartValidationErrorByProjectId.delete(projectId);
-  const listeners = listenersByProjectId.get(projectId);
+export function clearGanttRuntimeChartCacheEntry(projectId: number, chartId: number): void {
+  const key = createScopeKey(projectId, chartId);
+  runtimeChartCacheByScopeKey.delete(key);
+  runtimeChartValidationErrorByScopeKey.delete(key);
+  const listeners = listenersByScopeKey.get(key);
   listeners?.forEach((listener) => {
     listener();
   });
 }
 
 export function clearGanttRuntimeChartCache(): void {
-  for (const projectId of runtimeChartCacheByProjectId.keys()) {
-    clearGanttRuntimeChartCacheEntry(projectId);
+  for (const scopeKey of runtimeChartCacheByScopeKey.keys()) {
+    const [projectIdText, chartIdText] = scopeKey.split(":");
+    clearGanttRuntimeChartCacheEntry(Number(projectIdText), Number(chartIdText));
   }
-  runtimeChartCacheByProjectId.clear();
-  runtimeChartValidationErrorByProjectId.clear();
-  listenersByProjectId.clear();
+  runtimeChartCacheByScopeKey.clear();
+  runtimeChartValidationErrorByScopeKey.clear();
+  listenersByScopeKey.clear();
 }

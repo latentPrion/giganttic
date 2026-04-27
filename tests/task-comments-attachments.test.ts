@@ -1,11 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { taskMirror } from "../db/index.js";
+import { projectGanttCharts, taskMirror } from "../db/index.js";
 import { createCrudTestHarness } from "./crud-test-helpers.js";
 import { createMultipartFileBuffer } from "./multipart-form.helpers.js";
 
 const DEFAULT_TASK_ID = "1";
+const DEFAULT_CHART_ID = 0;
+const SECOND_CHART_ID = 1;
 const MISSING_TASK_ID = "missing-task";
 const MINIMAL_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
@@ -71,6 +73,19 @@ describe("task comments and attachments api", () => {
       comments: [],
     });
     expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID)).toEqual([]);
+  });
+
+  it("hard-cutover rejects legacy non-chart-scoped task comment route", async () => {
+    const user = await harness.registerUser("task-comments-legacy-route");
+    const { projectId } = await createProjectWithDefaultTask(user.accessToken, "Task comments legacy");
+
+    const response = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${projectId}/tasks/${DEFAULT_TASK_ID}/comments`,
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it("creates the task mirror on the first task-level attachment only", async () => {
@@ -308,7 +323,7 @@ describe("task comments and attachments api", () => {
     expect(memberDeleteResponse.statusCode).toBe(403);
   });
 
-  it("accepts otherwise rejected task attachment uploads for an effective project manager and rejects them for other users", async () => {
+  it("accepts bypassed task attachment uploads for effective project managers and rejects them for non-managers", async () => {
     const owner = await harness.registerUser("task-attachment-bypass-owner");
     const member = await harness.registerUser("task-attachment-bypass-member");
     const { projectId } = await createProjectWithDefaultTask(
@@ -347,6 +362,151 @@ describe("task comments and attachments api", () => {
     expect(memberBadExtension.statusCode).toBe(403);
     expect(memberBadMagic.statusCode).toBe(403);
   });
+
+  it("isolates task comments by chart id for the same task id", async () => {
+    const user = await harness.registerUser("task-comments-chart-scope");
+    const { projectId } = await createProjectWithDefaultTask(
+      user.accessToken,
+      "Task comments chart scope",
+    );
+    await createProjectChart(user.accessToken, projectId, "Secondary chart");
+    await putProjectChartWithTaskIds(user.accessToken, projectId, [DEFAULT_TASK_ID], SECOND_CHART_ID);
+
+    const createDefaultCommentResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "POST",
+      payload: { body: "Default chart comment" },
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID),
+    });
+    expect(createDefaultCommentResponse.statusCode).toBe(201);
+
+    const listDefaultCommentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID),
+    });
+    const listSecondCommentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskCommentsPath(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID),
+    });
+    const defaultCommentsPayload = harness.parseJson<{ comments: Array<{ body: string }> }>(
+      listDefaultCommentsResponse.payload,
+    );
+    const secondCommentsPayload = harness.parseJson<{ comments: Array<{ body: string }> }>(
+      listSecondCommentsResponse.payload,
+    );
+
+    expect(defaultCommentsPayload.comments).toHaveLength(1);
+    expect(defaultCommentsPayload.comments[0].body).toBe("Default chart comment");
+    expect(secondCommentsPayload.comments).toEqual([]);
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID)).toHaveLength(1);
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID)).toEqual([]);
+  });
+
+  it("isolates task journals by chart id for the same task id", async () => {
+    const user = await harness.registerUser("task-journal-chart-scope");
+    const { projectId } = await createProjectWithDefaultTask(
+      user.accessToken,
+      "Task journal chart scope",
+    );
+    await createProjectChart(user.accessToken, projectId, "Secondary chart");
+    await putProjectChartWithTaskIds(user.accessToken, projectId, [DEFAULT_TASK_ID], SECOND_CHART_ID);
+
+    const putDefaultJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "PUT",
+      payload: { markdown: "Default chart task journal" },
+      url: buildTaskJournalPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID),
+    });
+    expect(putDefaultJournalResponse.statusCode).toBe(200);
+
+    const getDefaultJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskJournalPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID),
+    });
+    const getSecondJournalResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskJournalPath(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID),
+    });
+
+    expect(
+      harness.parseJson<{
+        journalExists: boolean;
+        markdown: string | null;
+        taskMirrorExists: boolean;
+      }>(getDefaultJournalResponse.payload),
+    ).toEqual({
+      journalExists: true,
+      markdown: "Default chart task journal",
+      taskMirrorExists: true,
+    });
+    expect(
+      harness.parseJson<{
+        journalExists: boolean;
+        markdown: string | null;
+        taskMirrorExists: boolean;
+      }>(getSecondJournalResponse.payload),
+    ).toEqual({
+      journalExists: false,
+      markdown: null,
+      taskMirrorExists: false,
+    });
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID)).toHaveLength(1);
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID)).toEqual([]);
+  });
+
+  it("isolates task attachments and download permissions by chart id", async () => {
+    const user = await harness.registerUser("task-attachments-chart-scope");
+    const { projectId } = await createProjectWithDefaultTask(
+      user.accessToken,
+      "Task attachments chart scope",
+    );
+    await createProjectChart(user.accessToken, projectId, "Secondary chart");
+    await putProjectChartWithTaskIds(user.accessToken, projectId, [DEFAULT_TASK_ID], SECOND_CHART_ID);
+
+    const uploadSecondChartResponse = await harness.app.inject({
+      headers: buildMultipartHeaders(user.accessToken),
+      method: "POST",
+      payload: createPngUploadPayload("second-chart-task.png"),
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID),
+    });
+    expect(uploadSecondChartResponse.statusCode).toBe(201);
+    const uploadedAttachmentId = harness.parseJson<{ attachment: { id: string } }>(
+      uploadSecondChartResponse.payload,
+    ).attachment.id;
+
+    const defaultChartAttachmentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID),
+    });
+    const secondChartAttachmentsResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID),
+    });
+    expect(
+      harness.parseJson<{ attachments: unknown[] }>(defaultChartAttachmentsResponse.payload),
+    ).toEqual({ attachments: [] });
+    expect(
+      harness.parseJson<{ attachments: Array<{ id: string }> }>(
+        secondChartAttachmentsResponse.payload,
+      ).attachments.map((entry) => entry.id),
+    ).toEqual([uploadedAttachmentId]);
+
+    const crossChartDownloadResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(user.accessToken),
+      method: "GET",
+      url: `${buildTaskAttachmentsPath(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID)}/${uploadedAttachmentId}/download`,
+    });
+    expect(crossChartDownloadResponse.statusCode).toBe(404);
+
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, DEFAULT_CHART_ID)).toEqual([]);
+    expect(selectTaskMirrorRows(projectId, DEFAULT_TASK_ID, SECOND_CHART_ID)).toHaveLength(1);
+  });
 });
 
 async function createProjectWithDefaultTask(accessToken: string, name: string) {
@@ -372,6 +532,7 @@ async function putProjectChartWithTaskIds(
   accessToken: string,
   projectId: number,
   taskIds: string[],
+  chartId: number = DEFAULT_CHART_ID,
 ): Promise<void> {
   const content = `<?xml version="1.0" encoding="UTF-8"?>\n<data>\n${taskIds
     .map(
@@ -384,18 +545,49 @@ async function putProjectChartWithTaskIds(
     headers: harness.createAuthHeaders(accessToken),
     method: "PUT",
     payload: { xml: content },
-    url: `/stc-proj-mgmt/api/projects/${projectId}/chart`,
+    url: `/stc-proj-mgmt/api/projects/${projectId}/charts/${chartId}`,
   });
 
   expect(response.statusCode).toBe(200);
 }
 
-function buildTaskCommentsPath(projectId: number, taskId: string): string {
-  return `/stc-proj-mgmt/api/projects/${projectId}/tasks/${taskId}/comments`;
+async function createProjectChart(
+  accessToken: string,
+  projectId: number,
+  name: string,
+): Promise<void> {
+  const response = await harness.app.inject({
+    headers: harness.createAuthHeaders(accessToken),
+    method: "POST",
+    payload: { name },
+    url: `/stc-proj-mgmt/api/projects/${projectId}/charts`,
+  });
+
+  expect(response.statusCode).toBe(201);
 }
 
-function buildTaskAttachmentsPath(projectId: number, taskId: string): string {
-  return `/stc-proj-mgmt/api/projects/${projectId}/tasks/${taskId}/attachments`;
+function buildTaskCommentsPath(
+  projectId: number,
+  taskId: string,
+  chartId: number = DEFAULT_CHART_ID,
+): string {
+  return `/stc-proj-mgmt/api/projects/${projectId}/charts/${chartId}/tasks/${taskId}/comments`;
+}
+
+function buildTaskAttachmentsPath(
+  projectId: number,
+  taskId: string,
+  chartId: number = DEFAULT_CHART_ID,
+): string {
+  return `/stc-proj-mgmt/api/projects/${projectId}/charts/${chartId}/tasks/${taskId}/attachments`;
+}
+
+function buildTaskJournalPath(
+  projectId: number,
+  taskId: string,
+  chartId: number = DEFAULT_CHART_ID,
+): string {
+  return `/stc-proj-mgmt/api/projects/${projectId}/charts/${chartId}/tasks/${taskId}/journal`;
 }
 
 function buildMultipartHeaders(accessToken: string): Record<string, string> {
@@ -423,13 +615,28 @@ function createUploadPayload(
   });
 }
 
-function selectTaskMirrorRows(projectId: number, taskId: string) {
+function selectTaskMirrorRows(projectGanttChartId: number, taskId: string, chartId = DEFAULT_CHART_ID) {
+  const chartRecord = harness.databaseService.db
+    .select({
+      id: projectGanttCharts.id,
+    })
+    .from(projectGanttCharts)
+    .where(
+      and(
+        eq(projectGanttCharts.projectId, projectGanttChartId),
+        eq(projectGanttCharts.chartId, chartId),
+      ),
+    )
+    .get();
+  if (!chartRecord) {
+    return [];
+  }
   return harness.databaseService.db
     .select()
     .from(taskMirror)
     .where(
       and(
-        eq(taskMirror.projectId, projectId),
+        eq(taskMirror.projectGanttChartId, chartRecord.id),
         eq(taskMirror.taskId, taskId),
       ),
     )

@@ -14,9 +14,9 @@ function renderKanbanCard(
   card: KanbanColumnModel["cards"][number],
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void,
   onIssueNavigateToDetail: ((issueId: number) => void) | undefined,
-  onTaskNavigateToDetail: ((taskId: string) => void) | undefined,
+  onTaskNavigateToDetail: ((taskId: string, chartId: number) => void) | undefined,
   taskStatusChangeEnabled: boolean,
-  onTaskStatusChange: (taskId: string, status: IssueStatus) => void,
+  onTaskStatusChange: (taskId: string, chartId: number, status: IssueStatus) => void,
   isBusy: boolean,
 ) {
   switch (card.kind) {
@@ -48,9 +48,9 @@ export function KanbanColumn(props: {
   isBusy: boolean;
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
   onIssueNavigateToDetail?: (issueId: number) => void;
-  onTaskNavigateToDetail?: (taskId: string) => void;
+  onTaskNavigateToDetail?: (taskId: string, chartId: number) => void;
   taskStatusChangeEnabled?: boolean;
-  onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
+  onTaskStatusChange: (taskId: string, chartId: number, status: IssueStatus) => void;
 }) {
   const { column } = props;
 

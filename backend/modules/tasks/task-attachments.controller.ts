@@ -31,7 +31,7 @@ import {
 import { TasksService } from "./tasks.service.js";
 
 @Authenticated()
-@Controller("projects/:projectId/tasks/:taskId/attachments")
+@Controller("projects/:projectId/charts/:chartId/tasks/:taskId/attachments")
 export class TaskAttachmentsController {
   constructor(
     @Inject(TasksService)
@@ -45,14 +45,19 @@ export class TaskAttachmentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
     this.tasksService.validateTaskReadableForCurrentUser(
       request.authContext!,
       projectId,
+      chartId,
       taskId,
     );
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
 
-    const rows = this.attachmentService.listTaskLevelAttachmentRows(projectId, taskId);
+    const rows = this.attachmentService.listTaskLevelAttachmentRows(projectGanttChartId, taskId);
     return listTaskAttachmentsResponseSchema.parse({
       attachments: rows.map(toAttachmentSummary),
     });
@@ -65,11 +70,12 @@ export class TaskAttachmentsController {
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
     @UploadedMemoryFile() file: MemoryUploadedFile | undefined,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
     return uploadTaskAttachmentResponseSchema.parse(
       await this.tasksService.uploadTaskAttachment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         requireUploadedBuffer(file),
         file!.originalname,
@@ -82,13 +88,14 @@ export class TaskAttachmentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskAttachmentRouteParamsSchema)) params: unknown,
   ) {
-    const { attachmentId, projectId, taskId } =
+    const { attachmentId, chartId, projectId, taskId } =
       taskAttachmentRouteParamsSchema.parse(params);
 
     return deleteTaskAttachmentResponseSchema.parse(
       await this.tasksService.deleteTaskAttachment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         attachmentId,
       ),
@@ -100,17 +107,22 @@ export class TaskAttachmentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskAttachmentRouteParamsSchema)) params: unknown,
   ) {
-    const { attachmentId, projectId, taskId } =
+    const { attachmentId, chartId, projectId, taskId } =
       taskAttachmentRouteParamsSchema.parse(params);
 
     this.tasksService.validateTaskReadableForCurrentUser(
       request.authContext!,
       projectId,
+      chartId,
       taskId,
+    );
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
     );
 
     const row = this.attachmentService.requireAttachmentLinkedToTask(
-      projectId,
+      projectGanttChartId,
       taskId,
       attachmentId,
     );

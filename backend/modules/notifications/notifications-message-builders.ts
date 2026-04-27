@@ -80,6 +80,7 @@ export function buildIssueCreatedNotification(args: {
 }
 
 export function buildTaskCommentNotification(args: {
+  chartId: number;
   actorUsername: string;
   commentId: number;
   projectId: number;
@@ -95,6 +96,7 @@ export function buildTaskCommentNotification(args: {
     projectId: args.projectId,
     targetUrl: createTaskCommentNotificationTarget(
       args.projectId,
+      args.chartId,
       args.taskId,
       args.commentId,
     ),
@@ -128,6 +130,7 @@ export function buildIssueCommentMentionedNotification(args: {
 
 export function buildTaskCommentMentionedNotification(args: {
   actorUsername: string;
+  chartId: number;
   commentId: number;
   mentionedUserId: number;
   projectId: number;
@@ -144,6 +147,7 @@ export function buildTaskCommentMentionedNotification(args: {
     projectId: args.projectId,
     targetUrl: createTaskCommentNotificationTarget(
       args.projectId,
+      args.chartId,
       args.taskId,
       args.commentId,
     ),
@@ -173,6 +177,7 @@ export function buildIssueStatusChangedNotification(args: {
 
 export function buildTaskStatusChangedNotification(args: {
   actorUsername: string;
+  chartId: number;
   nextStatus: string;
   previousStatus: string;
   projectId: number;
@@ -187,7 +192,7 @@ export function buildTaskStatusChangedNotification(args: {
       `${args.actorUsername} changed Task "${taskLabel}" under ${args.projectName} `
       + `from ${getStatusLabel(args.previousStatus)} to ${getStatusLabel(args.nextStatus)}.`,
     projectId: args.projectId,
-    targetUrl: createTaskDetailsNotificationTarget(args.projectId, args.taskId),
+    targetUrl: createTaskDetailsNotificationTarget(args.projectId, args.chartId, args.taskId),
     taskId: args.taskId,
   };
 }
@@ -256,6 +261,7 @@ export function buildIssueJournalMentionedNotification(args: {
 
 export function buildTaskJournalUpdatedNotification(args: {
   actorUsername: string;
+  chartId: number;
   projectId: number;
   projectName: string;
   taskId: string;
@@ -266,13 +272,14 @@ export function buildTaskJournalUpdatedNotification(args: {
     eventType: "NOTIFICATION_EVENT_TASK_JOURNAL_UPDATED",
     message: `${args.actorUsername} updated the journal for Task "${taskLabel}" under ${args.projectName}.`,
     projectId: args.projectId,
-    targetUrl: createTaskJournalNotificationTarget(args.projectId, args.taskId),
+    targetUrl: createTaskJournalNotificationTarget(args.projectId, args.chartId, args.taskId),
     taskId: args.taskId,
   };
 }
 
 export function buildTaskJournalMentionedNotification(args: {
   actorUsername: string;
+  chartId: number;
   mentionedUserId: number;
   projectId: number;
   projectName: string;
@@ -285,7 +292,7 @@ export function buildTaskJournalMentionedNotification(args: {
     mentionedUserId: args.mentionedUserId,
     message: `${args.actorUsername} mentioned you in the journal for Task "${taskLabel}" under ${args.projectName}.`,
     projectId: args.projectId,
-    targetUrl: createTaskJournalNotificationTarget(args.projectId, args.taskId),
+    targetUrl: createTaskJournalNotificationTarget(args.projectId, args.chartId, args.taskId),
     taskId: args.taskId,
   };
 }
@@ -328,6 +335,7 @@ export function buildIssueAttachmentCreatedNotification(args: {
 export function buildTaskAttachmentCreatedNotification(args: {
   actorUsername: string;
   attachmentId: string;
+  chartId: number;
   projectId: number;
   projectName: string;
   taskId: string;
@@ -339,7 +347,7 @@ export function buildTaskAttachmentCreatedNotification(args: {
     eventType: "NOTIFICATION_EVENT_TASK_ATTACHMENT_CREATED",
     message: `${args.actorUsername} added an attachment to Task "${taskLabel}" under ${args.projectName}.`,
     projectId: args.projectId,
-    targetUrl: createTaskAttachmentsNotificationTarget(args.projectId, args.taskId),
+    targetUrl: createTaskAttachmentsNotificationTarget(args.projectId, args.chartId, args.taskId),
     taskId: args.taskId,
   };
 }

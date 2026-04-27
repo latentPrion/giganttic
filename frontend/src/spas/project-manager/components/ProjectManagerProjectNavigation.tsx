@@ -2,6 +2,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import React from "react";
 import {
   Box,
+  Chip,
   Stack,
   Tab,
   Tabs,
@@ -19,6 +20,7 @@ import {
   createProjectTasksRoute,
   type ProjectRouteSection,
 } from "../routes/project-route-paths.js";
+import { useProjectChartList } from "../hooks/use-project-chart-list.js";
 
 export interface ProjectIssueDetailTabContext {
   issueId: number;
@@ -33,6 +35,7 @@ export interface ProjectTaskDetailTabContext {
 interface ProjectManagerProjectNavigationProps {
   actions?: React.ReactNode;
   authToken: string | undefined;
+  chartId?: number;
   currentSection: ProjectRouteSection;
   issueDetailContext?: ProjectIssueDetailTabContext | null;
   taskDetailContext?: ProjectTaskDetailTabContext | null;
@@ -50,6 +53,7 @@ const TASKS_LABEL = "Tasks";
 function buildRouteForSection(
   currentSection: ProjectRouteSection,
   projectId: number | null,
+  chartId: number,
   options: {
     issueDetailIssueId?: number | null;
     taskDetailTaskId?: string | null;
@@ -65,13 +69,13 @@ function buildRouteForSection(
     case "detail":
       return createProjectDetailRoute(projectId);
     case "gantt":
-      return createProjectGanttRoute(projectId);
+      return createProjectGanttRoute(projectId, chartId);
     case "kanban":
-      return createProjectKanbanRoute(projectId);
+      return createProjectKanbanRoute(projectId, chartId);
     case "issues":
       return createProjectIssuesRoute(projectId);
     case "tasks":
-      return createProjectTasksRoute(projectId);
+      return createProjectTasksRoute(projectId, chartId);
     case "issue-detail":
       if (issueDetailIssueId == null) {
         return createProjectIssuesRoute(projectId);
@@ -79,9 +83,9 @@ function buildRouteForSection(
       return createProjectIssueRoute(projectId, issueDetailIssueId);
     case "task-detail":
       if (taskDetailTaskId == null) {
-        return createProjectTasksRoute(projectId);
+        return createProjectTasksRoute(projectId, chartId);
       }
-      return createProjectTaskRoute(projectId, taskDetailTaskId);
+      return createProjectTaskRoute(projectId, taskDetailTaskId, { chartId });
   }
 }
 
@@ -137,6 +141,10 @@ export function ProjectManagerProjectNavigation(
 ) {
   const navigate = useNavigate();
   const selectedSection: ProjectRouteSection = props.currentSection;
+  const projectCharts = useProjectChartList({
+    projectId: props.projectId,
+    token: props.authToken,
+  });
 
   function handleSectionChange(
     _event: React.SyntheticEvent,
@@ -147,7 +155,7 @@ export function ProjectManagerProjectNavigation(
     }
 
     navigate(
-      buildRouteForSection(nextSection, props.projectId, {
+      buildRouteForSection(nextSection, props.projectId, props.chartId ?? 0, {
         issueDetailIssueId: props.issueDetailContext?.issueId ?? null,
         taskDetailTaskId: props.taskDetailContext?.taskId ?? null,
       }),
@@ -180,6 +188,22 @@ export function ProjectManagerProjectNavigation(
     });
   }
 
+  function renderGanttTabLabel(): React.ReactNode {
+    const count = projectCharts.length;
+    return (
+      <Stack alignItems="center" direction="row" spacing={0.75}>
+        <Typography component="span" variant="button">
+          {GANTT_LABEL}
+        </Typography>
+        <Chip
+          label={count}
+          size="small"
+          variant={count > 0 ? "filled" : "outlined"}
+        />
+      </Stack>
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -200,7 +224,7 @@ export function ProjectManagerProjectNavigation(
         variant="scrollable"
       >
         <Tab disabled={props.projectId === null} label={DETAIL_LABEL} value="detail" />
-        <Tab disabled={props.projectId === null} label={GANTT_LABEL} value="gantt" />
+        <Tab disabled={props.projectId === null} label={renderGanttTabLabel()} value="gantt" />
         <Tab disabled={props.projectId === null} label={KANBAN_LABEL} value="kanban" />
         <Tab disabled={props.projectId === null} label={ISSUES_LABEL} value="issues" />
         <Tab disabled={props.projectId === null} label={TASKS_LABEL} value="tasks" />

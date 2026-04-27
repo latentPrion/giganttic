@@ -9,6 +9,7 @@ const PROJECT_ROLE_CODES = [
 const PROJECT_ROLE_ENUM = z.enum(PROJECT_ROLE_CODES);
 const PROJECT_MANAGER_SOURCE_CODES = ["direct", "org", "team"] as const;
 const PROJECT_ID_PARAM_NAME = "projectId";
+const PROJECT_CHART_ID_PARAM_NAME = "chartId";
 const PROJECT_UPDATE_REQUIRED_MESSAGE = "At least one field must be provided";
 const PROJECT_DUPLICATE_MEMBERS_MESSAGE = "Each project member must be unique";
 const PROJECT_DUPLICATE_ROLE_CODES_MESSAGE =
@@ -57,6 +58,11 @@ function hasUniqueOrganizationIds(
 
 export const projectIdParamSchema = z.object({
   [PROJECT_ID_PARAM_NAME]: z.coerce.number().int().positive(),
+});
+
+export const projectChartRouteParamsSchema = z.object({
+  [PROJECT_ID_PARAM_NAME]: z.coerce.number().int().positive(),
+  [PROJECT_CHART_ID_PARAM_NAME]: z.coerce.number().int().nonnegative(),
 });
 
 export const createProjectRequestSchema = z.object({
@@ -174,6 +180,35 @@ export const updateProjectChartResponseSchema = z.object({
   ok: z.literal(true),
 });
 
+export const projectChartSchema = z.object({
+  chartId: z.number().int().nonnegative(),
+  createdAt: z.string(),
+  id: z.number().int().positive(),
+  name: z.string(),
+  projectId: z.number().int().positive(),
+  updatedAt: z.string(),
+});
+
+export const createProjectChartRequestSchema = z.object({
+  name: z.string().trim().min(1),
+});
+
+export const createProjectChartResponseSchema = z.object({
+  chart: projectChartSchema,
+});
+
+export const listProjectChartsResponseSchema = z.object({
+  charts: z.array(projectChartSchema),
+});
+
+export const updateProjectChartMetadataRequestSchema = z.object({
+  name: z.string().trim().min(1),
+});
+
+export const updateProjectChartMetadataResponseSchema = z.object({
+  chart: projectChartSchema,
+});
+
 export const createProjectResponseSchema = z.object({
   project: projectSchema,
 });
@@ -268,4 +303,14 @@ export type UpdateProjectChartRequest = z.infer<
 >;
 export type UpdateProjectChartResponse = z.infer<
   typeof updateProjectChartResponseSchema
+>;
+export type ProjectChart = z.infer<typeof projectChartSchema>;
+export type CreateProjectChartRequest = z.infer<typeof createProjectChartRequestSchema>;
+export type CreateProjectChartResponse = z.infer<typeof createProjectChartResponseSchema>;
+export type ListProjectChartsResponse = z.infer<typeof listProjectChartsResponseSchema>;
+export type UpdateProjectChartMetadataRequest = z.infer<
+  typeof updateProjectChartMetadataRequestSchema
+>;
+export type UpdateProjectChartMetadataResponse = z.infer<
+  typeof updateProjectChartMetadataResponseSchema
 >;

@@ -36,8 +36,8 @@ describe("notification targets", () => {
     expect(createIssueAttachmentsNotificationTarget(4, 17)).toBe(
       "/pm/project/issue?id=17&projectId=4&tab=attachments#issue-attachments",
     );
-    expect(createTaskAttachmentsNotificationTarget(4, "task-1")).toBe(
-      "/pm/project/task?id=task-1&projectId=4&tab=attachments#task-attachments",
+    expect(createTaskAttachmentsNotificationTarget(4, 6, "task-1")).toBe(
+      "/pm/project/task?chartId=6&id=task-1&projectId=4&tab=attachments#task-attachments",
     );
   });
 
@@ -45,8 +45,8 @@ describe("notification targets", () => {
     expect(createIssueCommentNotificationTarget(4, 17, 99)).toBe(
       "/pm/project/issue?commentId=99&id=17&projectId=4&tab=comments",
     );
-    expect(createTaskCommentNotificationTarget(4, "task-1", 99)).toBe(
-      "/pm/project/task?commentId=99&id=task-1&projectId=4&tab=comments",
+    expect(createTaskCommentNotificationTarget(4, 6, "task-1", 99)).toBe(
+      "/pm/project/task?commentId=99&chartId=6&id=task-1&projectId=4&tab=comments",
     );
   });
 });

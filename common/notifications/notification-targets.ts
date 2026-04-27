@@ -128,6 +128,7 @@ export function createIssueAttachmentsNotificationTarget(
 
 export function createTaskNotificationTarget(
   projectId: number,
+  chartId: number,
   taskId: string,
   options: {
     commentId?: number | null;
@@ -137,6 +138,7 @@ export function createTaskNotificationTarget(
 ): string {
   const query = createQueryString({
     commentId: options.commentId ?? null,
+    chartId,
     id: taskId,
     projectId,
     tab: options.tab ?? null,
@@ -146,19 +148,21 @@ export function createTaskNotificationTarget(
 
 export function createTaskDetailsNotificationTarget(
   projectId: number,
+  chartId: number,
   taskId: string,
 ): string {
-  return createTaskNotificationTarget(projectId, taskId, {
+  return createTaskNotificationTarget(projectId, chartId, taskId, {
     tab: "details",
   });
 }
 
 export function createTaskCommentNotificationTarget(
   projectId: number,
+  chartId: number,
   taskId: string,
   commentId: number,
 ): string {
-  return createTaskNotificationTarget(projectId, taskId, {
+  return createTaskNotificationTarget(projectId, chartId, taskId, {
     commentId,
     tab: "comments",
   });
@@ -166,18 +170,20 @@ export function createTaskCommentNotificationTarget(
 
 export function createTaskJournalNotificationTarget(
   projectId: number,
+  chartId: number,
   taskId: string,
 ): string {
-  return createTaskNotificationTarget(projectId, taskId, {
+  return createTaskNotificationTarget(projectId, chartId, taskId, {
     hash: TASK_JOURNAL_SECTION_ANCHOR,
   });
 }
 
 export function createTaskAttachmentsNotificationTarget(
   projectId: number,
+  chartId: number,
   taskId: string,
 ): string {
-  return createTaskNotificationTarget(projectId, taskId, {
+  return createTaskNotificationTarget(projectId, chartId, taskId, {
     hash: TASK_ATTACHMENTS_SECTION_ANCHOR,
     tab: "attachments",
   });

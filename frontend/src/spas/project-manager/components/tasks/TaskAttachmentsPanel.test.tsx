@@ -49,7 +49,7 @@ describe("TaskAttachmentsPanel", () => {
       expect(taskAttachmentsApiMock.deleteAttachment).toHaveBeenCalledWith(
         "pm-token",
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
         "att-1",
       );
     });
@@ -91,7 +91,7 @@ describe("TaskAttachmentsPanel", () => {
       expect(taskAttachmentsApiMock.uploadAttachment).toHaveBeenCalledWith(
         "pm-token",
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
         expect.any(File),
       );
     });

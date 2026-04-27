@@ -8,6 +8,7 @@ import { DiscussionCommentsPanel } from "../discussion/DiscussionCommentsPanel.j
 import { TASK_COMMENT_MARKDOWN_HELP_TEXT, TaskMarkdownRender } from "./TaskMarkdownRender.js";
 
 interface TaskCommentsPanelProps {
+  chartId?: number;
   canManageTaskDiscussion?: boolean;
   currentUserId: number;
   highlightCommentId: number | null;
@@ -22,6 +23,7 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
   const {
     currentUserId,
     highlightCommentId,
+    chartId = 0,
     onNavigateToComment,
     projectId,
     taskId,
@@ -36,7 +38,7 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
           const response = await taskCommentsApi.createComment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             payload,
           );
           emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
@@ -46,7 +48,7 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
           const response = await taskCommentsApi.deleteComment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             commentId,
           );
           emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
@@ -56,19 +58,25 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
           taskCommentsApi.deleteCommentAttachment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             commentId,
             attachmentId,
           ),
         listComments: async () =>
-          taskCommentsApi.listComments(token, projectId, taskId),
+          taskCommentsApi.listComments(token, projectId, { chartId, taskId }),
         updateComment: async (commentId, payload) =>
-          taskCommentsApi.updateComment(token, projectId, taskId, commentId, payload),
+          taskCommentsApi.updateComment(
+            token,
+            projectId,
+            { chartId, taskId },
+            commentId,
+            payload,
+          ),
         uploadCommentAttachment: async (commentId, file) =>
           taskCommentsApi.uploadCommentAttachment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             commentId,
             file,
           ),
@@ -83,6 +91,7 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
       onNavigateToComment={onNavigateToComment}
       renderMarkdown={(markdown, context) => (
         <TaskMarkdownRender
+          chartId={chartId}
           commentId={context?.commentId ?? null}
           markdown={markdown}
           projectId={projectId}
@@ -91,7 +100,7 @@ export function TaskCommentsPanel(props: TaskCommentsPanelProps) {
         />
       )}
       resolveAttachmentDownloadPath={(attachmentId) =>
-        createTaskAttachmentDownloadPath(projectId, taskId, attachmentId)}
+        createTaskAttachmentDownloadPath(projectId, chartId, taskId, attachmentId)}
       token={token}
     />
   );

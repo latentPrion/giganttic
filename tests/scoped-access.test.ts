@@ -504,7 +504,7 @@ describe("scoped access tokens", () => {
     const getChartA = await app.inject({
       headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${projectA}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectA}/charts/0`,
     });
     expect([200, 404]).toContain(getChartA.statusCode);
 
@@ -512,14 +512,14 @@ describe("scoped access tokens", () => {
       headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
       method: "PUT",
       payload: { xml: "<project />" },
-      url: `/stc-proj-mgmt/api/projects/${projectA}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectA}/charts/0`,
     });
     expect(putChartA.statusCode).toBe(200);
 
     const getChartB = await app.inject({
       headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${projectB}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectB}/charts/0`,
     });
     expect(getChartB.statusCode).toBe(403);
 
@@ -527,9 +527,9 @@ describe("scoped access tokens", () => {
       headers: { authorization: `Bearer ${scopedLogin.accessToken}` },
       method: "PUT",
       payload: { xml: "<project />" },
-      url: `/stc-proj-mgmt/api/projects/${projectB}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${projectB}/charts/0`,
     });
-    expect(putChartB.statusCode).toBe(200);
+    expect(putChartB.statusCode).toBe(403);
   });
 
   it("applies deny-first allowlist to non-project and sensitive endpoints", async () => {

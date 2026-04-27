@@ -48,6 +48,7 @@ import {
 } from "../routes/project-route-paths.js";
 
 interface ProjectManagerTaskPageProps {
+  chartId?: number;
   commentId: number | null;
   currentUserId: number;
   projectId: number | null;
@@ -141,6 +142,7 @@ function renderDetailsTab(options: {
   missingJournalStateMessage: string | null;
   onSaveJournal: (markdown: string) => Promise<void>;
   canEditProjectContent: boolean;
+  chartId: number;
   isJournalLoading: boolean;
   isJournalSaving: boolean;
   isLoading: boolean;
@@ -157,6 +159,7 @@ function renderDetailsTab(options: {
     missingJournalStateMessage,
     onSaveJournal,
     canEditProjectContent,
+    chartId,
     isJournalLoading,
     isJournalSaving,
     isLoading,
@@ -201,6 +204,7 @@ function renderDetailsTab(options: {
         onSave={onSaveJournal}
         renderMarkdown={(markdown) => (
           <TaskMarkdownRender
+            chartId={chartId}
             markdown={markdown}
             projectId={projectId}
             taskId={task.id}
@@ -226,6 +230,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
   const [taskJournalMarkdown, setTaskJournalMarkdown] = React.useState<string | null>(null);
   const [taskMirrorExists, setTaskMirrorExists] = React.useState(false);
   const fileManager = useGanttChartFileManager({
+    chartId: props.chartId ?? 0,
     ganttRef,
     projectId: props.projectId,
     token: props.token,
@@ -255,7 +260,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
     const response = await taskCommentsApi.listComments(
       props.token,
       props.projectId!,
-      props.taskId!,
+      { chartId: props.chartId ?? 0, taskId: props.taskId! },
     );
     return response.comments.length;
   }, [props.projectId, props.taskId, props.token]);
@@ -277,7 +282,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
     const response = await taskAttachmentsApi.listAttachments(
       props.token,
       props.projectId!,
-      props.taskId!,
+      { chartId: props.chartId ?? 0, taskId: props.taskId! },
     );
     return response.attachments.length;
   }, [props.projectId, props.taskId, props.token]);
@@ -306,7 +311,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         const response = await taskJournalApi.getJournal(
           props.token,
           props.projectId!,
-          props.taskId!,
+          { chartId: props.chartId ?? 0, taskId: props.taskId! },
         );
         if (mounted) {
           setTaskJournalExists(response.journalExists);
@@ -332,7 +337,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
       }
       void loadTaskJournal();
     });
-  }, [props.projectId, props.taskId, props.token]);
+  }, [props.chartId, props.projectId, props.taskId, props.token]);
 
   function goBackToTasks(): void {
     if (props.projectId === null) {
@@ -340,7 +345,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
       return;
     }
 
-    navigate(createProjectTasksRoute(props.projectId));
+    navigate(createProjectTasksRoute(props.projectId, props.chartId ?? 0));
   }
 
   function handleTaskTabChange(
@@ -354,6 +359,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
     const nextCommentId = nextTab === "comments" ? props.commentId : null;
     navigate(
       createProjectTaskRoute(props.projectId, props.taskId, {
+        chartId: props.chartId ?? 0,
         commentId: nextCommentId === null ? undefined : nextCommentId,
         tab: nextTab,
       }),
@@ -367,6 +373,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
 
     navigate(
       createProjectTaskRoute(props.projectId, props.taskId, {
+        chartId: props.chartId ?? 0,
         commentId,
         tab: "comments",
       }),
@@ -384,7 +391,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
       const response = await taskJournalApi.updateJournal(
         props.token,
         props.projectId,
-        props.taskId,
+        { chartId: props.chartId ?? 0, taskId: props.taskId },
         markdown,
       );
       setTaskJournalExists(response.journalExists);
@@ -439,6 +446,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         </Stack>
         <ProjectManagerProjectNavigation
           authToken={props.token}
+          chartId={props.chartId}
           currentSection={
             props.projectId !== null && props.taskId !== null ? "task-detail" : "tasks"
           }
@@ -469,6 +477,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         ) : null}
         {props.taskTab === "details"
           ? renderDetailsTab({
+            chartId: props.chartId ?? 0,
             errorMessage: taskResolution.errorMessage,
             journalErrorMessage: taskJournalErrorMessage,
             journalExists: taskJournalExists,
@@ -493,6 +502,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
               highlightCommentId={props.commentId}
               onNavigateToComment={navigateToCommentAnchor}
               projectId={props.projectId}
+              chartId={props.chartId ?? 0}
               taskId={props.taskId}
               taskTab={props.taskTab}
               token={props.token}
@@ -500,6 +510,7 @@ export function ProjectManagerTaskPage(props: ProjectManagerTaskPageProps) {
         <TaskAttachmentsPanel
           canManageAttachments={canEditProjectContent}
           projectId={props.projectId}
+          chartId={props.chartId ?? 0}
           sectionId={TASK_ATTACHMENTS_SECTION_ANCHOR}
           taskId={props.taskId}
           taskTab={props.taskTab}

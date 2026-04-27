@@ -138,7 +138,7 @@ describe("ProjectManagerTaskPage", () => {
     expect(await screen.findByText("Gateway rollout")).toBeVisible();
     expect(screen.getByText("Detailed Task View")).toBeVisible();
     expect(screen.getByText("Investigate the gateway timeout")).toBeVisible();
-    expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+    expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 0);
     expect(screen.getByTestId("discussion-tab-count-comments")).toHaveTextContent("0");
     expect(screen.getByTestId("discussion-tab-count-attachments")).toHaveTextContent("0");
   });
@@ -150,7 +150,7 @@ describe("ProjectManagerTaskPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "Back to Tasks" }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/tasks?projectId=42&chartId=0");
   });
 
   it("shows project and task attachment embedding instructions in the task journal editor", async () => {
@@ -181,9 +181,9 @@ describe("ProjectManagerTaskPage", () => {
       within(projectWorkspaceTabs).getByRole("tab", { name: "Task task-7" }),
     ).toBeVisible();
 
-    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: "Gantt" }));
+    await user.click(within(projectWorkspaceTabs).getByRole("tab", { name: /Gantt/ }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/gantt?projectId=42&chartId=0");
   });
 
   it("loads task comments in the comments tab", async () => {
@@ -199,7 +199,7 @@ describe("ProjectManagerTaskPage", () => {
       expect(taskCommentsApiMock.listComments).toHaveBeenCalledWith(
         DEFAULT_TOKEN,
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
       );
     });
     expect(screen.getByText("Comments", { selector: "h6" })).toBeVisible();
@@ -231,7 +231,7 @@ describe("ProjectManagerTaskPage", () => {
       expect(taskAttachmentsApiMock.listAttachments).toHaveBeenCalledWith(
         DEFAULT_TOKEN,
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
       );
     });
     expect(screen.getByText("Task-level attachments")).toBeVisible();

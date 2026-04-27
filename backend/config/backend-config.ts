@@ -96,8 +96,11 @@ function createDefaultScopedSessionRouteAllowlist(): BackendConfig["scopedSessio
     { method: "GET", pattern: "/projects/:projectId" },
     { method: "GET", pattern: "/projects/:projectId/journal" },
     { method: "PUT", pattern: "/projects/:projectId/journal" },
-    { method: "GET", pattern: "/projects/:projectId/chart" },
-    { method: "PUT", pattern: "/projects/:projectId/chart" },
+    { method: "GET", pattern: "/projects/:projectId/charts" },
+    { method: "POST", pattern: "/projects/:projectId/charts" },
+    { method: "GET", pattern: "/projects/:projectId/charts/:chartId" },
+    { method: "PUT", pattern: "/projects/:projectId/charts/:chartId" },
+    { method: "PATCH", pattern: "/projects/:projectId/charts/:chartId" },
     { method: "GET", pattern: "/projects/:projectId/attachments" },
     { method: "POST", pattern: "/projects/:projectId/attachments" },
     {

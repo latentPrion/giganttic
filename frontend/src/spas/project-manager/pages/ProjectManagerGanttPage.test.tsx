@@ -164,6 +164,9 @@ vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
     getProjectChartExportCapabilities: (...args: unknown[]) =>
       getProjectChartExportCapabilitiesMock(...args),
+    listProjectCharts: vi.fn(async () => ({
+      charts: [{ chartId: 0, id: 1, name: "default", projectId: 42 }],
+    })),
     getProjectChartOrNull: (...args: unknown[]) => getProjectChartOrNullMock(...args),
     putProjectChart: (...args: unknown[]) => putProjectChartMock(...args),
   },
@@ -426,7 +429,7 @@ describe("ProjectManagerGanttPage", () => {
         expect.objectContaining({ map_to: "auto", name: "time", type: "duration" }),
       ]),
     );
-    expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+    expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42, 0);
     expect(getProjectChartExportCapabilitiesMock).toHaveBeenCalledWith(TEST_TOKEN);
     expect(mockGantt.parse.mock.calls[0]).toEqual([
       mockChartSource.content,
@@ -1047,6 +1050,7 @@ describe("ProjectManagerGanttPage", () => {
         TEST_TOKEN,
         42,
         "<data><task id=\"5000\" parent=\"0\" start_date=\"2026-03-22 00:00\" duration=\"1\" type=\"task\" ggtc_task_status=\"ISSUE_STATUS_OPEN\" ggtc_task_closed_reason=\"\" ggtc_task_description=\"\"><![CDATA[Kekw]]></task></data>",
+        0,
       );
     });
   });
@@ -1530,10 +1534,10 @@ describe("ProjectManagerGanttPage", () => {
     const view = renderWithProjectRouter(42);
 
     await waitFor(() => {
-      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42);
+      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 42, 0);
     });
 
-    clearGanttRuntimeChartCacheEntry(77);
+    clearGanttRuntimeChartCacheEntry(77, 0);
 
     view.rerender(
       <ThemeProvider theme={appTheme}>
@@ -1545,7 +1549,7 @@ describe("ProjectManagerGanttPage", () => {
     );
 
     await waitFor(() => {
-      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 77);
+      expect(getProjectChartOrNullMock).toHaveBeenCalledWith(TEST_TOKEN, 77, 0);
     });
 
     await waitFor(() => {
@@ -1675,6 +1679,96 @@ describe("ProjectManagerGanttPage", () => {
     await user.click(screen.getByRole("button", { name: "Show Controls" }));
 
     expect(screen.getByLabelText("View")).toBeVisible();
+  });
+
+  it("keeps gantt control state isolated per chart when switching chartId", async () => {
+    const user = userEvent.setup();
+    const { ganttApi } = await import("../api/gantt-api.js");
+    vi.mocked(ganttApi.listProjectCharts).mockResolvedValue({
+      charts: [
+        { chartId: 0, id: 1, name: "default", projectId: 42 },
+        { chartId: 1, id: 2, name: "second", projectId: 42 },
+      ],
+    });
+
+    const view = render(
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <MemoryRouter>
+          <ProjectManagerGanttPage
+            {...defaultPageProps}
+            chartId={0}
+            projectId={42}
+            token={TEST_TOKEN}
+          />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mockGantt.init).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByLabelText("View"));
+    await user.click(screen.getByRole("option", { name: "Grid" }));
+    expect(screen.getByLabelText("View")).toHaveTextContent("Grid");
+
+    await user.click(screen.getByRole("button", { name: "Hide Controls" }));
+    expect(screen.getByRole("button", { name: "Show Controls" })).toBeVisible();
+
+    view.rerender(
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <MemoryRouter>
+          <ProjectManagerGanttPage
+            {...defaultPageProps}
+            chartId={1}
+            projectId={42}
+            token={TEST_TOKEN}
+          />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText("View")).toHaveTextContent("Both");
+
+    await user.click(screen.getByLabelText("View"));
+    await user.click(screen.getByRole("option", { name: "Chart" }));
+    expect(screen.getByLabelText("View")).toHaveTextContent("Chart");
+
+    view.rerender(
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <MemoryRouter>
+          <ProjectManagerGanttPage
+            {...defaultPageProps}
+            chartId={0}
+            projectId={42}
+            token={TEST_TOKEN}
+          />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.queryByLabelText("View")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show Controls" }));
+    expect(screen.getByLabelText("View")).toHaveTextContent("Grid");
+
+    view.rerender(
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline />
+        <MemoryRouter>
+          <ProjectManagerGanttPage
+            {...defaultPageProps}
+            chartId={1}
+            projectId={42}
+            token={TEST_TOKEN}
+          />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByLabelText("View")).toHaveTextContent("Chart");
   });
 
   it("renders gantt-specific actions inside the bottom control panel", async () => {

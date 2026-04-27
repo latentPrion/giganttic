@@ -17,8 +17,8 @@ describe("db module facade", () => {
     expect(availableSchemaVersions).toContain(
       configuredRuntimeSchemaSnapshotSubdir,
     );
-    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v10");
-    expect(runtimeSchemaSnapshotSubdir).toBe("v10");
+    expect(configuredRuntimeSchemaSnapshotSubdir).toBe("v11");
+    expect(runtimeSchemaSnapshotSubdir).toBe("v11");
     expect(users).toBeDefined();
   });
 

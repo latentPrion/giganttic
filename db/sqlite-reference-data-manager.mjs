@@ -86,6 +86,7 @@ function ensureV2StyleReferenceData(db, schemaName) {
     || schemaName === "v8"
     || schemaName === "v9"
     || schemaName === "v10"
+    || schemaName === "v11"
   ) {
     for (const scopedAccessObjectType of referenceSeedData.scopedAccessObjectTypes) {
       runReferenceUpsert(
@@ -113,6 +114,7 @@ function ensureReferenceData(db, schemaName) {
       || schemaName === "v8"
       || schemaName === "v9"
       || schemaName === "v10"
+      || schemaName === "v11"
     ) {
       ensureV2StyleReferenceData(db, schemaName);
     } else {

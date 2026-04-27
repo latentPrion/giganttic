@@ -16,20 +16,20 @@ describe("gantt-runtime-chart-cache", () => {
   });
 
   it("stores cache entries per project id without clobbering other projects", () => {
-    setGanttRuntimeChartCacheEntry(4, { serializedXml: "<data id=\"4\"/>", type: "xml" });
-    setGanttRuntimeChartCacheEntry(9, { serializedXml: "<data id=\"9\"/>", type: "xml" });
+    setGanttRuntimeChartCacheEntry(4, 0, { serializedXml: "<data id=\"4\"/>", type: "xml" });
+    setGanttRuntimeChartCacheEntry(9, 0, { serializedXml: "<data id=\"9\"/>", type: "xml" });
 
-    expect(getGanttRuntimeChartCacheEntry(4)?.serializedXml).toContain("id=\"4\"");
-    expect(getGanttRuntimeChartCacheEntry(9)?.serializedXml).toContain("id=\"9\"");
+    expect(getGanttRuntimeChartCacheEntry(4, 0)?.serializedXml).toContain("id=\"4\"");
+    expect(getGanttRuntimeChartCacheEntry(9, 0)?.serializedXml).toContain("id=\"9\"");
   });
 
   it("notifies only listeners subscribed to the updated project id", () => {
     const listener4 = vi.fn();
     const listener9 = vi.fn();
-    const unsubscribe4 = subscribeGanttRuntimeChartCache(4, listener4);
-    const unsubscribe9 = subscribeGanttRuntimeChartCache(9, listener9);
+    const unsubscribe4 = subscribeGanttRuntimeChartCache(4, 0, listener4);
+    const unsubscribe9 = subscribeGanttRuntimeChartCache(9, 0, listener9);
 
-    setGanttRuntimeChartCacheEntry(4, { serializedXml: "<data/>", type: "xml" });
+    setGanttRuntimeChartCacheEntry(4, 0, { serializedXml: "<data/>", type: "xml" });
 
     expect(listener4).toHaveBeenCalledTimes(1);
     expect(listener9).not.toHaveBeenCalled();
@@ -39,22 +39,22 @@ describe("gantt-runtime-chart-cache", () => {
   });
 
   it("clears only one project entry when clear entry is used", () => {
-    setGanttRuntimeChartCacheEntry(4, { serializedXml: "<data id=\"4\"/>", type: "xml" });
-    setGanttRuntimeChartCacheEntry(9, { serializedXml: "<data id=\"9\"/>", type: "xml" });
+    setGanttRuntimeChartCacheEntry(4, 0, { serializedXml: "<data id=\"4\"/>", type: "xml" });
+    setGanttRuntimeChartCacheEntry(9, 0, { serializedXml: "<data id=\"9\"/>", type: "xml" });
 
-    clearGanttRuntimeChartCacheEntry(4);
+    clearGanttRuntimeChartCacheEntry(4, 0);
 
-    expect(getGanttRuntimeChartCacheEntry(4)).toBeUndefined();
-    expect(getGanttRuntimeChartCacheEntry(9)).toBeDefined();
+    expect(getGanttRuntimeChartCacheEntry(4, 0)).toBeUndefined();
+    expect(getGanttRuntimeChartCacheEntry(9, 0)).toBeDefined();
   });
 
   it("rejects duplicate task ids and stores a validation error without overwriting cache", () => {
-    setGanttRuntimeChartCacheEntry(4, {
+    setGanttRuntimeChartCacheEntry(4, 0, {
       serializedXml: "<data><task id=\"stable\"/></data>",
       type: "xml",
     });
 
-    const result = trySetValidatedGanttRuntimeChartCacheEntry(4, {
+    const result = trySetValidatedGanttRuntimeChartCacheEntry(4, 0, {
       serializedXml: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
       type: "xml",
     });
@@ -64,8 +64,8 @@ describe("gantt-runtime-chart-cache", () => {
       code: "duplicate_id",
       taskId: "dup",
     });
-    expect(getGanttRuntimeChartCacheEntry(4)?.serializedXml).toContain("stable");
-    expect(getGanttRuntimeChartValidationError(4)).toMatchObject({
+    expect(getGanttRuntimeChartCacheEntry(4, 0)?.serializedXml).toContain("stable");
+    expect(getGanttRuntimeChartValidationError(4, 0)).toMatchObject({
       code: "duplicate_id",
       taskId: "dup",
     });

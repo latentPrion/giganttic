@@ -7,7 +7,7 @@ import {
 } from "@nestjs/common";
 import { and, asc, count, eq } from "drizzle-orm";
 
-import { projects, taskComments } from "../../../db/index.js";
+import { projectGanttCharts, projects, taskComments } from "../../../db/index.js";
 import type { DiscussionAttachmentSummary } from "../../../common/discussion/discussion.contracts.js";
 import type { AuthContext } from "../auth/auth.types.js";
 import { DatabaseService } from "../database/database.service.js";
@@ -53,11 +53,17 @@ export class TaskCommentService {
   async listComments(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
   ): Promise<{ comments: TaskCommentResponse[] }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
 
@@ -66,7 +72,7 @@ export class TaskCommentService {
       .from(taskComments)
       .where(
         and(
-          eq(taskComments.projectId, projectId),
+          eq(taskComments.projectGanttChartId, projectGanttChartId),
           eq(taskComments.taskId, taskId),
         ),
       )
@@ -83,36 +89,48 @@ export class TaskCommentService {
   async getComment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     commentId: number,
   ): Promise<{ comment: TaskCommentResponse }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
 
-    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     return { comment: await this.buildCommentResponse(record) };
   }
 
   async createComment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     payload: CreateTaskCommentRequest,
   ): Promise<{ comment: TaskCommentResponse }> {
-    this.validateParentComment(projectId, taskId, payload.parentCommentId ?? null);
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
+    this.validateParentComment(projectGanttChartId, taskId, payload.parentCommentId ?? null);
     this.tasksService.ensureTaskMirrorExistsForReadableTask(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
 
     const [created] = this.databaseService.db.insert(taskComments).values({
       createdByUserId: authContext.userId,
       parentCommentId: payload.parentCommentId ?? null,
-      projectId,
+      projectGanttChartId,
       taskId,
     }).returning({ id: taskComments.id }).all();
 
@@ -128,6 +146,7 @@ export class TaskCommentService {
     );
     await this.notificationsService.notifyTaskCommentCreated({
       actorUserId: authContext.userId,
+      chartId,
       commentId: created.id,
       projectId,
       taskId,
@@ -135,28 +154,35 @@ export class TaskCommentService {
     await this.notificationsService.notifyTaskCommentMentions({
       actorUserId: authContext.userId,
       body: payload.body,
+      chartId,
       commentId: created.id,
       projectId,
       taskId,
     });
 
-    const record = this.getCommentRecordOrThrow(projectId, taskId, created.id);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, created.id);
     return { comment: await this.buildCommentResponse(record) };
   }
 
   async updateComment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     commentId: number,
     payload: UpdateTaskCommentRequest,
   ): Promise<{ comment: TaskCommentResponse }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
-    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     this.assertCanEditComment(authContext, projectId, record);
 
     await this.commentBodyStorage.writeTaskCommentBody(
@@ -173,27 +199,34 @@ export class TaskCommentService {
     await this.notificationsService.notifyTaskCommentMentions({
       actorUserId: authContext.userId,
       body: payload.body,
+      chartId,
       commentId,
       projectId,
       taskId,
     });
 
-    const next = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const next = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     return { comment: await this.buildCommentResponse(next) };
   }
 
   async deleteComment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     commentId: number,
   ): Promise<{ deletedCommentId: number }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
-    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     this.assertCanEditComment(authContext, projectId, record);
 
     const replyCountRow = this.databaseService.db
@@ -219,21 +252,27 @@ export class TaskCommentService {
   async deleteCommentAttachment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
   ): Promise<{ deletedAttachmentId: string }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
 
-    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     this.assertCanEditComment(authContext, projectId, record);
 
     const deletedAttachmentId = await this.attachmentService.deleteTaskCommentAttachmentLink(
-      projectId,
+      projectGanttChartId,
       taskId,
       commentId,
       attachmentId,
@@ -245,24 +284,31 @@ export class TaskCommentService {
   async uploadCommentAttachment(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     taskId: string,
     commentId: number,
     buffer: Buffer,
     originalFilename: string,
   ): Promise<{ attachment: DiscussionAttachmentSummary }> {
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
+    );
     this.tasksService.validateTaskReadableForCurrentUser(
       authContext,
       projectId,
+      chartId,
       taskId,
     );
 
-    const record = this.getCommentRecordOrThrow(projectId, taskId, commentId);
+    const record = this.getCommentRecordOrThrow(projectGanttChartId, taskId, commentId);
     this.assertCanEditComment(authContext, projectId, record);
 
     const attachment = await this.attachmentService.createAttachmentAndLinkToTaskComment({
       buffer,
       commentId,
       originalFilename,
+      projectGanttChartId,
       projectId,
       taskId,
       uploadedByUserId: authContext.userId,
@@ -272,15 +318,16 @@ export class TaskCommentService {
   }
 
   async deleteAllCommentBodiesForTask(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
   ): Promise<void> {
+    const projectId = this.resolveProjectIdForChart(projectGanttChartId);
     const rows = this.databaseService.db
       .select({ id: taskComments.id })
       .from(taskComments)
       .where(
         and(
-          eq(taskComments.projectId, projectId),
+          eq(taskComments.projectGanttChartId, projectGanttChartId),
           eq(taskComments.taskId, taskId),
         ),
       )
@@ -299,12 +346,13 @@ export class TaskCommentService {
     record: TaskCommentRecord,
   ): Promise<TaskCommentResponse> {
     const attachments = this.attachmentService.listAttachmentsForTaskComment(
-      record.projectId,
+      record.projectGanttChartId,
       record.taskId,
       record.id,
     );
+    const projectId = this.resolveProjectIdForChart(record.projectGanttChartId);
     const body = await this.commentBodyStorage.readTaskCommentBody(
-      record.projectId,
+      projectId,
       record.taskId,
       record.id,
     );
@@ -324,7 +372,7 @@ export class TaskCommentService {
   }
 
   private validateParentComment(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     parentCommentId: number | null,
   ): void {
@@ -339,7 +387,7 @@ export class TaskCommentService {
 
     if (
       !parent
-      || parent.projectId !== projectId
+      || parent.projectGanttChartId !== projectGanttChartId
       || parent.taskId !== taskId
     ) {
       throw new BadRequestException(PARENT_COMMENT_INVALID_MESSAGE);
@@ -347,7 +395,7 @@ export class TaskCommentService {
   }
 
   private getCommentRecordOrThrow(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
   ): TaskCommentRecord {
@@ -356,7 +404,7 @@ export class TaskCommentService {
       .where(
         and(
           eq(taskComments.id, commentId),
-          eq(taskComments.projectId, projectId),
+          eq(taskComments.projectGanttChartId, projectGanttChartId),
           eq(taskComments.taskId, taskId),
         ),
       )
@@ -383,5 +431,16 @@ export class TaskCommentService {
       projectId,
       COMMENT_EDIT_FORBIDDEN_MESSAGE,
     );
+  }
+
+  private resolveProjectIdForChart(projectGanttChartId: number): number {
+    const row = this.databaseService.db.select({ projectId: projectGanttCharts.projectId })
+      .from(projectGanttCharts)
+      .where(eq(projectGanttCharts.id, projectGanttChartId))
+      .get();
+    if (!row) {
+      throw new NotFoundException(PROJECT_NOT_FOUND_MESSAGE);
+    }
+    return row.projectId;
   }
 }

@@ -21,8 +21,6 @@ import {
   parseProjectKanbanTasksFromXml,
   type ParsedGanttKanbanTask,
 } from "../lib/project-kanban-gantt-parser.js";
-import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
-import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
 import {
   emitProjectManagerIssueUpdatedEvent,
   subscribeProjectManagerIssueUpdatedEvent,
@@ -33,11 +31,14 @@ import {
 } from "../lib/gantt-runtime-chart-cache.js";
 import {
   emitGanttRuntimeMetadataReloadRequestedEvent,
+  subscribeGanttRuntimeChartUpdatedEvent,
 } from "../lib/gantt-runtime-chart-events.js";
 import { updateTaskStatusInChartXml } from "../lib/kanban-task-status-cache-update.js";
 import { useProjectEditAccess } from "../hooks/use-project-edit-access.js";
+import { loadAggregatedProjectChartSources } from "../lib/project-charts-aggregation.js";
 
 interface ProjectManagerKanbanPageProps {
+  chartId?: number;
   currentUserId: number;
   projectId: number | null;
   token: string;
@@ -59,18 +60,15 @@ function createSelectedProjectLabel(projectId: number | null): string {
 
 export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
   const navigate = useNavigate();
-  const ganttRef = useRef<GanttChartHandle | null>(null);
-  const fileManager = useGanttChartFileManager({
-    ganttRef,
-    projectId: props.projectId,
-    token: props.token,
-  });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [issueErrorMessage, setIssueErrorMessage] = useState<string | null>(null);
+  const [taskErrorMessage, setTaskErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(props.projectId !== null);
   const [isUpdatingCardStatus, setIsUpdatingCardStatus] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [tasks, setTasks] = useState<ParsedGanttKanbanTask[]>([]);
+  const chartXmlByIdRef = useRef<Map<number, string>>(new Map());
   const { canEdit: canEditProjectContent } = useProjectEditAccess({
     currentUserId: props.currentUserId,
     projectId: props.projectId,
@@ -90,13 +88,13 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     }
 
     setIsLoading(true);
-    setErrorMessage(null);
+    setIssueErrorMessage(null);
 
     try {
       const issuesResponse = await issuesApi.listIssues(props.token, props.projectId);
       setIssues(issuesResponse.issues);
     } catch (error) {
-      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      setIssueErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
       setIssues([]);
     } finally {
       setIsLoading(false);
@@ -105,7 +103,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
 
   useEffect(() => {
     if (props.projectId === null) {
-      setErrorMessage(null);
+      setTaskErrorMessage(null);
       setIsLoading(false);
       setIssues([]);
       setTasks([]);
@@ -129,40 +127,46 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     });
   }, [props.projectId, reloadIssuesFromBackend]);
 
-  useEffect(() => {
+  const reloadTasksFromAllCharts = useCallback(async () => {
     if (props.projectId === null) {
-      return;
-    }
-
-    if (fileManager.loadErrorMessage) {
-      setErrorMessage(fileManager.loadErrorMessage);
-      setTasks([]);
-      return;
-    }
-
-    if (fileManager.runtimeValidationErrorMessage) {
-      setErrorMessage(fileManager.runtimeValidationErrorMessage);
-      setTasks([]);
-      return;
-    }
-
-    if (fileManager.cache.serializedXml === null) {
+      chartXmlByIdRef.current.clear();
       setTasks([]);
       return;
     }
 
     try {
-      setTasks(parseProjectKanbanTasksFromXml(fileManager.cache.serializedXml));
+      const chartSources = await loadAggregatedProjectChartSources(props.token, props.projectId);
+      const nextChartXmlById = new Map<number, string>();
+      const nextTasks: ParsedGanttKanbanTask[] = [];
+      for (const source of chartSources) {
+        nextChartXmlById.set(source.chartId, source.serializedXml);
+        nextTasks.push(...parseProjectKanbanTasksFromXml(source.serializedXml, new Date(), source.chartId));
+      }
+      chartXmlByIdRef.current = nextChartXmlById;
+      setErrorMessage(null);
+      setTasks(nextTasks);
     } catch (error) {
-      setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      setTaskErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+      chartXmlByIdRef.current.clear();
       setTasks([]);
     }
-  }, [
-    fileManager.cache.serializedXml,
-    fileManager.loadErrorMessage,
-    fileManager.runtimeValidationErrorMessage,
-    props.projectId,
-  ]);
+  }, [props.projectId, props.token]);
+
+  useEffect(() => {
+    void reloadTasksFromAllCharts();
+  }, [reloadTasksFromAllCharts]);
+
+  useEffect(() => {
+    if (props.projectId === null) {
+      return undefined;
+    }
+    return subscribeGanttRuntimeChartUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+      void reloadTasksFromAllCharts();
+    });
+  }, [props.projectId, reloadTasksFromAllCharts]);
 
   async function handleIssueStatusChange(issueId: number, status: IssueStatus): Promise<void> {
     if (props.projectId === null) {
@@ -208,26 +212,32 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
     navigate(createProjectIssueRoute(props.projectId, issueId));
   }
 
-  function openTaskDetail(taskId: string): void {
+  function openTaskDetail(taskId: string, chartId: number): void {
     if (props.projectId === null) {
       return;
     }
-    navigate(createProjectTaskRoute(props.projectId, taskId));
+    navigate(createProjectTaskRoute(props.projectId, taskId, { chartId }));
   }
 
-  function handleTaskStatusChange(taskId: string, status: IssueStatus): void {
+  function handleTaskStatusChange(taskId: string, chartId: number, status: IssueStatus): void {
     if (props.projectId === null || !canEditProjectContent) {
       return;
     }
 
-    const cacheEntry = getGanttRuntimeChartCacheEntry(props.projectId);
-    if (!cacheEntry) {
+    const cacheEntry = getGanttRuntimeChartCacheEntry(props.projectId, chartId)
+      ?? (chartXmlByIdRef.current.has(chartId)
+        ? {
+            serializedXml: chartXmlByIdRef.current.get(chartId)!,
+            type: "xml" as const,
+          }
+        : null);
+    if (!cacheEntry?.serializedXml) {
       return;
     }
 
     try {
       const updatedXml = updateTaskStatusInChartXml(cacheEntry.serializedXml, taskId, status);
-      const result = trySetValidatedGanttRuntimeChartCacheEntry(props.projectId, {
+      const result = trySetValidatedGanttRuntimeChartCacheEntry(props.projectId, chartId, {
         serializedXml: updatedXml,
         type: "xml",
       });
@@ -235,7 +245,8 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
         setErrorMessage(result.error?.message ?? DEFAULT_ERROR_MESSAGE);
         return;
       }
-      emitGanttRuntimeMetadataReloadRequestedEvent({ projectId: props.projectId });
+      emitGanttRuntimeMetadataReloadRequestedEvent({ chartId, projectId: props.projectId });
+      void reloadTasksFromAllCharts();
     } catch (error) {
       setErrorMessage(buildErrorMessage(error, DEFAULT_ERROR_MESSAGE));
     }
@@ -246,7 +257,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       return <Alert severity="info">{MISSING_PROJECT_MESSAGE}</Alert>;
     }
 
-    if (isLoading || fileManager.isLoading) {
+    if (isLoading) {
       return (
         <Stack alignItems="center" direction="row" spacing={1.5}>
           <CircularProgress size={20} />
@@ -255,8 +266,9 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
       );
     }
 
-    if (errorMessage) {
-      return <Alert severity="error">{errorMessage}</Alert>;
+    const combinedErrorMessage = issueErrorMessage ?? taskErrorMessage ?? errorMessage;
+    if (combinedErrorMessage) {
+      return <Alert severity="error">{combinedErrorMessage}</Alert>;
     }
 
     return (
@@ -291,6 +303,7 @@ export function ProjectManagerKanbanPage(props: ProjectManagerKanbanPageProps) {
           </Typography>
           <ProjectManagerProjectNavigation
             authToken={props.token}
+            chartId={props.chartId}
             currentSection="kanban"
             projectId={props.projectId}
           />

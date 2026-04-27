@@ -12,6 +12,7 @@ describe("TaskListItem", () => {
     renderWithTheme(
       <TaskListItem
         task={{
+          chartId: 0,
           id: "mile-1",
           progressPercentage: 100,
           startDate: STARTED_AT,

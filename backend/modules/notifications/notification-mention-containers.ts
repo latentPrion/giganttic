@@ -1,4 +1,5 @@
 export interface MentionContainerDescriptor {
+  chartId: number | null;
   commentId: number | null;
   issueId: number | null;
   mentionContainerType: string;
@@ -17,6 +18,7 @@ export function createMentionContainerKey(
 ): string {
   return [
     String(container.projectId),
+    normalizeContainerSegment(container.chartId),
     normalizeContainerSegment(container.issueId),
     normalizeContainerSegment(container.taskId),
     normalizeContainerSegment(container.commentId),

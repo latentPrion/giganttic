@@ -44,7 +44,7 @@ describe("db version selection pipeline", () => {
     }
   });
 
-  it("advertises v10 as the active schema version", () => {
+  it("advertises v11 as the active schema version", () => {
     expect(availableSchemaVersions).toContain("v4");
     expect(availableSchemaVersions).toContain("v5");
     expect(availableSchemaVersions).toContain("v6");
@@ -52,7 +52,8 @@ describe("db version selection pipeline", () => {
     expect(availableSchemaVersions).toContain("v8");
     expect(availableSchemaVersions).toContain("v9");
     expect(availableSchemaVersions).toContain("v10");
-    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v10");
+    expect(availableSchemaVersions).toContain("v11");
+    expect(dbTestRuntimeConfig.runtimeSchemaSnapshotSubdir).toBe("v11");
   });
 
   it("resolves generated artifact paths from explicit version arguments", () => {
@@ -95,6 +96,10 @@ describe("db version selection pipeline", () => {
     );
     expect(getGeneratedSqlDdlFilePath("v10")).toContain(
       "db/v10/generated-sql-ddl/schema.sql",
+    );
+    expect(getGeneratedSqlDdlDir("v11")).toContain("db/v11/generated-sql-ddl");
+    expect(getGeneratedSqlDdlFilePath("v11")).toContain(
+      "db/v11/generated-sql-ddl/schema.sql",
     );
   });
 

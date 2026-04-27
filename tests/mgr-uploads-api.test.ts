@@ -100,6 +100,7 @@ describe("mgr-uploads api auth matrix", () => {
 
   it("allows a direct project owner without project-manager role", async () => {
     const ownerOnly = await harness.registerUser("mgr-uploads-owner-only");
+    const manager = await harness.registerUser("mgr-uploads-owner-only-manager");
     const projectResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(ownerOnly.accessToken),
       method: "POST",
@@ -116,6 +117,10 @@ describe("mgr-uploads api auth matrix", () => {
       method: "PUT",
       payload: {
         members: [
+          {
+            roleCodes: [PROJECT_MANAGER_ROLE, PROJECT_OWNER_ROLE],
+            userId: manager.user.id,
+          },
           {
             roleCodes: [PROJECT_OWNER_ROLE],
             userId: ownerOnly.user.id,

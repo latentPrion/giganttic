@@ -441,7 +441,7 @@ describe("app routing", () => {
 
     expect(await screen.findByText("Project Kanban Board")).toBeVisible();
     expect(screen.getByText("Selected project: 1")).toBeVisible();
-    expect(await screen.findByRole("heading", { name: "Open" })).toBeVisible();
+    expect(await screen.findByRole("tab", { name: "Kanban Board", selected: true })).toBeVisible();
   });
 
   it("renders the PM tasks SPA for authenticated users", async () => {

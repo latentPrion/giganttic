@@ -41,6 +41,7 @@ export const TASK_COMMENT_MARKDOWN_HELP_TEXT =
   });
 
 interface TaskMarkdownRenderProps {
+  chartId?: number;
   commentId?: number | null;
   markdown: string;
   projectId: number;
@@ -66,7 +67,15 @@ function parseTaskCommentAttachmentUriSuffix(
 }
 
 export function TaskMarkdownRender(props: TaskMarkdownRenderProps) {
-  const { commentId = null, markdown, projectId, showHelpText = false, taskId, token } = props;
+  const {
+    chartId = 0,
+    commentId = null,
+    markdown,
+    projectId,
+    showHelpText = false,
+    taskId,
+    token,
+  } = props;
 
   return (
     <DiscussionMarkdownRender
@@ -78,7 +87,7 @@ export function TaskMarkdownRender(props: TaskMarkdownRenderProps) {
         },
         {
           buildDownloadPath: (attachmentId) =>
-            createTaskAttachmentDownloadPath(projectId, taskId, attachmentId),
+            createTaskAttachmentDownloadPath(projectId, chartId, taskId, attachmentId),
           prefix: GIGANTT_TASK_ATTACHMENT_URL_PREFIX,
         },
         {
@@ -90,6 +99,7 @@ export function TaskMarkdownRender(props: TaskMarkdownRenderProps) {
 
             return createTaskCommentAttachmentDownloadPath(
               projectId,
+              chartId,
               taskId,
               parsed.commentId,
               parsed.attachmentId,

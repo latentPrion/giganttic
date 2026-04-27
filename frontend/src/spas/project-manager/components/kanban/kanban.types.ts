@@ -6,6 +6,7 @@ import type {
 export type KanbanColumnValue = IssueStatus;
 
 export interface GanttTaskCardData {
+  chartId: number;
   id: string;
   isMilestone: boolean;
   progressPercentage: number;

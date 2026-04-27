@@ -34,7 +34,7 @@ describe("gantt-runtime-chart-events", () => {
       projectId: 42,
       serializedXml: "<data><task id=\"42\"/></data>",
     });
-    expect(getGanttRuntimeChartCacheEntry(42)?.serializedXml).toContain("task id=\"42\"");
+    expect(getGanttRuntimeChartCacheEntry(42, 0)?.serializedXml).toContain("task id=\"42\"");
 
     unsubscribe();
   });
@@ -50,7 +50,7 @@ describe("gantt-runtime-chart-events", () => {
 
     expect(didEmit).toBe(false);
     expect(handler).not.toHaveBeenCalled();
-    expect(getGanttRuntimeChartCacheEntry(42)).toBeUndefined();
+    expect(getGanttRuntimeChartCacheEntry(42, 0)).toBeUndefined();
 
     unsubscribe();
   });

@@ -8,6 +8,7 @@ describe("TaskMirrorService", () => {
   const deleteTaskCommentBodyMock = vi.fn();
   const removeOrphanAttachmentsAndFilesMock = vi.fn();
   const selectAllMock = vi.fn();
+  const selectGetMock = vi.fn();
   const deleteRunMock = vi.fn();
   const onConflictDoNothingMock = vi.fn(() => ({ run: vi.fn() }));
   const insertValuesMock = vi.fn(() => ({ onConflictDoNothing: onConflictDoNothingMock }));
@@ -24,6 +25,7 @@ describe("TaskMirrorService", () => {
         from: vi.fn(() => ({
           where: vi.fn(() => ({
             all: selectAllMock,
+            get: selectGetMock,
           })),
         })),
       })),
@@ -59,6 +61,8 @@ describe("TaskMirrorService", () => {
     deleteTaskCommentBodyMock.mockReset();
     removeOrphanAttachmentsAndFilesMock.mockReset();
     selectAllMock.mockReset();
+    selectGetMock.mockReset();
+    selectGetMock.mockReturnValue({ projectId: 42 });
     deleteRunMock.mockReset();
     onConflictDoNothingMock.mockClear();
     insertValuesMock.mockClear();
@@ -67,20 +71,20 @@ describe("TaskMirrorService", () => {
   it("lists canonical task ids from the current chart xml", () => {
     readProjectChartMock.mockReturnValue("<data><task id=\"task-1\"/><task id=\"task-2\"/></data>");
 
-    expect(service.listTaskIdsFromCurrentChart(42)).toEqual(["task-1", "task-2"]);
+    expect(service.listTaskIdsFromCurrentChart(42, 0)).toEqual(["task-1", "task-2"]);
   });
 
   it("creates task mirror rows lazily with conflict-ignore semantics", () => {
     service.ensureTaskMirrorExists(42, "task-7");
 
-    expect(insertValuesMock).toHaveBeenCalledWith({ projectId: 42, taskId: "task-7" });
+    expect(insertValuesMock).toHaveBeenCalledWith({ projectGanttChartId: 42, taskId: "task-7" });
     expect(onConflictDoNothingMock).toHaveBeenCalledTimes(1);
   });
 
   it("throws when a task is missing from the current chart", () => {
     readProjectChartMock.mockReturnValue("<data><task id=\"task-1\"/></data>");
 
-    expect(() => service.assertTaskExistsInCurrentChart(42, "task-7")).toThrowError(
+    expect(() => service.assertTaskExistsInCurrentChart(42, 0, "task-7")).toThrowError(
       new NotFoundException("Task not found"),
     );
   });

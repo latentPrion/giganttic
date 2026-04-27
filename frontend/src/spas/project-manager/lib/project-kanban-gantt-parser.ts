@@ -9,6 +9,7 @@ import {
 import { inferMilestoneStatusesFromXml } from "./project-tasks-history-parser.js";
 
 export interface ParsedGanttKanbanTask {
+  chartId: number;
   column: KanbanColumnValue;
   id: string;
   isMilestone: boolean;
@@ -103,7 +104,7 @@ function parseVisibleTask(
   taskElement: Element,
   now: Date,
   inferredMilestoneStatuses: ReadonlyMap<string, IssueStatus>,
-): ParsedGanttKanbanTask | null {
+): Omit<ParsedGanttKanbanTask, "chartId"> | null {
   const title = parseTaskTitle(taskElement);
   const taskId = taskElement.getAttribute("id")?.trim() ?? "";
   const startDate = parseGanttDate(taskElement.getAttribute("start_date") ?? "");
@@ -136,6 +137,7 @@ function parseVisibleTask(
 export function parseProjectKanbanTasksFromXml(
   xmlContent: string,
   now: Date = new Date(),
+  chartId: number = 0,
 ): ParsedGanttKanbanTask[] {
   const xmlDocument = new DOMParser().parseFromString(xmlContent, "application/xml");
   const parserError = xmlDocument.querySelector("parsererror");
@@ -146,6 +148,9 @@ export function parseProjectKanbanTasksFromXml(
 
   const inferredMilestoneStatuses = inferMilestoneStatusesFromXml(xmlContent);
   return Array.from(xmlDocument.querySelectorAll("task"))
-    .map((taskElement) => parseVisibleTask(taskElement, now, inferredMilestoneStatuses))
+    .map((taskElement) => {
+      const parsed = parseVisibleTask(taskElement, now, inferredMilestoneStatuses);
+      return parsed ? { ...parsed, chartId } : null;
+    })
     .filter((task): task is ParsedGanttKanbanTask => task !== null);
 }

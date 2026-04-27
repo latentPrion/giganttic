@@ -33,14 +33,16 @@ describe("project route paths", () => {
   });
 
   it("creates task detail routes and encodes task ids safely", () => {
-    expect(createProjectTaskRoute(42, "task-7")).toBe("/pm/project/task?projectId=42&id=task-7");
+    expect(createProjectTaskRoute(42, "task-7")).toBe(
+      "/pm/project/task?projectId=42&id=task-7&chartId=0",
+    );
     expect(
       createProjectTaskRoute(42, "phase/one task", {
         commentId: 99,
         tab: "comments",
       }),
     ).toBe(
-      "/pm/project/task?projectId=42&id=phase%2Fone+task&tab=comments&commentId=99",
+      "/pm/project/task?projectId=42&id=phase%2Fone+task&chartId=0&tab=comments&commentId=99",
     );
   });
 });

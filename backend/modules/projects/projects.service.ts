@@ -71,10 +71,13 @@ import { DiscussionJournalStorageService } from "../discussion/discussion-journa
 import { NotificationsService } from "../notifications/notifications.service.js";
 import { TaskMirrorService } from "../tasks/task-mirror.service.js";
 import type {
+  CreateProjectChartRequest,
+  CreateProjectChartResponse,
   CreateProjectRequest,
   DeleteProjectResponse,
   GetProjectChartExportCapabilitiesResponse,
   GetProjectResponse,
+  ListProjectChartsResponse,
   ListProjectsResponse,
   ProjectMember,
   ProjectManager,
@@ -92,6 +95,8 @@ import type {
   UpdateProjectTeamsResponse,
   UpdateProjectRoleAssignmentResponse,
   UpdateProjectChartResponse,
+  UpdateProjectChartMetadataRequest,
+  UpdateProjectChartMetadataResponse,
 } from "./projects.contracts.js";
 
 const LAST_PROJECT_MANAGER_MESSAGE =
@@ -138,6 +143,24 @@ function toProjectResponse(project: typeof projects.$inferSelect): ProjectRespon
     id: project.id,
     name: project.name,
     updatedAt: project.updatedAt.toISOString(),
+  };
+}
+
+function toProjectChartResponse(chart: {
+  chartId: number;
+  createdAt: Date;
+  id: number;
+  name: string;
+  projectId: number;
+  updatedAt: Date;
+}) {
+  return {
+    chartId: chart.chartId,
+    createdAt: chart.createdAt.toISOString(),
+    id: chart.id,
+    name: chart.name,
+    projectId: chart.projectId,
+    updatedAt: chart.updatedAt.toISOString(),
   };
 }
 
@@ -239,6 +262,17 @@ export class ProjectsService {
     return this.buildProjectResponse(createdProjectId);
   }
 
+  async createProjectChart(
+    authContext: AuthContext,
+    projectId: number,
+    payload: CreateProjectChartRequest,
+  ): Promise<CreateProjectChartResponse> {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+    const chart = this.projectChartsService.createProjectChart(projectId, payload.name);
+    return { chart: toProjectChartResponse(chart) };
+  }
+
   getProjectChartExportCapabilities(
     _authContext: AuthContext,
   ): GetProjectChartExportCapabilitiesResponse {
@@ -252,14 +286,27 @@ export class ProjectsService {
     };
   }
 
+  listProjectCharts(
+    authContext: AuthContext,
+    projectId: number,
+  ): ListProjectChartsResponse {
+    this.assertProjectExists(projectId);
+    this.assertCanViewProject(authContext, projectId);
+    return {
+      charts: this.projectChartsService.listProjectCharts(projectId).map(toProjectChartResponse),
+    };
+  }
+
   async getProjectChart(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
   ): Promise<string> {
     this.assertProjectExists(projectId);
     this.assertCanViewProject(authContext, projectId);
+    this.assertProjectChartExists(projectId, chartId);
 
-    const chartXml = this.projectChartsService.readProjectChart(projectId);
+    const chartXml = this.projectChartsService.readProjectChart(projectId, chartId);
     if (chartXml === null) {
       throw new NotFoundException("Project chart not found");
     }
@@ -270,31 +317,56 @@ export class ProjectsService {
   async updateProjectChart(
     authContext: AuthContext,
     projectId: number,
+    chartId: number,
     xml: string,
   ): Promise<UpdateProjectChartResponse> {
     this.assertProjectExists(projectId);
     this.assertCanEditProject(authContext, projectId);
+    this.assertProjectChartExists(projectId, chartId);
 
-    const existingXml = this.projectChartsService.readProjectChart(projectId);
+    const existingXml = this.projectChartsService.readProjectChart(projectId, chartId);
     const previousTaskIds = existingXml === null
       ? []
       : collectProjectChartTaskIdsBestEffort(existingXml);
     const nextTaskIds = validateProjectChartTaskIdsOrThrow(xml);
     const removedTaskIds = listRemovedTaskIds(previousTaskIds, nextTaskIds);
 
-    this.projectChartsService.writeProjectChart(projectId, xml);
+    const chartRecord = this.requireProjectChartRecord(projectId, chartId);
+    this.projectChartsService.writeProjectChart(projectId, chartId, xml);
     await this.taskMirrorService.deleteRemovedTaskMirrorData(
-      projectId,
+      chartRecord.id,
       removedTaskIds,
     );
     await this.notificationsService.notifyTaskStatusChanges({
       actorUserId: authContext.userId,
+      chartId,
       nextXml: xml,
       previousXml: existingXml,
       projectId,
     });
 
     return { ok: true };
+  }
+
+  async updateProjectChartMetadata(
+    authContext: AuthContext,
+    projectId: number,
+    chartId: number,
+    payload: UpdateProjectChartMetadataRequest,
+  ): Promise<UpdateProjectChartMetadataResponse> {
+    this.assertProjectExists(projectId);
+    this.assertCanEditProject(authContext, projectId);
+    const updated = this.projectChartsService.updateProjectChartName(
+      projectId,
+      chartId,
+      payload.name,
+    );
+    if (!updated) {
+      throw new NotFoundException("Project chart not found");
+    }
+    return {
+      chart: toProjectChartResponse(updated),
+    };
   }
 
   private createMsProjectExportCapabilities() {
@@ -475,7 +547,7 @@ export class ProjectsService {
     this.assertCanDeleteProject(authContext, projectId);
 
     this.deleteProjectRecord(projectId);
-    this.projectChartsService.deleteProjectChart(projectId);
+    this.projectChartsService.deleteProjectChartsForProject(projectId);
     await this.journalStorage.deleteProjectJournal(projectId);
     return { deletedProjectId: projectId };
   }
@@ -627,7 +699,7 @@ export class ProjectsService {
 
   private cleanupProjectAfterChartCreationFailure(projectId: number): void {
     try {
-      this.projectChartsService.deleteProjectChart(projectId);
+      this.projectChartsService.deleteProjectChartsForProject(projectId);
     } catch {
       // Best-effort cleanup only; the project row must still be removed.
     }
@@ -719,11 +791,17 @@ export class ProjectsService {
     authContext: AuthContext,
     projectId: number,
   ): void {
-    if (this.canEditProject(authContext, projectId)) {
-      return;
-    }
-
-    throw new ForbiddenException("Not permitted to manage that project");
+    assertProjectAccessibleWithScopedPolicy(
+      this.databaseService.db,
+      authContext,
+      projectId,
+      () => {
+        if (this.canEditProject(authContext, projectId)) {
+          return;
+        }
+        throw new ForbiddenException("Not permitted to manage that project");
+      },
+    );
   }
 
   private assertCanManageProjectMembership(
@@ -783,11 +861,7 @@ export class ProjectsService {
     authContext: AuthContext,
     projectId: number,
   ): void {
-    if (this.canEditProject(authContext, projectId)) {
-      return;
-    }
-
-    throw new ForbiddenException("Not permitted to manage that project");
+    this.assertCanEditProject(authContext, projectId);
   }
 
   private assertCanRevokeProjectRole(
@@ -835,6 +909,20 @@ export class ProjectsService {
     if (!project) {
       throw new NotFoundException("Project not found");
     }
+  }
+
+  private assertProjectChartExists(projectId: number, chartId: number): void {
+    if (!this.projectChartsService.resolveProjectChart(projectId, chartId)) {
+      throw new NotFoundException("Project chart not found");
+    }
+  }
+
+  private requireProjectChartRecord(projectId: number, chartId: number) {
+    const chartRecord = this.projectChartsService.resolveProjectChart(projectId, chartId);
+    if (!chartRecord) {
+      throw new NotFoundException("Project chart not found");
+    }
+    return chartRecord;
   }
 
   private assertProjectRetainsEffectiveManagerAfterMembershipReplace(

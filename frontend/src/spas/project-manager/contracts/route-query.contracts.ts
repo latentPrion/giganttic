@@ -39,6 +39,12 @@ export function parseProjectIdFromSearchParameters(
   return parsePositiveIntegerSearchParameter(searchParameters, "projectId");
 }
 
+export function parseChartIdFromSearchParameters(
+  searchParameters: URLSearchParams,
+): number {
+  return parsePositiveIntegerSearchParameter(searchParameters, "chartId") ?? 0;
+}
+
 export function parseTeamIdFromSearchParameters(
   searchParameters: URLSearchParams,
 ): number | null {

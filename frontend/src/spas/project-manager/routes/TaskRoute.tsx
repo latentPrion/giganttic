@@ -2,6 +2,7 @@ import React from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 
 import {
+  parseChartIdFromSearchParameters,
   parseProjectIdFromSearchParameters,
   parseTaskCommentIdFromSearchParameters,
   parseTaskIdFromSearchParameters,
@@ -20,6 +21,7 @@ export function TaskRoute() {
     <ProjectManagerAuthenticatedRoute>
       {(token, currentUserId) => (
         <ProjectManagerTaskPage
+          chartId={parseChartIdFromSearchParameters(searchParameters)}
           commentId={parseTaskCommentIdFromSearchParameters(searchParameters)}
           currentUserId={currentUserId}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}

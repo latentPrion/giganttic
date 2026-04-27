@@ -37,6 +37,7 @@ vi.mock("../api/issues-api.js", () => ({
 
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
+    listProjectCharts: vi.fn(),
     getProjectChartOrNull: vi.fn(),
   },
 }));
@@ -126,6 +127,10 @@ describe("ProjectManagerKanbanPage", () => {
     issuesApiMock.listIssues.mockReset();
     issuesApiMock.updateIssue.mockReset();
     ganttApiMock.getProjectChartOrNull.mockReset();
+    ganttApiMock.listProjectCharts.mockReset();
+    ganttApiMock.listProjectCharts.mockResolvedValue({
+      charts: [{ chartId: 0, id: 1, name: "default", projectId: 42 }],
+    });
     lobbyApiMock.getProject.mockReset();
     navigateMock.mockReset();
     issuesApiMock.listIssues.mockResolvedValue({
@@ -223,9 +228,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     renderKanbanPage();
 
-    expect(
-      await screen.findByText("Unable to load that project kanban board right now."),
-    ).toBeVisible();
+    expect(await screen.findByText("Unable to load that project kanban board right now.")).toBeVisible();
   });
 
   it("shows an error when chart loading fails with a non-404 status", async () => {
@@ -247,6 +250,7 @@ describe("ProjectManagerKanbanPage", () => {
     expect(await screen.findByText("Select a valid project to view its kanban board.")).toBeVisible();
     expect(issuesApiMock.listIssues).not.toHaveBeenCalled();
     expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
+    expect(ganttApiMock.listProjectCharts).not.toHaveBeenCalled();
   });
 
   it("loads both issues and chart XML for the selected project", async () => {
@@ -254,7 +258,8 @@ describe("ProjectManagerKanbanPage", () => {
 
     await waitFor(() => {
       expect(issuesApiMock.listIssues).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
-      expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+      expect(ganttApiMock.listProjectCharts).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+      expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 0);
     });
   });
 
@@ -332,11 +337,11 @@ describe("ProjectManagerKanbanPage", () => {
     const user = userEvent.setup();
     renderKanbanPage();
 
-    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    const taskCard = await screen.findByTestId("kanban-task-card-0-101");
     await user.click(taskCard);
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=101");
+      expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=101&chartId=0");
     });
   });
 
@@ -347,7 +352,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     renderKanbanPage();
 
-    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    const taskCard = await screen.findByTestId("kanban-task-card-0-101");
     fireEvent.doubleClick(taskCard);
     await user.click(await screen.findByRole("menuitem", { name: "blocked" }));
 
@@ -364,7 +369,7 @@ describe("ProjectManagerKanbanPage", () => {
     const user = userEvent.setup();
     renderKanbanPage();
 
-    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    const taskCard = await screen.findByTestId("kanban-task-card-0-101");
     fireEvent.doubleClick(taskCard);
     await user.click(document.body);
 
@@ -380,7 +385,7 @@ describe("ProjectManagerKanbanPage", () => {
 
     renderKanbanPage();
 
-    const taskCard = await screen.findByTestId("kanban-task-card-101");
+    const taskCard = await screen.findByTestId("kanban-task-card-0-101");
     fireEvent.doubleClick(taskCard);
 
     expect(screen.queryByRole("menuitem", { name: "blocked" })).not.toBeInTheDocument();

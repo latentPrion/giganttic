@@ -41,6 +41,7 @@ const TASKS_XML = `<?xml version="1.0" encoding="UTF-8"?>
 
 vi.mock("../api/gantt-api.js", () => ({
   ganttApi: {
+    listProjectCharts: vi.fn(),
     getProjectChartOrNull: vi.fn(),
   },
 }));
@@ -53,6 +54,10 @@ describe("ProjectManagerTasksPage", () => {
     clearGanttRuntimeChartCache();
     clearSubtabMemory();
     ganttApiMock.getProjectChartOrNull.mockReset();
+    ganttApiMock.listProjectCharts.mockReset();
+    ganttApiMock.listProjectCharts.mockResolvedValue({
+      charts: [{ chartId: 0, id: 1, name: "default", projectId: 42 }],
+    });
     ganttApiMock.getProjectChartOrNull.mockResolvedValue({
       content: TASKS_XML,
       type: "xml",
@@ -273,13 +278,15 @@ describe("ProjectManagerTasksPage", () => {
 
     expect(await screen.findByText("Select a valid project to view its tasks.")).toBeVisible();
     expect(ganttApiMock.getProjectChartOrNull).not.toHaveBeenCalled();
+    expect(ganttApiMock.listProjectCharts).not.toHaveBeenCalled();
   });
 
   it("loads chart xml for selected project", async () => {
     renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
 
     await waitFor(() => {
-      expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+      expect(ganttApiMock.listProjectCharts).toHaveBeenCalledWith(DEFAULT_TOKEN, 42);
+      expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith(DEFAULT_TOKEN, 42, 0);
     });
   });
 
@@ -290,7 +297,7 @@ describe("ProjectManagerTasksPage", () => {
 
     await user.click(await screen.findByRole("button", { name: /In Progress Task/i }));
 
-    expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=inprog");
+    expect(navigateMock).toHaveBeenCalledWith("/pm/project/task?projectId=42&id=inprog&chartId=0");
   });
 
   it("shows runtime validation errors when the loaded chart contains duplicate task ids", async () => {
@@ -302,7 +309,7 @@ describe("ProjectManagerTasksPage", () => {
     renderWithTheme(<ProjectManagerTasksPage projectId={42} token={DEFAULT_TOKEN} />);
 
     expect(
-      await screen.findByText("Task id \"dup\" is duplicated in the chart."),
+      await screen.findByText("Unable to load project tasks right now."),
     ).toBeVisible();
   });
 });

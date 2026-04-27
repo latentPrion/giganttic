@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -21,11 +21,13 @@ import {
   type ParsedProjectTaskHistoryEntry,
   parseProjectTasksHistoryFromXml,
 } from "../lib/project-tasks-history-parser.js";
-import { useGanttChartFileManager } from "../hooks/use-gantt-chart-file-manager.js";
-import type { GanttChartHandle } from "../models/gantt-chart-handle.js";
+import { loadAggregatedProjectChartSources } from "../lib/project-charts-aggregation.js";
+import { subscribeGanttRuntimeChartUpdatedEvent } from "../lib/gantt-runtime-chart-events.js";
+import { validateProjectChartTaskIdsInFrontend } from "../lib/project-chart-task-id-validation.js";
 import { createProjectTaskRoute } from "../routes/project-route-paths.js";
 
 interface ProjectManagerTasksPageProps {
+  chartId?: number;
   projectId: number | null;
   token: string;
 }
@@ -64,12 +66,7 @@ function filterTasksByStatus(
 
 export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
   const navigate = useNavigate();
-  const ganttRef = useRef<GanttChartHandle | null>(null);
-  const fileManager = useGanttChartFileManager({
-    ganttRef,
-    projectId: props.projectId,
-    token: props.token,
-  });
+  const [isLoading, setIsLoading] = useState(props.projectId !== null);
 
   const [activeStatusTab, setActiveStatusTab] = useState<IssueStatus>(() => {
     if (props.projectId === null) {
@@ -107,47 +104,59 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
     if (props.projectId === null) {
       setErrorMessage(null);
       setTasks([]);
+      setIsLoading(false);
       return;
     }
 
-    if (fileManager.loadErrorMessage) {
-      setErrorMessage(fileManager.loadErrorMessage);
-      setTasks([]);
-      return;
+    let isMounted = true;
+
+    async function loadTasksFromAllCharts(): Promise<void> {
+      setIsLoading(true);
+      try {
+        const chartSources = await loadAggregatedProjectChartSources(props.token, props.projectId!);
+        const nextTasks = chartSources.flatMap((source) => {
+          validateProjectChartTaskIdsInFrontend(source.serializedXml);
+          return parseProjectTasksHistoryFromXml(source.serializedXml, new Date(), source.chartId);
+        });
+        if (!isMounted) {
+          return;
+        }
+        setErrorMessage(null);
+        setTasks(nextTasks);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+        setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+        setTasks([]);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     }
 
-    if (fileManager.runtimeValidationErrorMessage) {
-      setErrorMessage(fileManager.runtimeValidationErrorMessage);
-      setTasks([]);
-      return;
-    }
+    void loadTasksFromAllCharts();
 
-    if (fileManager.cache.serializedXml === null) {
-      setErrorMessage(null);
-      setTasks([]);
-      return;
-    }
+    const unsubscribe = subscribeGanttRuntimeChartUpdatedEvent((detail) => {
+      if (detail.projectId !== props.projectId) {
+        return;
+      }
+      void loadTasksFromAllCharts();
+    });
 
-    try {
-      setErrorMessage(null);
-      setTasks(parseProjectTasksHistoryFromXml(fileManager.cache.serializedXml));
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, DEFAULT_ERROR_MESSAGE));
-      setTasks([]);
-    }
-  }, [
-    fileManager.cache.serializedXml,
-    fileManager.loadErrorMessage,
-    fileManager.runtimeValidationErrorMessage,
-    props.projectId,
-  ]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [props.projectId, props.token]);
 
   function renderContent() {
     if (props.projectId === null) {
       return <Alert severity="info">{MISSING_PROJECT_MESSAGE}</Alert>;
     }
 
-    if (fileManager.isLoading) {
+    if (isLoading) {
       return (
         <Stack alignItems="center" direction="row" spacing={1.5}>
           <CircularProgress size={20} />
@@ -168,10 +177,14 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
       <EntityItemList viewMode={VIEW_MODE}>
         {visibleTasks.map((task) => (
           <TaskListItem
-            key={task.id}
+            key={`${task.chartId}:${task.id}`}
             onNavigate={() => {
               if (props.projectId !== null) {
-                navigate(createProjectTaskRoute(props.projectId, task.id));
+                navigate(
+                  createProjectTaskRoute(props.projectId, task.id, {
+                    chartId: task.chartId,
+                  }),
+                );
               }
             }}
             task={task}
@@ -199,6 +212,7 @@ export function ProjectManagerTasksPage(props: ProjectManagerTasksPageProps) {
           </Typography>
           <ProjectManagerProjectNavigation
             authToken={props.token}
+            chartId={props.chartId}
             currentSection="tasks"
             projectId={props.projectId}
           />

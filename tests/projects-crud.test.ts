@@ -244,12 +244,225 @@ describe("projects crud api", () => {
     const chartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(chartResponse.statusCode).toBe(200);
     expect(chartResponse.headers["content-type"]).toContain("application/xml");
     expect(chartResponse.payload).toContain("Edit your new Gantt chart");
+  });
+
+  it("lists project charts and includes the default chart immediately after project creation", async () => {
+    const creator = await harness.registerUser("project-chart-list-default");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "List Default Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const payload = harness.parseJson<{
+      charts: Array<{ chartId: number; id: number; name: string; projectId: number }>;
+    }>(listResponse.payload);
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(payload.charts).toHaveLength(1);
+    expect(payload.charts[0]).toMatchObject({
+      chartId: 0,
+      name: "default",
+      projectId: createdProjectId,
+    });
+  });
+
+  it("creates additional charts with monotonically increasing chartId and materializes chart files", async () => {
+    const creator = await harness.registerUser("project-chart-create-extra");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Extra Charts Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const firstExtraResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Roadmap" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const secondExtraResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Execution" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+
+    expect(firstExtraResponse.statusCode).toBe(201);
+    expect(secondExtraResponse.statusCode).toBe(201);
+
+    const firstExtraChartId = harness.parseJson<{ chart: { chartId: number } }>(
+      firstExtraResponse.payload,
+    ).chart.chartId;
+    const secondExtraChartId = harness.parseJson<{ chart: { chartId: number } }>(
+      secondExtraResponse.payload,
+    ).chart.chartId;
+
+    expect(firstExtraChartId).toBe(1);
+    expect(secondExtraChartId).toBe(2);
+    expect(await readFile(harness.createProjectChartPath(createdProjectId, 1), "utf8")).toContain(
+      "Edit your new Gantt chart",
+    );
+    expect(await readFile(harness.createProjectChartPath(createdProjectId, 2), "utf8")).toContain(
+      "Edit your new Gantt chart",
+    );
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const payload = harness.parseJson<{ charts: Array<{ chartId: number; name: string }> }>(
+      listResponse.payload,
+    );
+    expect(listResponse.statusCode).toBe(200);
+    expect(payload.charts.map((entry) => entry.chartId)).toEqual([0, 1, 2]);
+    expect(payload.charts.map((entry) => entry.name)).toEqual(["default", "Roadmap", "Execution"]);
+  });
+
+  it("updates chart metadata by chartId and keeps sibling chart names unchanged", async () => {
+    const creator = await harness.registerUser("project-chart-metadata-update");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Metadata Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+    const createChartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Iteration A" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    expect(createChartResponse.statusCode).toBe(201);
+
+    const patchResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: { name: "Iteration A - renamed" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/1`,
+    });
+
+    expect(patchResponse.statusCode).toBe(200);
+    expect(
+      harness.parseJson<{ chart: { chartId: number; name: string } }>(
+        patchResponse.payload,
+      ).chart,
+    ).toMatchObject({
+      chartId: 1,
+      name: "Iteration A - renamed",
+    });
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const payload = harness.parseJson<{ charts: Array<{ chartId: number; name: string }> }>(
+      listResponse.payload,
+    );
+    expect(payload.charts).toEqual([
+      expect.objectContaining({ chartId: 0, name: "default" }),
+      expect.objectContaining({ chartId: 1, name: "Iteration A - renamed" }),
+    ]);
+  });
+
+  it("enforces chart route authz for listing, creating, and renaming project charts", async () => {
+    const creator = await harness.registerUser("project-chart-ops-owner");
+    const outsider = await harness.registerUser("project-chart-ops-outsider");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Protected Chart Ops Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const listResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const createChartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "POST",
+      payload: { name: "Nope" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const renameResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(outsider.accessToken),
+      method: "PATCH",
+      payload: { name: "Nope Renamed" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
+    });
+
+    expect(listResponse.statusCode).toBe(403);
+    expect(createChartResponse.statusCode).toBe(403);
+    expect(renameResponse.statusCode).toBe(403);
+  });
+
+  it("returns 404 when creating or renaming charts for missing project or chart ids", async () => {
+    const creator = await harness.registerUser("project-chart-ops-missing");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Existing Project For Missing Chart Assertions",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const createMissingProjectResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "Missing Parent" },
+      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/charts`,
+    });
+    const renameMissingChartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: { name: "No Chart Here" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/99`,
+    });
+
+    expect(createMissingProjectResponse.statusCode).toBe(404);
+    expect(renameMissingChartResponse.statusCode).toBe(404);
+  });
+
+  it("validates chart create and metadata payloads", async () => {
+    const creator = await harness.registerUser("project-chart-ops-validate");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Validation Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const createInvalidResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "POST",
+      payload: { name: "   " },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts`,
+    });
+    const patchInvalidResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "PATCH",
+      payload: { name: "" },
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
+    });
+
+    expect(createInvalidResponse.statusCode).toBe(400);
+    expect(patchInvalidResponse.statusCode).toBe(400);
   });
 
   it("reports cloud-fallback gantt export capabilities by default", async () => {
@@ -367,6 +580,24 @@ describe("projects crud api", () => {
     const chartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
+    });
+
+    expect(chartResponse.statusCode).toBe(404);
+  });
+
+  it("hard-cutover rejects legacy single-chart project route", async () => {
+    const creator = await harness.registerUser("project-chart-legacy-route");
+    const createResponse = await createProject(creator.accessToken, {
+      name: "Legacy Route Chart Project",
+    });
+    const createdProjectId = harness.parseJson<{ project: { id: number } }>(
+      createResponse.payload,
+    ).project.id;
+
+    const chartResponse = await harness.app.inject({
+      headers: harness.createAuthHeaders(creator.accessToken),
+      method: "GET",
       url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
     });
 
@@ -386,7 +617,7 @@ describe("projects crud api", () => {
     const chartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(outsider.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(chartResponse.statusCode).toBe(403);
@@ -398,7 +629,7 @@ describe("projects crud api", () => {
     const chartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/charts/0`,
     });
 
     expect(chartResponse.statusCode).toBe(404);
@@ -434,7 +665,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(200);
@@ -446,7 +677,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     const getResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.payload).toBe(UPDATED_PROJECT_CHART_XML);
@@ -465,7 +696,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(200);
@@ -476,7 +707,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     const getResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(getResponse.statusCode).toBe(200);
@@ -497,7 +728,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(200);
@@ -520,7 +751,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(outsider.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(403);
@@ -533,7 +764,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(404);
@@ -552,7 +783,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: "" },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(400);
@@ -571,7 +802,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: {},
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(400);
@@ -590,7 +821,7 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(putResponse.statusCode).toBe(200);
@@ -611,13 +842,13 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
     const secondPut = await harness.app.inject({
       headers: harness.createAuthHeaders(creator.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(firstPut.statusCode).toBe(200);
@@ -662,13 +893,13 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
     const getChartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(member.accessToken),
       method: "GET",
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
     const putChartResponse = await harness.app.inject({
       headers: harness.createAuthHeaders(member.accessToken),
       method: "PUT",
       payload: { xml: UPDATED_PROJECT_CHART_XML },
-      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/chart`,
+      url: `/stc-proj-mgmt/api/projects/${createdProjectId}/charts/0`,
     });
 
     expect(getChartResponse.statusCode).toBe(200);
@@ -797,12 +1028,12 @@ const UPDATED_PROJECT_CHART_WITH_DEPENDENCIES_XML = `<?xml version="1.0" encodin
       }),
       harness.app.inject({
         method: "GET",
-        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/charts/0`,
       }),
       harness.app.inject({
         method: "PUT",
         payload: { xml: "<data/>" },
-        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/chart`,
+        url: `/stc-proj-mgmt/api/projects/${MISSING_ENTITY_ID}/charts/0`,
       }),
       harness.app.inject({
         method: "POST",

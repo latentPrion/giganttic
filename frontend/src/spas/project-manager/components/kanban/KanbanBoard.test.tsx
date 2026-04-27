@@ -42,6 +42,7 @@ describe("KanbanBoard", () => {
               id: "ganttTask:101",
               kind: "ganttTask",
               task: {
+                chartId: 0,
                 id: "101",
                 isMilestone: false,
                 progressPercentage: 45,

@@ -9,9 +9,14 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   Typography,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 import { lobbyApi } from "../../../lobby/api/lobby-api.js";
 import type { GetProjectResponse } from "../../../lobby/contracts/lobby.contracts.js";
@@ -30,14 +35,17 @@ import {
 } from "../hooks/use-gantt-chart-file-manager.js";
 import { type GgtcTaskExtensionMissingAttributeReport } from "../lib/ggtc-dhtmlx-gantt-extensions-manager.js";
 import { canEditProject } from "../lib/project-edit-permissions.js";
+import { useProjectChartList } from "../hooks/use-project-chart-list.js";
 import type {
   GanttChartHandle,
   GanttSelectedTask,
 } from "../models/gantt-chart-handle.js";
 import type { GanttChartSource } from "../models/gantt-chart-source.js";
 import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
+import { createProjectGanttRoute } from "../routes/project-route-paths.js";
 
 interface ProjectManagerGanttPageProps {
+  chartId?: number;
   currentUserId?: number;
   currentUserRoles?: string[];
   projectId: number | null;
@@ -70,6 +78,16 @@ const EDIT_SELECTED_TASK_LABEL = "Edit Selected Task";
 const MILESTONE_ACTIONS_LABEL = "Milestone actions";
 const TASK_ACTIONS_LABEL = "Task actions";
 const VIEWER_REFRESH_BUTTON_LABEL = "Refresh";
+const CHART_SELECTOR_LABEL = "Chart";
+interface GanttChartControlUiState {
+  displayMode: GanttDisplayMode;
+  isControlPanelExpanded: boolean;
+}
+
+const DEFAULT_CHART_CONTROL_UI_STATE: GanttChartControlUiState = {
+  displayMode: DEFAULT_DISPLAY_MODE,
+  isControlPanelExpanded: true,
+};
 
 function createSelectedProjectLabel(projectId: number | null): string {
   return projectId === null ? "None" : `${projectId}`;
@@ -321,6 +339,7 @@ function renderGanttWorkspace(
   onRefresh: () => void,
   onSelectionChange: (selectedTask: GanttSelectedTask | null) => void,
   onToggleExpanded: () => void,
+  chartId: number,
   projectId: number,
   selectedTask: GanttSelectedTask | null,
   showSavedState: boolean,
@@ -341,6 +360,7 @@ function renderGanttWorkspace(
       {chartSource ? (
         <GanttChart
           ref={chartRef}
+          chartId={chartId}
           chartSource={chartSource}
           displayMode={displayMode}
           projectId={projectId}
@@ -385,9 +405,59 @@ function renderGanttWorkspace(
   );
 }
 
+function cloneDefaultChartControlUiState(): GanttChartControlUiState {
+  return {
+    ...DEFAULT_CHART_CONTROL_UI_STATE,
+  };
+}
+
+function resolveCurrentChartId(chartId: number | undefined): number {
+  return chartId ?? 0;
+}
+
+function createChartControlUiStateScopeKey(projectId: number | null, chartId: number): string {
+  return `${projectId ?? "none"}:${chartId}`;
+}
+
+function resolveChartControlUiState(
+  stateByScopeKey: Record<string, GanttChartControlUiState>,
+  scopeKey: string,
+): GanttChartControlUiState {
+  return stateByScopeKey[scopeKey] ?? cloneDefaultChartControlUiState();
+}
+
+function updateChartControlUiState(
+  stateByScopeKey: Record<string, GanttChartControlUiState>,
+  scopeKey: string,
+  nextState: GanttChartControlUiState,
+): Record<string, GanttChartControlUiState> {
+  const currentState = stateByScopeKey[scopeKey];
+  if (
+    currentState
+    && currentState.displayMode === nextState.displayMode
+    && currentState.isControlPanelExpanded === nextState.isControlPanelExpanded
+  ) {
+    return stateByScopeKey;
+  }
+
+  return {
+    ...stateByScopeKey,
+    [scopeKey]: nextState,
+  };
+}
+
 export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
-  const [displayMode, setDisplayMode] = useState<GanttDisplayMode>(DEFAULT_DISPLAY_MODE);
-  const [isControlPanelExpanded, setIsControlPanelExpanded] = useState(true);
+  const navigate = useNavigate();
+  const currentChartId = resolveCurrentChartId(props.chartId);
+  const currentChartControlUiStateScopeKey = createChartControlUiStateScopeKey(
+    props.projectId,
+    currentChartId,
+  );
+  const [chartControlUiStateByScopeKey, setChartControlUiStateByScopeKey] = useState<
+    Record<string, GanttChartControlUiState>
+  >(() => ({
+    [currentChartControlUiStateScopeKey]: cloneDefaultChartControlUiState(),
+  }));
   const [isRefreshConfirmOpen, setIsRefreshConfirmOpen] = useState(false);
   const [projectResponse, setProjectResponse] = useState<GetProjectResponse | null>(null);
   const [showSavedState, setShowSavedState] = useState(false);
@@ -397,8 +467,21 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   const [isSaveExtensionWarningOpen, setIsSaveExtensionWarningOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<GanttSelectedTask | null>(null);
   const ganttRef = useRef<GanttChartHandle | null>(null);
+  const projectCharts = useProjectChartList({
+    projectId: props.projectId,
+    token: props.token,
+  });
+  const currentChartControlUiState = resolveChartControlUiState(
+    chartControlUiStateByScopeKey,
+    currentChartControlUiStateScopeKey,
+  );
+  const {
+    displayMode,
+    isControlPanelExpanded,
+  } = currentChartControlUiState;
 
   const fileManager = useGanttChartFileManager({
+    chartId: props.chartId ?? 0,
     ganttRef,
     projectId: props.projectId,
     token: props.token,
@@ -475,7 +558,19 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
   );
 
   function toggleControlPanelExpanded(): void {
-    setIsControlPanelExpanded((current) => !current);
+    setChartControlUiStateByScopeKey((current) =>
+      updateChartControlUiState(
+        current,
+        currentChartControlUiStateScopeKey,
+        {
+          ...resolveChartControlUiState(current, currentChartControlUiStateScopeKey),
+          isControlPanelExpanded: !resolveChartControlUiState(
+            current,
+            currentChartControlUiStateScopeKey,
+          )
+            .isControlPanelExpanded,
+        },
+      ));
   }
 
   function addChildTask(): void {
@@ -543,11 +638,22 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
 
   async function confirmRefresh(): Promise<void> {
     setIsRefreshConfirmOpen(false);
-    setDisplayMode(DEFAULT_DISPLAY_MODE);
-    setIsControlPanelExpanded(true);
+    setChartControlUiStateByScopeKey((current) =>
+      updateChartControlUiState(
+        current,
+        currentChartControlUiStateScopeKey,
+        cloneDefaultChartControlUiState(),
+      ));
     setSelectedTask(null);
     setShowSavedState(false);
     await reloadChart();
+  }
+
+  function handleChartSelectionChange(nextChartId: number): void {
+    if (props.projectId === null || nextChartId === (props.chartId ?? 0)) {
+      return;
+    }
+    navigate(createProjectGanttRoute(props.projectId, nextChartId));
   }
 
   return (
@@ -567,12 +673,39 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
           </Typography>
           <ProjectManagerProjectNavigation
             authToken={props.token}
+            chartId={props.chartId}
             currentSection="gantt"
             projectId={props.projectId}
           />
-          <Typography component="h1" variant="h3">
-            {PAGE_TITLE}
-          </Typography>
+          <Stack
+            alignItems={{ sm: "center", xs: "flex-start" }}
+            direction={{ sm: "row", xs: "column" }}
+            spacing={1.5}
+          >
+            <Typography component="h1" variant="h3">
+              {PAGE_TITLE}
+            </Typography>
+            <FormControl disabled={props.projectId === null} size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="gantt-chart-selector-label">{CHART_SELECTOR_LABEL}</InputLabel>
+              <Select
+                label={CHART_SELECTOR_LABEL}
+                labelId="gantt-chart-selector-label"
+                onChange={(event) => {
+                  handleChartSelectionChange(Number(event.target.value));
+                }}
+                value={props.chartId ?? 0}
+              >
+                {projectCharts.length === 0 ? (
+                  <MenuItem value={props.chartId ?? 0}>default</MenuItem>
+                ) : null}
+                {projectCharts.map((chart) => (
+                  <MenuItem key={chart.id} value={chart.chartId}>
+                    {chart.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
           <Typography color="text.secondary" variant="body1">
             Selected project: {createSelectedProjectLabel(props.projectId)}
           </Typography>
@@ -622,7 +755,17 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             convertSelectedTaskToMilestone,
             deleteSelectedMilestone,
             deleteSelectedTask,
-            setDisplayMode,
+            (nextValue) => {
+              setChartControlUiStateByScopeKey((current) =>
+                updateChartControlUiState(
+                  current,
+                  currentChartControlUiStateScopeKey,
+                  {
+                    ...resolveChartControlUiState(current, currentChartControlUiStateScopeKey),
+                    displayMode: nextValue,
+                  },
+                ));
+            },
             editSelectedMilestone,
             editSelectedTask,
             onEditorChange,
@@ -630,6 +773,7 @@ export function ProjectManagerGanttPage(props: ProjectManagerGanttPageProps) {
             requestRefresh,
             onSelectionChange,
             toggleControlPanelExpanded,
+            props.chartId ?? 0,
             props.projectId,
             selectedTask,
             showSavedState,

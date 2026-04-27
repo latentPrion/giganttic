@@ -275,10 +275,10 @@ describe("ProjectManagerIssuesPage", () => {
     );
 
     await user.click(await screen.findByRole("tab", { name: "Details" }));
-    await user.click(screen.getByRole("tab", { name: "Gantt" }));
+    await user.click(screen.getByRole("tab", { name: /Gantt/ }));
 
     expect(navigateMock).toHaveBeenNthCalledWith(1, "/pm/project?projectId=42");
-    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42");
+    expect(navigateMock).toHaveBeenNthCalledWith(2, "/pm/project/gantt?projectId=42&chartId=0");
   });
 
   it("renders the missing-project fallback and disables create when no project is selected", async () => {

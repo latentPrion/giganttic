@@ -63,10 +63,14 @@ export class DiscussionJournalStorageService {
     );
   }
 
-  resolveTaskJournalMarkdownPath(projectId: number, taskId: string): string {
+  resolveTaskJournalMarkdownPath(
+    projectId: number,
+    chartId: number,
+    taskId: string,
+  ): string {
     return path.join(
       this.config.untrustedContentTaskJournalsDir,
-      `${projectId}--${encodeTaskJournalTaskId(taskId)}.md`,
+      `${projectId}-${chartId}--${encodeTaskJournalTaskId(taskId)}.md`,
     );
   }
 
@@ -80,8 +84,14 @@ export class DiscussionJournalStorageService {
     );
   }
 
-  async readTaskJournal(projectId: number, taskId: string): Promise<string | null> {
-    return readFileIfExists(this.resolveTaskJournalMarkdownPath(projectId, taskId));
+  async readTaskJournal(
+    projectId: number,
+    chartId: number,
+    taskId: string,
+  ): Promise<string | null> {
+    return readFileIfExists(
+      this.resolveTaskJournalMarkdownPath(projectId, chartId, taskId),
+    );
   }
 
   async writeProjectJournal(projectId: number, markdown: string): Promise<void> {
@@ -104,12 +114,13 @@ export class DiscussionJournalStorageService {
 
   async writeTaskJournal(
     projectId: number,
+    chartId: number,
     taskId: string,
     markdown: string,
   ): Promise<void> {
     await this.ensureUntrustedDirectoriesExist();
     await writeFile(
-      this.resolveTaskJournalMarkdownPath(projectId, taskId),
+      this.resolveTaskJournalMarkdownPath(projectId, chartId, taskId),
       markdown,
       "utf8",
     );
@@ -123,7 +134,13 @@ export class DiscussionJournalStorageService {
     await unlinkQuietly(this.resolveIssueJournalMarkdownPath(projectId, issueId));
   }
 
-  async deleteTaskJournal(projectId: number, taskId: string): Promise<void> {
-    await unlinkQuietly(this.resolveTaskJournalMarkdownPath(projectId, taskId));
+  async deleteTaskJournal(
+    projectId: number,
+    chartId: number,
+    taskId: string,
+  ): Promise<void> {
+    await unlinkQuietly(
+      this.resolveTaskJournalMarkdownPath(projectId, chartId, taskId),
+    );
   }
 }

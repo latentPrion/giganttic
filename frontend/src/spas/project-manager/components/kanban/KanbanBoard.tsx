@@ -15,9 +15,9 @@ export function KanbanBoard(props: {
   isBusy: boolean;
   onIssueStatusChange: (issueId: number, status: IssueStatus) => void;
   onIssueNavigateToDetail?: (issueId: number) => void;
-  onTaskNavigateToDetail?: (taskId: string) => void;
+  onTaskNavigateToDetail?: (taskId: string, chartId: number) => void;
   taskStatusChangeEnabled?: boolean;
-  onTaskStatusChange: (taskId: string, status: IssueStatus) => void;
+  onTaskStatusChange: (taskId: string, chartId: number, status: IssueStatus) => void;
 }) {
   return (
     <Stack

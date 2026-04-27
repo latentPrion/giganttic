@@ -34,6 +34,7 @@ import type { GanttDisplayMode } from "../models/gantt-display-mode.js";
 export type { GanttChartHandle };
 
 interface GanttChartProps {
+  chartId?: number;
   projectId: number;
   chartSource: GanttChartSource;
   displayMode: GanttDisplayMode;
@@ -462,6 +463,7 @@ function createLayoutForDisplayMode(displayMode: GanttDisplayMode): GanttLayoutC
 
 function attachEditorEvents(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  chartId: number,
   projectId: number,
   isApplyingMilestoneInferenceRef: { current: boolean },
   onEditorChange?: () => void,
@@ -490,6 +492,7 @@ function attachEditorEvents(
       isApplyingMilestoneInferenceRef.current = true;
       try {
         inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+          chartId,
           projectId,
           shouldEmit: true,
         });
@@ -505,6 +508,7 @@ function attachEditorEvents(
 
 function attachLightboxParentNormalizationEvent(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
+  chartId: number,
   projectId: number,
   isApplyingMilestoneInferenceRef: { current: boolean },
 ): string[] {
@@ -544,6 +548,7 @@ function attachLightboxParentNormalizationEvent(
     isApplyingMilestoneInferenceRef.current = true;
     try {
       inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+        chartId,
         projectId,
         shouldEmit: true,
       });
@@ -560,6 +565,7 @@ function attachLightboxParentNormalizationEvent(
 function inferAndApplyMilestoneStatusesToRuntime(
   ganttInstance: ReturnType<typeof getDhtmlxGantt>,
   options: {
+    chartId?: number;
     projectId: number;
     shouldEmit: boolean;
   },
@@ -612,6 +618,7 @@ function inferAndApplyMilestoneStatusesToRuntime(
   const postInferenceXml = didMutate ? serializeGanttXml(ganttInstance) : preInferenceXml;
   if (options.shouldEmit) {
     emitGanttRuntimeChartUpdatedEvent({
+      chartId: options.chartId ?? 0,
       projectId: options.projectId,
       serializedXml: postInferenceXml,
     });
@@ -693,6 +700,7 @@ function initializeMountedGantt(
   containerElement: HTMLDivElement,
   displayMode: GanttDisplayMode,
   interactionsEnabled: boolean,
+  chartId: number,
   projectId: number,
   isApplyingMilestoneInferenceRef: { current: boolean },
   onBaselineReady?: (serializedXml: string) => void,
@@ -710,6 +718,7 @@ function initializeMountedGantt(
   // Ensure milestone statuses are inferred and written into runtime tasks on initial load,
   // so the lightbox shows consistent values even before the first user edit.
   inferAndApplyMilestoneStatusesToRuntime(ganttInstance, {
+    chartId,
     projectId,
     shouldEmit: false,
   });
@@ -718,11 +727,13 @@ function initializeMountedGantt(
     ...attachTaskExtensionAttributeEvents(ganttInstance),
     ...attachLightboxParentNormalizationEvent(
       ganttInstance,
+      chartId,
       projectId,
       isApplyingMilestoneInferenceRef,
     ),
     ...attachEditorEvents(
       ganttInstance,
+      chartId,
       projectId,
       isApplyingMilestoneInferenceRef,
       onEditorChange,
@@ -1002,6 +1013,7 @@ function editSelectedTask(
 export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
   function GanttChart(props, ref) {
     const {
+      chartId = 0,
       projectId,
       chartSource,
       displayMode,
@@ -1124,6 +1136,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
         containerElement,
         displayMode,
         interactionsEnabled,
+        chartId,
         projectId,
         isApplyingMilestoneInferenceRef,
         onBaselineReady,
@@ -1148,6 +1161,7 @@ export const GanttChart = forwardRef<GanttChartHandle, GanttChartProps>(
       chartSource,
       displayMode,
       interactionsEnabled,
+      chartId,
       projectId,
       onBaselineReady,
       onEditorChange,

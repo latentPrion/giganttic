@@ -7,6 +7,7 @@ import { DiscussionAttachmentsPanel } from "../discussion/DiscussionAttachmentsP
 
 interface TaskAttachmentsPanelProps {
   canManageAttachments?: boolean;
+  chartId?: number;
   projectId: number;
   sectionId?: string;
   taskId: string;
@@ -15,7 +16,8 @@ interface TaskAttachmentsPanelProps {
 }
 
 export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
-  const { canManageAttachments = true, projectId, sectionId, taskId, taskTab, token } = props;
+  const { canManageAttachments = true, chartId = 0, projectId, sectionId, taskId, taskTab, token } =
+    props;
 
   return (
     <DiscussionAttachmentsPanel
@@ -24,19 +26,19 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
           const response = await taskAttachmentsApi.deleteAttachment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             attachmentId,
           );
           emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
           return response;
         },
         listAttachments: async () =>
-          taskAttachmentsApi.listAttachments(token, projectId, taskId),
+          taskAttachmentsApi.listAttachments(token, projectId, { chartId, taskId }),
         uploadAttachment: async (file) => {
           const response = await taskAttachmentsApi.uploadAttachment(
             token,
             projectId,
-            taskId,
+            { chartId, taskId },
             file,
           );
           emitProjectManagerTaskDiscussionStateEvent({ projectId, taskId });
@@ -48,7 +50,7 @@ export function TaskAttachmentsPanel(props: TaskAttachmentsPanelProps) {
       isActive={taskTab === "attachments"}
       panelTitle="Task-level attachments"
       resolveAttachmentDownloadPath={(attachmentId) =>
-        createTaskAttachmentDownloadPath(projectId, taskId, attachmentId)}
+        createTaskAttachmentDownloadPath(projectId, chartId, taskId, attachmentId)}
       sectionId={sectionId}
       token={token}
     />

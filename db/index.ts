@@ -15,6 +15,7 @@ import * as v7 from "./v7/index.js";
 import * as v8 from "./v8/index.js";
 import * as v9 from "./v9/index.js";
 import * as v10 from "./v10/index.js";
+import * as v11 from "./v11/index.js";
 
 const schemaModules = {
   v1,
@@ -27,6 +28,7 @@ const schemaModules = {
   v8,
   v9,
   v10,
+  v11,
 } as const;
 
 type SchemaModuleVersion = keyof typeof schemaModules;
@@ -37,7 +39,7 @@ const runtimeSchemaSnapshotSubdir = resolveRuntimeSchemaSnapshotSubdir(
 
 const activeDbModule = schemaModules[
   runtimeSchemaSnapshotSubdir as SchemaModuleVersion
-] as typeof v10;
+] as typeof v11;
 
 export {
   availableSchemaVersions,
@@ -134,6 +136,8 @@ export const {
   notificationsSelectSchema,
   projectRoleCodes,
   projectRoles,
+  projectGanttCharts,
+  projectGanttChartsRelations,
   projectRolesInsertSchema,
   projectRolesRelations,
   projectRolesSelectSchema,

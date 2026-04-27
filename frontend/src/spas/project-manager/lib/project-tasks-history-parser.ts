@@ -71,6 +71,7 @@ function emitDebugLog(
 }
 
 export interface ParsedProjectTaskHistoryEntry {
+  chartId: number;
   id: string;
   progressPercentage: number;
   startDate: string;
@@ -311,8 +312,13 @@ export function inferMilestoneStatusesFromXml(xmlContent: string): Map<string, I
   return inferred;
 }
 
-function toHistoryEntry(task: ParsedTaskNode, status: IssueStatus): ParsedProjectTaskHistoryEntry {
+function toHistoryEntry(
+  task: ParsedTaskNode,
+  status: IssueStatus,
+  chartId: number,
+): ParsedProjectTaskHistoryEntry {
   return {
+    chartId,
     id: task.id,
     progressPercentage: task.progressPercentage,
     startDate: task.startDate!.toISOString(),
@@ -337,6 +343,7 @@ function toTaskDetail(task: ParsedTaskNode, status: IssueStatus): ParsedProjectT
 export function parseProjectTasksHistoryFromXml(
   xmlContent: string,
   now: Date = new Date(),
+  chartId: number = 0,
 ): ParsedProjectTaskHistoryEntry[] {
   const runId = `tasks-parse-${Date.now()}`;
   const xmlDocument = parseChartXmlDocument(xmlContent);
@@ -348,7 +355,12 @@ export function parseProjectTasksHistoryFromXml(
   const allTasks = Array.from(tasksById.values());
   const displayableTasks = allTasks.filter((task) => isDisplayableTask(task, now));
   const historyEntries = displayableTasks
-    .map((task) => toHistoryEntry(task, task.type === "milestone" ? resolveTaskStatus(task.id) : task.status));
+    .map((task) =>
+      toHistoryEntry(
+        task,
+        task.type === "milestone" ? resolveTaskStatus(task.id) : task.status,
+        chartId,
+      ));
   const statusCounts = historyEntries.reduce((acc, entry) => {
     acc[entry.status] = (acc[entry.status] ?? 0) + 1;
     return acc;

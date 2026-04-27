@@ -8,20 +8,25 @@ import {
 import { createDiscussionAttachmentsApi } from "./discussion-api-factory.js";
 import { createTaskAttachmentDownloadPath } from "./task-attachment-paths.js";
 
-function taskAttachmentsCollectionPath(projectId: number, taskId: string): string {
-  return `/projects/${projectId}/tasks/${encodeURIComponent(taskId)}/attachments`;
+interface TaskSubjectId {
+  chartId: number;
+  taskId: string;
+}
+
+function taskAttachmentsCollectionPath(projectId: number, subject: TaskSubjectId): string {
+  return `/projects/${projectId}/charts/${subject.chartId}/tasks/${encodeURIComponent(subject.taskId)}/attachments`;
 }
 
 function taskAttachmentItemPath(
   projectId: number,
-  taskId: string,
+  subject: TaskSubjectId,
   attachmentId: string,
 ): string {
-  return `${taskAttachmentsCollectionPath(projectId, taskId)}/${encodeURIComponent(attachmentId)}`;
+  return `${taskAttachmentsCollectionPath(projectId, subject)}/${encodeURIComponent(attachmentId)}`;
 }
 
 export const taskAttachmentsApi = createDiscussionAttachmentsApi<
-  string,
+  TaskSubjectId,
   DeleteTaskAttachmentResponse,
   ListTaskAttachmentsResponse,
   { attachment: unknown }

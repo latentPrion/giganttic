@@ -68,7 +68,7 @@ describe("useGanttChartFileManager", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith("token-a", 42);
+    expect(ganttApiMock.getProjectChartOrNull).toHaveBeenCalledWith("token-a", 42, 0);
     expect(result.current.chartSource).toEqual({ content: SERVER_XML, type: "xml" });
     expect(result.current.hasServerChart).toBe(true);
     expect(result.current.loadErrorMessage).toBeNull();
@@ -275,7 +275,7 @@ describe("useGanttChartFileManager", () => {
       expect(persistResult.missingExtensionAttributeReports).toEqual([]);
     });
 
-    expect(ganttApiMock.putProjectChart).toHaveBeenCalledWith("tok-e", 5, MODIFIED_XML);
+    expect(ganttApiMock.putProjectChart).toHaveBeenCalledWith("tok-e", 5, MODIFIED_XML, 0);
     expect(result.current.isDirty).toBe(false);
     expect(result.current.hasServerChart).toBe(true);
     expect(result.current.persistErrorMessage).toBeNull();
@@ -312,6 +312,7 @@ describe("useGanttChartFileManager", () => {
       "tok-progress",
       77,
       expect.stringContaining("progress=\"0.73\""),
+      0,
     );
   });
 
@@ -460,6 +461,7 @@ describe("useGanttChartFileManager", () => {
       "tok-i",
       8,
       DEFAULT_PROJECT_CHART_XML,
+      0,
     );
     expect(result.current.chartSource).toEqual({
       content: DEFAULT_PROJECT_CHART_XML,
@@ -487,7 +489,7 @@ describe("useGanttChartFileManager", () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    setGanttRuntimeChartCacheEntry(42, {
+    setGanttRuntimeChartCacheEntry(42, 0, {
       serializedXml: "<data><task id=\"cache-task\"/></data>",
       type: "xml",
     });
@@ -616,7 +618,7 @@ describe("useGanttChartFileManager", () => {
     });
 
     act(() => {
-      trySetValidatedGanttRuntimeChartCacheEntry(13, {
+      trySetValidatedGanttRuntimeChartCacheEntry(13, 0, {
         serializedXml: "<data><task id=\"dup\"/><task id=\"dup\"/></data>",
         type: "xml",
       });

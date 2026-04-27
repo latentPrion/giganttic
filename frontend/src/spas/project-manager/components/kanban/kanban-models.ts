@@ -49,7 +49,7 @@ function createIssueCards(issues: Issue[]): KanbanCardModel[] {
 function createTaskCards(tasks: ParsedGanttKanbanTask[]): KanbanCardModel[] {
   return sortTasksForKanban(tasks).map((task) => ({
     column: task.column,
-    id: `ganttTask:${task.id}`,
+    id: `ganttTask:${task.chartId}:${task.id}`,
     kind: "ganttTask",
     task,
     title: task.title,

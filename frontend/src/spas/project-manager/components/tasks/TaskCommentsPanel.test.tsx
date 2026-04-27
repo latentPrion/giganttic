@@ -110,7 +110,7 @@ describe("TaskCommentsPanel", () => {
       expect(taskCommentsApiMock.createComment).toHaveBeenCalledWith(
         "pm-token",
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
         { body: "A new task comment body", parentCommentId: undefined },
       );
     });
@@ -221,7 +221,7 @@ describe("TaskCommentsPanel", () => {
       expect(taskCommentsApiMock.createComment).toHaveBeenCalledWith(
         "pm-token",
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
         { body: "A new task comment body", parentCommentId: undefined },
       );
     });
@@ -251,7 +251,7 @@ describe("TaskCommentsPanel", () => {
       expect(taskCommentsApiMock.deleteCommentAttachment).toHaveBeenCalledWith(
         "pm-token",
         42,
-        "task-7",
+        { chartId: 0, taskId: "task-7" },
         2,
         "att-t-1",
       );

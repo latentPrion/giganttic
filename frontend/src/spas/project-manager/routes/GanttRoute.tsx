@@ -1,6 +1,9 @@
 import React from "react";
 import { useSearchParams } from "react-router-dom";
-import { parseProjectIdFromSearchParameters } from "../contracts/route-query.contracts.js";
+import {
+  parseChartIdFromSearchParameters,
+  parseProjectIdFromSearchParameters,
+} from "../contracts/route-query.contracts.js";
 import { ProjectManagerGanttPage } from "../pages/ProjectManagerGanttPage.js";
 import { ProjectManagerAuthenticatedRoute } from "./ProjectManagerAuthenticatedRoute.js";
 
@@ -11,6 +14,7 @@ export function GanttRoute() {
     <ProjectManagerAuthenticatedRoute>
       {(token, currentUserId, currentUserRoles) => (
         <ProjectManagerGanttPage
+          chartId={parseChartIdFromSearchParameters(searchParameters)}
           currentUserId={currentUserId}
           currentUserRoles={currentUserRoles}
           projectId={parseProjectIdFromSearchParameters(searchParameters)}

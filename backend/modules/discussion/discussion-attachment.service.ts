@@ -49,11 +49,11 @@ type AttachmentLinkInput =
   | { kind: "project"; projectId: number }
   | { issueId: number; kind: "issue" }
   | { commentId: number; issueId: number; kind: "issue-comment" }
-  | { kind: "task"; projectId: number; taskId: string }
+  | { kind: "task"; projectGanttChartId: number; taskId: string }
   | {
     commentId: number;
     kind: "task-comment";
-    projectId: number;
+    projectGanttChartId: number;
     taskId: string;
   };
 
@@ -148,14 +148,14 @@ export class DiscussionAttachmentService {
     );
   }
 
-  countTaskLevelAttachments(projectId: number, taskId: string): number {
+  countTaskLevelAttachments(projectGanttChartId: number, taskId: string): number {
     return this.countByQuery(
       this.databaseService.db
         .select({ value: count() })
         .from(taskAttachments)
         .where(
           and(
-            eq(taskAttachments.projectId, projectId),
+            eq(taskAttachments.projectGanttChartId, projectGanttChartId),
             eq(taskAttachments.taskId, taskId),
           ),
         )
@@ -164,7 +164,7 @@ export class DiscussionAttachmentService {
   }
 
   countTaskCommentAttachments(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
   ): number {
@@ -174,7 +174,7 @@ export class DiscussionAttachmentService {
         .from(taskCommentsAttachments)
         .where(
           and(
-            eq(taskCommentsAttachments.projectId, projectId),
+            eq(taskCommentsAttachments.projectGanttChartId, projectGanttChartId),
             eq(taskCommentsAttachments.taskId, taskId),
             eq(taskCommentsAttachments.commentId, commentId),
           ),
@@ -197,19 +197,19 @@ export class DiscussionAttachmentService {
     );
   }
 
-  assertCanAddTaskAttachment(projectId: number, taskId: string): void {
+  assertCanAddTaskAttachment(projectGanttChartId: number, taskId: string): void {
     this.assertWithinAttachmentLimit(
-      this.countTaskLevelAttachments(projectId, taskId),
+      this.countTaskLevelAttachments(projectGanttChartId, taskId),
     );
   }
 
   assertCanAddTaskCommentAttachment(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
   ): void {
     this.assertWithinAttachmentLimit(
-      this.countTaskCommentAttachments(projectId, taskId, commentId),
+      this.countTaskCommentAttachments(projectGanttChartId, taskId, commentId),
     );
   }
 
@@ -287,16 +287,17 @@ export class DiscussionAttachmentService {
     buffer: Buffer;
     originalFilename: string;
     projectId: number;
+    projectGanttChartId: number;
     taskId: string;
     uploadedByUserId: number;
   }): Promise<AttachmentSummary> {
-    this.assertCanAddTaskAttachment(input.projectId, input.taskId);
+    this.assertCanAddTaskAttachment(input.projectGanttChartId, input.taskId);
 
     return this.persistAttachmentAndInsert({
       buffer: input.buffer,
       link: {
         kind: "task",
-        projectId: input.projectId,
+        projectGanttChartId: input.projectGanttChartId,
         taskId: input.taskId,
       },
       originalFilename: input.originalFilename,
@@ -313,12 +314,17 @@ export class DiscussionAttachmentService {
     commentId: number;
     originalFilename: string;
     projectId: number;
+    projectGanttChartId: number;
     taskId: string;
     uploadedByUserId: number;
   }): Promise<AttachmentSummary> {
-    this.assertTaskCommentExists(input.projectId, input.taskId, input.commentId);
+    this.assertTaskCommentExists(
+      input.projectGanttChartId,
+      input.taskId,
+      input.commentId,
+    );
     this.assertCanAddTaskCommentAttachment(
-      input.projectId,
+      input.projectGanttChartId,
       input.taskId,
       input.commentId,
     );
@@ -328,7 +334,7 @@ export class DiscussionAttachmentService {
       link: {
         commentId: input.commentId,
         kind: "task-comment",
-        projectId: input.projectId,
+        projectGanttChartId: input.projectGanttChartId,
         taskId: input.taskId,
       },
       originalFilename: input.originalFilename,
@@ -391,7 +397,7 @@ export class DiscussionAttachmentService {
   }
 
   listTaskLevelAttachmentRows(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
   ): AttachmentRow[] {
     return this.databaseService.db
@@ -403,7 +409,7 @@ export class DiscussionAttachmentService {
       )
       .where(
         and(
-          eq(taskAttachments.projectId, projectId),
+          eq(taskAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskAttachments.taskId, taskId),
         ),
       )
@@ -413,7 +419,7 @@ export class DiscussionAttachmentService {
   }
 
   listAttachmentsForTaskComment(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
   ): AttachmentRow[] {
@@ -426,7 +432,7 @@ export class DiscussionAttachmentService {
       )
       .where(
         and(
-          eq(taskCommentsAttachments.projectId, projectId),
+          eq(taskCommentsAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskCommentsAttachments.taskId, taskId),
           eq(taskCommentsAttachments.commentId, commentId),
         ),
@@ -502,17 +508,21 @@ export class DiscussionAttachmentService {
   }
 
   async deleteTaskAttachmentLink(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     attachmentId: string,
   ): Promise<string> {
-    const linked = this.requireTaskAttachmentLink(projectId, taskId, attachmentId);
+    const linked = this.requireTaskAttachmentLink(
+      projectGanttChartId,
+      taskId,
+      attachmentId,
+    );
 
     this.databaseService.db
       .delete(taskAttachments)
       .where(
         and(
-          eq(taskAttachments.projectId, projectId),
+          eq(taskAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskAttachments.taskId, taskId),
           eq(taskAttachments.attachmentId, attachmentId),
         ),
@@ -524,13 +534,13 @@ export class DiscussionAttachmentService {
   }
 
   async deleteTaskCommentAttachmentLink(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
   ): Promise<string> {
     const linked = this.requireTaskCommentAttachmentLink(
-      projectId,
+      projectGanttChartId,
       taskId,
       commentId,
       attachmentId,
@@ -540,7 +550,7 @@ export class DiscussionAttachmentService {
       .delete(taskCommentsAttachments)
       .where(
         and(
-          eq(taskCommentsAttachments.projectId, projectId),
+          eq(taskCommentsAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskCommentsAttachments.taskId, taskId),
           eq(taskCommentsAttachments.commentId, commentId),
           eq(taskCommentsAttachments.attachmentId, attachmentId),
@@ -590,11 +600,11 @@ export class DiscussionAttachmentService {
   }
 
   requireAttachmentLinkedToTask(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     attachmentId: string,
   ): AttachmentRow {
-    return this.requireTaskAttachmentRow(projectId, taskId, attachmentId);
+    return this.requireTaskAttachmentRow(projectGanttChartId, taskId, attachmentId);
   }
 
   requireAttachmentLinkedToIssueComment(
@@ -608,14 +618,14 @@ export class DiscussionAttachmentService {
   }
 
   requireAttachmentLinkedToTaskComment(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
   ): AttachmentRow {
-    this.assertTaskCommentExists(projectId, taskId, commentId);
+    this.assertTaskCommentExists(projectGanttChartId, taskId, commentId);
     return this.requireTaskCommentAttachmentRow(
-      projectId,
+      projectGanttChartId,
       taskId,
       commentId,
       attachmentId,
@@ -734,7 +744,7 @@ export class DiscussionAttachmentService {
   }
 
   private assertTaskCommentExists(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
   ): void {
@@ -744,7 +754,7 @@ export class DiscussionAttachmentService {
       .where(
         and(
           eq(taskComments.id, commentId),
-          eq(taskComments.projectId, projectId),
+          eq(taskComments.projectGanttChartId, projectGanttChartId),
           eq(taskComments.taskId, taskId),
         ),
       )
@@ -813,11 +823,15 @@ export class DiscussionAttachmentService {
   }
 
   private requireTaskAttachmentLink(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     attachmentId: string,
   ): { id: string } {
-    const linked = this.requireTaskAttachmentRow(projectId, taskId, attachmentId);
+    const linked = this.requireTaskAttachmentRow(
+      projectGanttChartId,
+      taskId,
+      attachmentId,
+    );
 
     if (!linked) {
       throw new NotFoundException("Attachment not found");
@@ -827,13 +841,13 @@ export class DiscussionAttachmentService {
   }
 
   private requireTaskCommentAttachmentLink(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
   ): { id: string } {
     const linked = this.requireTaskCommentAttachmentRow(
-      projectId,
+      projectGanttChartId,
       taskId,
       commentId,
       attachmentId,
@@ -901,7 +915,7 @@ export class DiscussionAttachmentService {
   }
 
   private requireTaskAttachmentRow(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     attachmentId: string,
   ): AttachmentRow {
@@ -914,7 +928,7 @@ export class DiscussionAttachmentService {
       )
       .where(
         and(
-          eq(taskAttachments.projectId, projectId),
+          eq(taskAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskAttachments.taskId, taskId),
           eq(taskAttachments.attachmentId, attachmentId),
         ),
@@ -929,7 +943,7 @@ export class DiscussionAttachmentService {
   }
 
   private requireTaskCommentAttachmentRow(
-    projectId: number,
+    projectGanttChartId: number,
     taskId: string,
     commentId: number,
     attachmentId: string,
@@ -943,7 +957,7 @@ export class DiscussionAttachmentService {
       )
       .where(
         and(
-          eq(taskCommentsAttachments.projectId, projectId),
+          eq(taskCommentsAttachments.projectGanttChartId, projectGanttChartId),
           eq(taskCommentsAttachments.taskId, taskId),
           eq(taskCommentsAttachments.commentId, commentId),
           eq(taskCommentsAttachments.attachmentId, attachmentId),
@@ -1054,7 +1068,7 @@ export class DiscussionAttachmentService {
     if (link.kind === "task") {
       this.databaseService.db.insert(taskAttachments).values({
         attachmentId,
-        projectId: link.projectId,
+        projectGanttChartId: link.projectGanttChartId,
         taskId: link.taskId,
       }).run();
       return;
@@ -1063,7 +1077,7 @@ export class DiscussionAttachmentService {
     this.databaseService.db.insert(taskCommentsAttachments).values({
       attachmentId,
       commentId: link.commentId,
-      projectId: link.projectId,
+      projectGanttChartId: link.projectGanttChartId,
       taskId: link.taskId,
     }).run();
   }

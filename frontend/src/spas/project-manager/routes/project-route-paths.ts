@@ -75,20 +75,20 @@ export function createProjectManagerUserRoute(userId: number): string {
   return `${USER_ROUTE_PATH}?userId=${userId}`;
 }
 
-export function createProjectGanttRoute(projectId: number): string {
-  return `${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=${projectId}`;
+export function createProjectGanttRoute(projectId: number, chartId: number = 0): string {
+  return `${PROJECT_MANAGER_GANTT_ROUTE_PATH}?projectId=${projectId}&chartId=${chartId}`;
 }
 
-export function createProjectKanbanRoute(projectId: number): string {
-  return `${PROJECT_MANAGER_KANBAN_ROUTE_PATH}?projectId=${projectId}`;
+export function createProjectKanbanRoute(projectId: number, chartId: number = 0): string {
+  return `${PROJECT_MANAGER_KANBAN_ROUTE_PATH}?projectId=${projectId}&chartId=${chartId}`;
 }
 
 export function createProjectIssuesRoute(projectId: number): string {
   return `${PROJECT_MANAGER_ISSUES_ROUTE_PATH}?projectId=${projectId}`;
 }
 
-export function createProjectTasksRoute(projectId: number): string {
-  return `${PROJECT_MANAGER_TASKS_ROUTE_PATH}?projectId=${projectId}`;
+export function createProjectTasksRoute(projectId: number, chartId: number = 0): string {
+  return `${PROJECT_MANAGER_TASKS_ROUTE_PATH}?projectId=${projectId}&chartId=${chartId}`;
 }
 
 export function createProjectNotificationsRoute(): string {
@@ -119,11 +119,12 @@ export function createProjectIssueRoute(
 export function createProjectTaskRoute(
   projectId: number,
   taskId: string,
-  options: { commentId?: number | null; tab?: TaskDetailTab } = {},
+  options: { chartId?: number | null; commentId?: number | null; tab?: TaskDetailTab } = {},
 ): string {
   const parameters = new URLSearchParams();
   parameters.set("projectId", String(projectId));
   parameters.set("id", taskId);
+  parameters.set("chartId", String(options.chartId ?? 0));
 
   const tab = options.tab ?? "details";
   if (tab !== "details") {

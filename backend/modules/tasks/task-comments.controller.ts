@@ -47,7 +47,7 @@ function requireUploadedBuffer(file: MemoryUploadedFile | undefined): Buffer {
 }
 
 @Authenticated()
-@Controller("projects/:projectId/tasks/:taskId/comments")
+@Controller("projects/:projectId/charts/:chartId/tasks/:taskId/comments")
 export class TaskCommentsController {
   constructor(
     @Inject(TaskCommentService)
@@ -63,12 +63,13 @@ export class TaskCommentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
 
     return listTaskCommentsResponseSchema.parse(
       await this.taskCommentService.listComments(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
       ),
     );
@@ -80,12 +81,13 @@ export class TaskCommentsController {
     @Param(new ZodValidationPipe(taskCommentsRouteParamsSchema)) params: unknown,
     @Body(new ZodValidationPipe(createTaskCommentRequestSchema)) body: unknown,
   ) {
-    const { projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
+    const { chartId, projectId, taskId } = taskCommentsRouteParamsSchema.parse(params);
 
     return getTaskCommentResponseSchema.parse(
       await this.taskCommentService.createComment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         body as never,
       ),
@@ -97,7 +99,7 @@ export class TaskCommentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentRouteParamsSchema)) params: unknown,
   ) {
-    const { commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
+    const { chartId, commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
       params,
     );
 
@@ -105,6 +107,7 @@ export class TaskCommentsController {
       await this.taskCommentService.getComment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         commentId,
       ),
@@ -117,7 +120,7 @@ export class TaskCommentsController {
     @Param(new ZodValidationPipe(taskCommentRouteParamsSchema)) params: unknown,
     @Body(new ZodValidationPipe(updateTaskCommentRequestSchema)) body: unknown,
   ) {
-    const { commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
+    const { chartId, commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
       params,
     );
 
@@ -125,6 +128,7 @@ export class TaskCommentsController {
       await this.taskCommentService.updateComment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         commentId,
         body as never,
@@ -137,7 +141,7 @@ export class TaskCommentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentRouteParamsSchema)) params: unknown,
   ) {
-    const { commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
+    const { chartId, commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
       params,
     );
 
@@ -145,6 +149,7 @@ export class TaskCommentsController {
       await this.taskCommentService.deleteComment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         commentId,
       ),
@@ -156,13 +161,14 @@ export class TaskCommentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentAttachmentRouteParamsSchema)) params: unknown,
   ) {
-    const { attachmentId, commentId, projectId, taskId } =
+    const { attachmentId, chartId, commentId, projectId, taskId } =
       taskCommentAttachmentRouteParamsSchema.parse(params);
 
     return deleteTaskAttachmentResponseSchema.parse(
       await this.taskCommentService.deleteCommentAttachment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         commentId,
         attachmentId,
@@ -177,7 +183,7 @@ export class TaskCommentsController {
     @Param(new ZodValidationPipe(taskCommentRouteParamsSchema)) params: unknown,
     @UploadedMemoryFile() file: MemoryUploadedFile | undefined,
   ) {
-    const { commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
+    const { chartId, commentId, projectId, taskId } = taskCommentRouteParamsSchema.parse(
       params,
     );
 
@@ -185,6 +191,7 @@ export class TaskCommentsController {
       await this.taskCommentService.uploadCommentAttachment(
         request.authContext!,
         projectId,
+        chartId,
         taskId,
         commentId,
         requireUploadedBuffer(file),
@@ -198,17 +205,22 @@ export class TaskCommentsController {
     @Req() request: AuthenticatedRequest,
     @Param(new ZodValidationPipe(taskCommentAttachmentRouteParamsSchema)) params: unknown,
   ) {
-    const { attachmentId, commentId, projectId, taskId } =
+    const { attachmentId, chartId, commentId, projectId, taskId } =
       taskCommentAttachmentRouteParamsSchema.parse(params);
 
     this.tasksService.validateTaskReadableForCurrentUser(
       request.authContext!,
       projectId,
+      chartId,
       taskId,
+    );
+    const projectGanttChartId = this.tasksService.resolveProjectGanttChartId(
+      projectId,
+      chartId,
     );
 
     const row = this.attachmentService.requireAttachmentLinkedToTaskComment(
-      projectId,
+      projectGanttChartId,
       taskId,
       commentId,
       attachmentId,

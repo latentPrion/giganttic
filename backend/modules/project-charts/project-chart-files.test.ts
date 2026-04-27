@@ -15,6 +15,7 @@ import { createDbTestTempDir } from "../../../tests/db-test-execution-db.js";
 
 const TEMP_DIR_PREFIX = "giganttic-project-chart-files-";
 const DEFAULT_TASK_TEXT = "Edit your new Gantt chart";
+const DEFAULT_CHART_ID = 0;
 const FIRST_PROJECT_ID = 101;
 const SECOND_PROJECT_ID = 202;
 const CUSTOM_CHART_XML =
@@ -64,10 +65,10 @@ describe("project chart files", () => {
 
     const chartPath = ensureDefaultProjectChartXml(chartsDir, FIRST_PROJECT_ID);
 
-    expect(chartPath).toBe(createProjectChartPath(chartsDir, FIRST_PROJECT_ID));
+    expect(chartPath).toBe(createProjectChartPath(chartsDir, FIRST_PROJECT_ID, DEFAULT_CHART_ID));
     expect(await pathExists(chartPath)).toBe(true);
     expect(await readFile(chartPath, "utf8")).toBe(createDefaultProjectChartXml());
-    expect(readProjectChartXml(chartsDir, FIRST_PROJECT_ID)).toBe(
+    expect(readProjectChartXml(chartsDir, FIRST_PROJECT_ID, DEFAULT_CHART_ID)).toBe(
       createDefaultProjectChartXml(),
     );
   });
@@ -77,13 +78,18 @@ describe("project chart files", () => {
     tempDirs.push(tempDir);
     const chartsDir = path.join(tempDir, "charts");
 
-    const firstChartPath = writeProjectChartXml(chartsDir, FIRST_PROJECT_ID, CUSTOM_CHART_XML);
+    const firstChartPath = writeProjectChartXml(
+      chartsDir,
+      FIRST_PROJECT_ID,
+      DEFAULT_CHART_ID,
+      CUSTOM_CHART_XML,
+    );
     const secondChartPath = ensureDefaultProjectChartXml(chartsDir, SECOND_PROJECT_ID);
 
     expect(await readFile(firstChartPath, "utf8")).toBe(CUSTOM_CHART_XML);
     expect(await readFile(secondChartPath, "utf8")).toBe(createDefaultProjectChartXml());
 
-    expect(deleteProjectChartXml(chartsDir, SECOND_PROJECT_ID)).toBe(true);
+    expect(deleteProjectChartXml(chartsDir, SECOND_PROJECT_ID, DEFAULT_CHART_ID)).toBe(true);
     expect(await pathExists(secondChartPath)).toBe(false);
     expect(await pathExists(firstChartPath)).toBe(true);
     expect(await readFile(firstChartPath, "utf8")).toBe(CUSTOM_CHART_XML);

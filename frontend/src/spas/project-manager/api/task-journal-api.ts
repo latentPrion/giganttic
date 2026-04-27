@@ -4,8 +4,13 @@ import {
 } from "../contracts/journal.contracts.js";
 import { createJournalApi } from "./journal-api-factory.js";
 
-export const taskJournalApi = createJournalApi<GetTaskJournalResponse, string>({
+interface TaskSubjectId {
+  chartId: number;
+  taskId: string;
+}
+
+export const taskJournalApi = createJournalApi<GetTaskJournalResponse, TaskSubjectId>({
   getResponseSchema: getTaskJournalResponseSchema,
-  resolvePath: (projectId, taskId) =>
-    `/projects/${projectId}/tasks/${encodeURIComponent(taskId)}/journal`,
+  resolvePath: (projectId, subject) =>
+    `/projects/${projectId}/charts/${subject.chartId}/tasks/${encodeURIComponent(subject.taskId)}/journal`,
 });
