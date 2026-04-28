@@ -12,13 +12,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ProjectGanttCharts_projectId_chartId_unique"
   ON "ProjectGanttCharts" ("projectId", "chartId");
 
 INSERT OR IGNORE INTO "ProjectGanttCharts" ("projectId", "chartId", "name")
-SELECT DISTINCT "projectId", 0, 'default'
-FROM (
-  SELECT "projectId" FROM "TaskMirror"
-  UNION
-  SELECT "projectId" FROM "TaskAttachments"
-  UNION
-  SELECT "projectId" FROM "TaskComments"
-  UNION
-  SELECT "projectId" FROM "TaskComments_Attachments"
-);
+SELECT "id", 0, 'default'
+FROM "Projects";

@@ -224,6 +224,17 @@ async function seedV10ProjectChartCutoverFixture(dbPath: string) {
   db.close();
 }
 
+async function seedV10ProjectsWithoutTasksFixture(dbPath: string) {
+  const db = openDatabaseConnection(dbPath);
+  db.exec(
+    `INSERT INTO Projects (id, name, createdAt, updatedAt)
+     VALUES
+       (701, 'Migration Empty Project Alpha', 1000, 1000),
+       (702, 'Migration Empty Project Beta', 1000, 1000);`,
+  );
+  db.close();
+}
+
 function readTableColumnNames(dbPath: string, tableName: string): string[] {
   const db = openDatabaseConnection(dbPath, { readonly: true });
   const columns = db.prepare(`PRAGMA table_info(${tableName});`).all() as Array<{ name: string }>;
@@ -1144,6 +1155,39 @@ describe("db lifecycle scripts", () => {
     ).toBe(commentAttachmentRows.length);
 
     db.close();
+  }, 20_000);
+
+  it("creates default chart rows for every v10 project even when task tables are empty", async () => {
+    const tempDir = await createDbTestTempDir(TEMP_DIR_PREFIX);
+    tempDirs.push(tempDir);
+    const dbPath = createTargetDbPath(tempDir, "dev");
+
+    await ensureDbArtifacts(tempDir);
+    await createDatabaseFromSchema({
+      dbTarget: "dev",
+      projectRoot: tempDir,
+      schemaName: "v10",
+    });
+    await seedV10ProjectsWithoutTasksFixture(dbPath);
+
+    await migrateDatabase({
+      dbTarget: "dev",
+      migrationPairName: "v10--v11",
+      projectRoot: tempDir,
+    });
+
+    const db = openDatabaseConnection(dbPath, { readonly: true });
+    const chartRows = db.prepare(
+      `SELECT projectId, chartId, name
+       FROM ProjectGanttCharts
+       ORDER BY projectId, chartId;`,
+    ).all() as Array<{ chartId: number; name: string; projectId: number }>;
+    db.close();
+
+    expect(chartRows).toEqual([
+      { chartId: 0, name: "default", projectId: 701 },
+      { chartId: 0, name: "default", projectId: 702 },
+    ]);
   }, 20_000);
 
   it("repairs legacy v9 mention rows by adding and backfilling containerKey during v9--v10", async () => {
